@@ -24,12 +24,13 @@
     plus: '<path d="M12 5v14M5 12h14"/>', kbd: '<rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M6 14h12"/>',
     penm: '<path d="M4 20l4-1 11-11-3-3L5 16z"/><path d="M14 6l3 3"/>', search: '<circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/>',
     journal: '<path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h11M9 8h6"/>',
+    help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.5V14"/><circle cx="12" cy="17" r=".8"/>',
     lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>'
   };
   MP.ic = (k, s = 20) => `<svg aria-hidden="true" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${ICON[k] || ""}</svg>`;
   const ic = MP.ic;
 
-  const SCREENS = [["today", "Today"], ["timetable", "Timetable"], ["habits", "Habits"], ["dash", "Habit Dashboard"], ["study", "Study"], ["planner", "Planner"], ["todo", "To-Do"], ["affirm", "Affirmations"], ["journal", "Journal"], ["three", "3-6-9"], ["mood", "Mood & Wellness"], ["dates", "Special Dates"], ["history", "History & Search"], ["print", "Print"], ["prefs", "Settings"]];
+  const SCREENS = [["today", "Today"], ["timetable", "Timetable"], ["habits", "Habits"], ["dash", "Habit Dashboard"], ["study", "Study"], ["planner", "Planner"], ["todo", "To-Do"], ["affirm", "Affirmations"], ["journal", "Journal"], ["three", "3-6-9"], ["mood", "Mood & Wellness"], ["dates", "Special Dates"], ["history", "History & Search"], ["print", "Print"], ["prefs", "Settings"], ["help", "Help & Guide"]];
   const THEMES = [["sage", "Sage Botanical"], ["lavender", "Lavender Dream"], ["beige", "Beige Minimal"], ["blush", "Blush Floral"], ["midnight", "Midnight Moon"], ["ocean", "Ocean Calm"]];
   const TYPES = ["Study", "Fixed", "Break", "Rest", "Planning", "Morning", "Free"];
   const TCOL = { Study: "var(--acc)", Fixed: "var(--acc2)", Break: "#CFE0D3", Rest: "#D3E3EA", Planning: "#F1DFAE", Morning: "#F4D3BB", Free: "#E1D7EF" };
@@ -417,6 +418,19 @@
   };
   V.print = () => { const pv = P().printView || "detailed"; return `${head("Preview before printing", "Print", `<button class="btn" data-print>${ic("print", 16)} Print / save as PDF</button>`)}<div class="row noprint mb"><label class="row small" style="gap:8px"><span class="lab">Layout</span>${sel("data-printsel", [["summary", "Summary one-pager"], ["detailed", "Detailed Daily Rhythm"], ["hourly", "Hourly time-block sheet"], ["journal", "Journal spread"]], pv, 'style="width:auto;font-weight:700" aria-label="Print layout"')}</label><span class="tiny muted">A4 portrait · uses your theme · typed and handwritten entries print too</span></div><section class="card a4" id="printarea">${PV[pv]()}</section>`; };
 
+  /* ---------- Help & User Guide ---------- */
+  const blockHTML = (b) => { const [k, v] = b; if (k === "p") return `<p class="small" style="margin:0;line-height:1.55">${E(v)}</p>`; if (k === "steps") return `<ol class="small hlist">${v.map((x) => `<li>${E(x)}</li>`).join("")}</ol>`; if (k === "list") return `<ul class="small hlist">${v.map((x) => `<li>${E(x)}</li>`).join("")}</ul>`; if (k === "tip") return `<div class="small soft" style="border-radius:12px;padding:10px 12px">💡 ${E(v)}</div>`.replace("💡", "Tip:"); return ""; };
+  V.help = () => {
+    const H = window.MP_HELP || [], q = (view.hq || "").trim().toLowerCase();
+    const match = (s) => !q || (s.title + " " + JSON.stringify(s.body)).toLowerCase().includes(q);
+    const shown = H.filter(match);
+    return `${head("User guide · version " + E(MP.VERSION), "Help & Guide")}
+      <section class="card row mb"><span class="muted">${ic("search", 18)}</span><input class="f" id="helpq" value="${E(view.hq || "")}" placeholder="Search the guide, e.g. sync, S Pen, matrix" style="flex:1" aria-label="Search the guide"></section>
+      <section class="card stack mb"><span class="lab">Contents</span><div class="row">${H.map((s, i) => `<button class="pill out" data-hsec="${s.id}">${i + 1}. ${E(s.title)}</button>`).join("")}</div></section>
+      <div class="stack" style="gap:14px">${shown.map((s) => `<section class="card stack" id="help-${s.id}"><div class="between wrap"><h2>${H.indexOf(s) + 1}. ${E(s.title)}</h2>${s.route ? `<button class="btn ghost sm" data-go="${s.route}">Open this screen →</button>` : ""}</div>${s.body.map(blockHTML).join("")}</section>`).join("") || '<p class="small muted">Nothing matches. Try another word.</p>'}</div>
+      <p class="tiny muted c mt">Still stuck? Ask the person who set up My Planner for your family.</p>`;
+  };
+
   /* ---------- settings ---------- */
   V.prefs = () => {
     const sh = P().share, acc = mode === "google" && G.user ? E(G.user.email) : "Demo mode · this device only";
@@ -441,7 +455,7 @@
       <section class="card stack"><span class="lab">Your data</span><span class="small">${mode === "google" ? `Saved privately in the <b>My Planner</b> folder of your Google Drive. Only this app and you can see it.` : `Demo mode: saved in this browser only.`}</span>
       <div class="row"><button class="btn ghost sm" data-backup>Download backup</button><label class="btn ghost sm" style="cursor:pointer">Restore backup<input type="file" accept="application/json,.json" data-restore hidden></label><button class="btn ghost sm" data-csv>Export daily log (CSV)</button></div>
       <button class="btn danger sm" data-wipe style="align-self:flex-start">Delete all my data…</button></section></div>
-      <p class="tiny muted c mt">My Planner ${MP.VERSION} · <button class="learnlink" data-vhist>Version history</button> · no ads, no tracking, no analytics.</p>`;
+      <p class="tiny muted c mt">My Planner ${MP.VERSION} · <button class="learnlink" data-go="help">Help & user guide</button> · <button class="learnlink" data-vhist>Version history</button> · no ads, no tracking, no analytics.</p>`;
   };
 
   const weekSummary = () => {
@@ -689,6 +703,7 @@
     if (d.calrm) return calRemove(d.calrm);
     if (d.write) { MP.inputMode = d.write; MP.pref.set("input", d.write); return go("three"); }
     if (d.tdv) { view.tdv = d.tdv; return MP.render(); }
+    if (d.hsec) { view.hq = ""; if (route !== "help") go("help"); else MP.render(); const el = document.getElementById("help-" + d.hsec); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); return; }
     if (d.wnseen !== undefined) { P().seenVersion = MP.VERSION; touchP(); return MP.render(); }
     if (d.vhist !== undefined) return modal(historyHTML());
     if (d.snd) { d.snd === "play" ? startSound() : stopSound(); return MP.render(); }
@@ -803,9 +818,10 @@
     if (d.prf) { P().practice[d.prf] = d.prf === "text" ? t.value.slice(0, 240) : t.value; touchP(); }
     if (d.shareemails !== undefined) { P().share.emails = t.value.split(/[,;\s]+/).map((x) => x.trim().toLowerCase()).filter((x) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x)).slice(0, 5); touchP(); }
     if (t.id === "wname") wiz.name = t.value;
+    if (t.id === "helpq") { clearTimeout(window._hq); window._hq = setTimeout(() => { view.hq = t.value; MP.render(); const f = document.getElementById("helpq"); if (f) { f.focus(); f.setSelectionRange(f.value.length, f.value.length); } }, 300); }
   });
   document.addEventListener("click", (e) => { if (e.target.closest(".ytl")) stopSound(); });
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape") { closeModal(); document.getElementById("sheet").classList.remove("on"); } if (e.key === "Enter" && e.target.id === "hq") { view.q = e.target.value; MP.render(); } });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") { closeModal(); document.getElementById("sheet").classList.remove("on"); } if (e.key === "Enter" && e.target.id === "hq") { view.q = e.target.value; MP.render(); } if (e.key === "Enter" && e.target.id === "helpq") { view.hq = e.target.value; MP.render(); const f = document.getElementById("helpq"); if (f) { f.focus(); f.setSelectionRange(f.value.length, f.value.length); } } });
   document.getElementById("sheet").addEventListener("click", (e) => { if (e.target.id === "sheet") e.currentTarget.classList.remove("on"); });
   document.getElementById("modal").addEventListener("click", (e) => { if (e.target.id === "modal") closeModal(); });
 
@@ -831,7 +847,7 @@
   document.addEventListener("pointerup", (e) => { if (!drag) return; if (drag.moved) { drag.el.remove(); const u = document.elementFromPoint(e.clientX, e.clientY), q = u && u.closest("[data-quad]"); if (q) { const x = MP.S.tasks[drag.id], m = { q1: [true, true], q2: [false, true], q3: [true, false], q4: [false, false] }[q.dataset.quad]; x.urg = m[0]; x.imp = m[1]; x.u = Date.now(); MP.changed(); MP.toast("Moved to " + q.querySelector("h3").textContent); } } drag = null; MP.render(); });
 
   /* ---------- start-up ---------- */
-  MP.VERSION = "1.3";
+  MP.VERSION = "1.4";
   if (MP.sound) MP.sound.onchange = () => { miniPlayer(); if (route === "study") MP.render(); };
   /* Public, read-only helpers for future modules and connectors. */
   MP.api = { today, iso, dayPct, studyHours, streak, tasks, feed: () => MP.buildFeed(MP.S), version: MP.VERSION, schemaVersion: MP.SCHEMA_VERSION };

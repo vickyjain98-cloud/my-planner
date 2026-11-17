@@ -173,6 +173,7 @@ input.typed:focus{background:color-mix(in srgb,var(--soft) 40%,transparent)}
 /* focus-sound mini player */
 .mini{position:fixed;right:18px;bottom:18px;z-index:35;display:none;align-items:center;gap:10px;background:var(--surf);color:var(--ink);border-radius:99px;padding:6px 6px 6px 16px;font-size:13px;font-weight:700;box-shadow:0 6px 20px rgba(0,0,0,.15)}
 .mini.on{display:flex}
+ol.hlist,ul.hlist{margin:0;padding-left:20px;line-height:1.6}
 a.pill{text-decoration:none;display:inline-flex;align-items:center}
 @media (max-width:900px){
  .mini{bottom:80px;right:12px}

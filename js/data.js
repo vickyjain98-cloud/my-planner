@@ -56,6 +56,7 @@ window.MP_DATA = {
   },
   /* Version history: newest first. Shown once per person after an update ("What's new"). */
   changelog: [
+    { v: "1.4", date: "2026-11-17", items: ["New Help & Guide in the menu: a searchable user guide with an index and Open this screen buttons.", "A Help & user guide link at the bottom of Settings."] },
     { v: "1.3", date: "2026-11-17", items: ["A \u201cWhat\u2019s new\u201d card appears on Today after each update.", "Version history is in Settings."] },
     { v: "1.2", date: "2026-11-17", items: ["Study music: 10 YouTube study-music links on the Study screen.", "Save your own Spotify or YouTube playlist in Settings."] },
     { v: "1.0", date: "2026-11-17", items: ["First release: timetable, habits with streaks and dashboards, study blocks with focus timer, Eisenhower to-do matrix with 1-3-5, journal (13 formats), affirmations, 3-6-9 with S Pen, mood with Year in Pixels, Hindu-calendar Purnima/Amavasya, portals, special dates, printable pages, Google Drive sync and Calendar sending."] }

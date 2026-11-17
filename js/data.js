@@ -54,6 +54,12 @@ window.MP_DATA = {
     P: ["I release what holds me back and honour how far I have come.", "I am grateful for every step of this cycle.", "What I have worked for is coming to light."],
     A: ["In the quiet dark, I choose what I want to build.", "I plant a clear intention and trust it to grow.", "This new cycle begins with one small, brave step."]
   },
+  /* Version history: newest first. Shown once per person after an update ("What's new"). */
+  changelog: [
+    { v: "1.3", date: "2026-11-17", items: ["A \u201cWhat\u2019s new\u201d card appears on Today after each update.", "Version history is in Settings."] },
+    { v: "1.2", date: "2026-11-17", items: ["Study music: 10 YouTube study-music links on the Study screen.", "Save your own Spotify or YouTube playlist in Settings."] },
+    { v: "1.0", date: "2026-11-17", items: ["First release: timetable, habits with streaks and dashboards, study blocks with focus timer, Eisenhower to-do matrix with 1-3-5, journal (13 formats), affirmations, 3-6-9 with S Pen, mood with Year in Pixels, Hindu-calendar Purnima/Amavasya, portals, special dates, printable pages, Google Drive sync and Calendar sending."] }
+  ],
   suggest: {
     habits: ["Drink 8 glasses of water","Exercise / gym","Wake up on time","Phone away while studying","Meditate","Journal","Read for 20 minutes","Sleep by 11 PM","Walk 5,000 steps","No screens after 10 PM","Eat fruit","Stretch for 10 minutes"],
     routine: [["07:00","07:30","Wake up, water, sunlight","Morning"],["07:30","07:45","Plan the day: top 3","Planning"],["07:45","08:45","Study block 1","Study"],["09:00","10:00","Exercise","Fixed"],["10:00","11:00","Get ready, breakfast","Fixed"],["11:00","11:50","Study block 2","Study"],["11:50","12:10","Break · walk, water","Break"],["12:10","13:00","Study block 3","Study"],["13:00","14:30","Lunch and rest","Rest"],["14:30","15:20","Study block 4","Study"],["15:20","17:30","Free time / errands","Free"],["18:30","19:30","Dinner","Fixed"],["19:30","19:50","Daily review · plan tomorrow","Planning"],["20:00","22:30","Unwind · family, hobbies","Free"],["22:30","23:00","Wind down · no screens","Free"],["23:00","","Sleep","Fixed"]],

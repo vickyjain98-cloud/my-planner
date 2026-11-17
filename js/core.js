@@ -47,6 +47,7 @@
     if (!Array.isArray(out.profile.habits)) out.profile.habits = [];
     if (!Array.isArray(out.profile.mine)) out.profile.mine = [];
     if (!Array.isArray(out.profile.fav)) out.profile.fav = [];
+    if (out.profile.setupDone && !out.profile.seenVersion) out.profile.seenVersion = "1.2"; /* people who set up before version tracking see the 1.3 note once */
     return out;
   };
 

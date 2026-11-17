@@ -164,11 +164,11 @@
     const headr = `<div class="between hdr" style="align-items:flex-start"><div><div class="lab">${fmt(t, { weekday: "long", day: "numeric", month: "long" })}</div><h1 class="title">${greet},<br><em>${E(P().name || "friend")}</em></h1></div>
       <div class="stack" style="align-items:flex-end;gap:10px"><label class="row small" style="gap:8px"><span class="lab">View</span>${sel("data-tviewsel", [["overview", "Summary"], ["sheet", "Detailed day sheet"], ["clock", "Day clock"], ["journal", "Journal spread"]], tv, 'aria-label="Day view" style="width:auto;font-weight:700"')}</label>
       <div class="row">${nm ? `<span class="pill ${nm.m === "Purnima" ? "c-moon" : "c-ama"}">${nm.m === "Purnima" ? "○" : "●"} ${nm.m} ${nm.i === 0 ? "today" : "in " + nm.i + " day" + (nm.i > 1 ? "s" : "")} · ${fmt(nm.d, { weekday: "short", day: "numeric", month: "short" })}</span>` : ""}${p ? `<span class="pill c-portal">✦ ${E(p)}</span>` : ""}${pr.text && pday >= 1 && pday <= pr.len ? `<span class="pill out">3-6-9 · Day ${pday} of ${pr.len}</span>` : ""}</div></div></div>`;
-    if (tv === "sheet") return headr + daySheet();
+    if (tv === "sheet") return headr + whatsNewCard() + daySheet();
     if (tv === "clock") return headr + dayClock();
     if (tv === "journal") return headr + journalSpread();
     const hs = activeHabits(), pct = dayPct(t) || 0, tm = moodOf(t);
-    return headr + `<div class="grid g2">
+    return headr + whatsNewCard() + `<div class="grid g2">
       <section class="card stack"><div class="between"><span class="lab">Today's affirmation</span>${writeBtns()}</div><p class="quote">“${E(a.text)}”</p><span class="tiny muted">${E(a.src)}</span></section>
       <section class="card hero stack">${sr.length ? (nb ? `<div class="between"><span class="lab inherit">Up next · ${fmtT(nb.start)}</span><span class="tiny" style="opacity:.85">${rowLen(nb)} min</span></div><h2 class="inherit">${E(nb.text)}</h2>` : `<h2 class="inherit">All study blocks done today</h2>`) : `<h2 class="inherit">No study blocks yet</h2><span class="small">Add Study rows in your timetable.</span>`}
       <div class="bar"><i style="width:${sr.length ? (doneB / sr.length) * 100 : 0}%"></i></div><div class="between wrap"><span class="small" style="opacity:.9">${doneB} of ${sr.length} blocks · ${studyHours(t).toFixed(1)} h studied</span><button class="btn inv" data-go="study">Focus timer</button></div></section></div>
@@ -441,7 +441,7 @@
       <section class="card stack"><span class="lab">Your data</span><span class="small">${mode === "google" ? `Saved privately in the <b>My Planner</b> folder of your Google Drive. Only this app and you can see it.` : `Demo mode: saved in this browser only.`}</span>
       <div class="row"><button class="btn ghost sm" data-backup>Download backup</button><label class="btn ghost sm" style="cursor:pointer">Restore backup<input type="file" accept="application/json,.json" data-restore hidden></label><button class="btn ghost sm" data-csv>Export daily log (CSV)</button></div>
       <button class="btn danger sm" data-wipe style="align-self:flex-start">Delete all my data…</button></section></div>
-      <p class="tiny muted c mt">My Planner ${MP.VERSION} · no ads, no tracking, no analytics.</p>`;
+      <p class="tiny muted c mt">My Planner ${MP.VERSION} · <button class="learnlink" data-vhist>Version history</button> · no ads, no tracking, no analytics.</p>`;
   };
 
   const weekSummary = () => {
@@ -466,6 +466,12 @@
     data.inboxDecisions = Object.entries(S.inbox).filter(([, v]) => v && v.status !== "pending").map(([id, v]) => ({ id, status: v.status }));
     return { schema: "my-planner-feed", schemaVersion: MP.SCHEMA_VERSION, generatedAt: new Date().toISOString(), categories: Object.keys(cats).filter((k) => cats[k]), data };
   };
+  /* ---------- What's new ---------- */
+  const vNum = (v) => String(v || "0").split(".").map((n) => +n || 0);
+  const vNewer = (a, b) => { const x = vNum(a), y = vNum(b); for (let i = 0; i < 3; i++) { if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0); } return false; };
+  const unseen = () => { const seen = P().seenVersion; if (!seen) return []; return (D.changelog || []).filter((c) => vNewer(c.v, seen) && !vNewer(c.v, MP.VERSION)); };
+  const whatsNewCard = () => { const list = unseen(); if (!list.length) return ""; return `<section class="card stack mb" style="box-shadow:inset 0 0 0 2px var(--acc)"><div class="between"><span class="lab">✨ What's new in My Planner ${E(MP.VERSION)}</span><button class="btn sm" data-wnseen>Got it</button></div>${list.map((c) => `<div class="stack" style="gap:4px"><b class="small">Version ${E(c.v)}</b>${c.items.map((x) => `<span class="small">• ${E(x)}</span>`).join("")}</div>`).join("")}</section>`; };
+  const historyHTML = () => `<div class="between"><h2>Version history</h2><button class="tool" data-close aria-label="Close">✕</button></div><span class="small muted">You're on version ${E(MP.VERSION)}. Updates arrive automatically the next time you open the app while online.</span>${(D.changelog || []).map((c) => `<div class="stack" style="gap:4px"><b>Version ${E(c.v)} · <span class="muted small">${fmt(parseISO(c.date), { day: "numeric", month: "short", year: "numeric" })}</span></b>${c.items.map((x) => `<span class="small">• ${E(x)}</span>`).join("")}</div>`).join("")}<button class="btn" data-close style="align-self:flex-end">Close</button>`;
   const inboxPending = () => live("inbox").filter(([, v]) => v.status === "pending");
   function approveInbox(id) {
     const it = MP.S.inbox[id]; if (!it) return;
@@ -492,7 +498,7 @@
     const p = P(); p.name = wiz.name.trim(); p.theme = wiz.theme; p.collections = Object.assign({}, wiz.cols);
     if (!p.timetable.length && wiz.routine) p.timetable = D.suggest.routine.map((r) => ({ id: uid(), start: r[0], end: r[1], text: r[2], type: r[3] }));
     wiz.habits.forEach((n) => { if (!p.habits.some((h) => h.name === n)) p.habits.push({ id: uid(), name: n, def: "", active: true }); });
-    p.setupDone = true; touchP(); go("today");
+    p.seenVersion = MP.VERSION; p.setupDone = true; touchP(); go("today");
   }
 
   /* ---------- shell ---------- */
@@ -683,6 +689,8 @@
     if (d.calrm) return calRemove(d.calrm);
     if (d.write) { MP.inputMode = d.write; MP.pref.set("input", d.write); return go("three"); }
     if (d.tdv) { view.tdv = d.tdv; return MP.render(); }
+    if (d.wnseen !== undefined) { P().seenVersion = MP.VERSION; touchP(); return MP.render(); }
+    if (d.vhist !== undefined) return modal(historyHTML());
     if (d.snd) { d.snd === "play" ? startSound() : stopSound(); return MP.render(); }
     if (d.sndtype) { SND().type = d.sndtype; touchP(); if (MP.sound && MP.sound.playing()) startSound(); return MP.render(); }
     if (d.inok) return approveInbox(d.inok);
@@ -823,7 +831,7 @@
   document.addEventListener("pointerup", (e) => { if (!drag) return; if (drag.moved) { drag.el.remove(); const u = document.elementFromPoint(e.clientX, e.clientY), q = u && u.closest("[data-quad]"); if (q) { const x = MP.S.tasks[drag.id], m = { q1: [true, true], q2: [false, true], q3: [true, false], q4: [false, false] }[q.dataset.quad]; x.urg = m[0]; x.imp = m[1]; x.u = Date.now(); MP.changed(); MP.toast("Moved to " + q.querySelector("h3").textContent); } } drag = null; MP.render(); });
 
   /* ---------- start-up ---------- */
-  MP.VERSION = "1.2";
+  MP.VERSION = "1.3";
   if (MP.sound) MP.sound.onchange = () => { miniPlayer(); if (route === "study") MP.render(); };
   /* Public, read-only helpers for future modules and connectors. */
   MP.api = { today, iso, dayPct, studyHours, streak, tasks, feed: () => MP.buildFeed(MP.S), version: MP.VERSION, schemaVersion: MP.SCHEMA_VERSION };

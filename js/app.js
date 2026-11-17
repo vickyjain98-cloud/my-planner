@@ -164,9 +164,9 @@
     const pr = P().practice, pday = pr.start ? Math.floor((t - parseISO(pr.start)) / 864e5) + 1 : 0;
     const hour = new Date().getHours(), greet = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
     const headr = `<div class="between hdr" style="align-items:flex-start"><div><div class="lab">${fmt(t, { weekday: "long", day: "numeric", month: "long" })}</div><h1 class="title">${greet},<br><em>${E(P().name || "friend")}</em></h1></div>
-      <div class="stack" style="align-items:flex-end;gap:10px"><label class="row small" style="gap:8px"><span class="lab">View</span>${sel("data-tviewsel", [["overview", "Summary"], ["sheet", "Detailed day sheet"], ["clock", "Day clock"], ["journal", "Journal spread"]], tv, 'aria-label="Day view" style="width:auto;font-weight:700"')}</label>
+      <div class="stack" style="align-items:flex-end;gap:10px"><div class="row" style="gap:8px"><button class="btn sm" data-sched>${ic("plus", 16)} Add / schedule</button><label class="row small" style="gap:8px"><span class="lab">View</span>${sel("data-tviewsel", [["overview", "Summary"], ["sheet", "Detailed day sheet"], ["clock", "Day clock"], ["journal", "Journal spread"]], tv, 'aria-label="Day view" style="width:auto;font-weight:700"')}</label></div>
       <div class="row">${nm ? `<span class="pill ${nm.m === "Purnima" ? "c-moon" : "c-ama"}">${nm.m === "Purnima" ? "○" : "●"} ${nm.m} ${nm.i === 0 ? "today" : "in " + nm.i + " day" + (nm.i > 1 ? "s" : "")} · ${fmt(nm.d, { weekday: "short", day: "numeric", month: "short" })}</span>` : ""}${p ? `<span class="pill c-portal">✦ ${E(p)}</span>` : ""}${pr.text && pday >= 1 && pday <= pr.len ? `<span class="pill out">3-6-9 · Day ${pday} of ${pr.len}</span>` : ""}</div></div></div>`;
-    if (tv === "sheet") return headr + whatsNewCard() + daySheet();
+    if (tv === "sheet") return headr + whatsNewCard() + schedCard() + daySheet();
     if (tv === "clock") return headr + dayClock();
     if (tv === "journal") return headr + journalSpread();
     const hs = activeHabits(), pct = dayPct(t) || 0, tm = moodOf(t);
@@ -176,7 +176,7 @@
       <div class="bar"><i style="width:${sr.length ? (doneB / sr.length) * 100 : 0}%"></i></div><div class="between wrap"><span class="small" style="opacity:.9">${doneB} of ${sr.length} blocks · ${studyHours(t).toFixed(1)} h studied</span><button class="btn inv" data-go="study">Focus timer</button></div></section></div>
       <section class="card stack mt"><div class="between"><span class="lab">Habits today</span><span class="small accb">${hs.filter((h) => (rec.h || {})[h.id] === "d").length} of ${hs.length} · ${Math.round(pct * 100)}%</span></div>
       ${hs.length ? `<div class="row habrow">${hs.map((h) => `<button class="hb" data-h="${E(h.id)}" aria-label="${E(h.name)}: tap to change">${dots((rec.h || {})[h.id] || "e", (rec.h || {})[h.id])}<span>${E(h.name.split(" ")[0])}</span></button>`).join("")}</div><span class="tiny muted">Tap a circle: empty → Done (100%) → Partial (50%) → Missed</span>` : `<span class="small muted">No habits yet. <button class="link" data-go="habits">Add habits →</button></span>`}</section>
-      ${inboxCard()}<div class="grid g2 mt">${todoCard()}
+      ${schedCard()}${inboxCard()}<div class="grid g2 mt">${todoCard()}
       <section class="card stack"><div class="between"><span class="lab">Mood check-in</span><button class="link" data-go="mood">Open →</button></div>
       <div class="row">${Object.keys(MOODCOL).map((w) => `<button class="moodbtn" data-moodq="${w}" style="${tm === w ? `background:${MOODCOL[w]};color:#1d1d1d` : ""}">${w}</button>`).join("")}</div>
       <div class="between"><div><div class="lab">Winning streak</div><div class="big">${streak()} days</div></div><div class="row" style="gap:6px">${[...Array(7)].map((_, i) => { const d = addD(monday(t), i), q = dayPct(d), on = q !== null && q >= 0.7; return `<span class="wd"><span class="wdot ${on ? "on" : ""}"></span>${"MTWTFSS"[i]}</span>`; }).join("")}</div></div></section></div>`;
@@ -689,7 +689,7 @@
     let opts = "";
     if (s.kind === "block") opts = `<label class="row small"><input type="radio" name="cr" value="once" checked> Today only (${fmtT(s.row.start)}–${fmtT(s.row.end)})</label><label class="row small"><input type="radio" name="cr" value="daily"> Every day at this time</label>`;
     else if (s.kind === "task") opts = `<p class="small">Adds "${E(s.t.t)}" on ${fmt(parseISO(s.t.due), { weekday: "short", day: "numeric", month: "short" })} at 9:00 am, with an alert ${P().alerts} min before.</p>`;
-    else if (s.kind === "event") opts = `<p class="small">Adds "${E(s.e.t)}" on ${fmt(parseISO(s.e.d), { weekday: "short", day: "numeric", month: "short" })}${s.e.time ? " at " + fmtT(s.e.time) : " (all day, reminder 9 AM the day before)"}.</p>`;
+    else if (s.kind === "event") opts = `<p class="small">Adds "${E(s.e.t)}" on ${fmt(parseISO(s.e.d), { weekday: "short", day: "numeric", month: "short" })}${s.e.time ? " at " + fmtT(s.e.time) : " (all day)"}${s.e.rem !== undefined && s.e.rem !== "" ? ", with its reminder" : ""}${s.e.rep ? ", repeating" : ""}.</p>`;
     else if (s.kind === "date") opts = `<p class="small">Adds a yearly event for ${E(s.x.n)} (${E(s.x.type)}) with a reminder at 9 AM the day before.</p>`;
     modal(`<h2>Send to Google Calendar</h2>${opts}<p class="tiny muted">Only this item is sent. The first time, Google will ask you to allow My Planner to add events.</p><div class="row" style="justify-content:flex-end"><button class="btn ghost" data-close>Cancel</button><button class="btn" data-calgo="${E(key)}">Add to Calendar</button></div>`);
     void t;
@@ -701,7 +701,7 @@
       let ev;
       if (s.kind === "block") ev = timedEv("Study · " + s.row.text, iso(today()), s.row.start, s.row.end, choice === "daily" ? "RRULE:FREQ=DAILY" : null);
       else if (s.kind === "task") ev = timedEv("To-do · " + s.t.t, s.t.due, "09:00", "09:30");
-      else if (s.kind === "event") ev = s.e.time ? timedEv(s.e.t, s.e.d, s.e.time, minToT(tMin(s.e.time) + 60)) : allDayEv(s.e.t, s.e.d);
+      else if (s.kind === "event") ev = buildEv(MP.S.events[s.e.id] || s.e);
       else if (s.kind === "date") { const [mm, dd] = s.x.md.split("-").map(Number); let y = today().getFullYear(); if (new Date(y, mm - 1, dd) < today()) y++; ev = allDayEv(`${s.x.n} · ${s.x.type}`, `${y}-${String(mm).padStart(2, "0")}-${String(dd).padStart(2, "0")}`, "RRULE:FREQ=YEARLY"); }
       const id = await G.calInsert(ev);
       MP.S.sent[key] = { id, u: Date.now() }; MP.changed(); MP.toast("Added to your Google Calendar"); MP.render();
@@ -721,8 +721,132 @@
       ${EV.map(([, e]) => `<div class="small">• ${e.time ? fmtT(e.time) + " · " : ""}${E(e.t)}</div>`).join("") || (!mo && !po && !DT.length ? '<div class="small muted">Nothing planned.</div>' : "")}
       ${studyHours(d) ? `<div class="small accb">${studyHours(d).toFixed(1)} h studied</div>` : ""}
       <div class="row"><input class="f" type="time" id="ddtm" style="width:auto" aria-label="Time"><input class="f" id="ddt" maxlength="120" placeholder="Add an event on this day" style="flex:1"><button class="btn sm" data-dayadd="${k}">Add</button></div>
-      <button class="link" data-hgo="${k}">Open this day in History →</button>`);
+      <div class="between wrap"><button class="link" data-hgo="${k}">Open this day in History →</button><button class="btn sm" data-sched="${k}">${ic("plus", 16)} Add / schedule</button></div>`);
   }
+
+  /* ---------- Add / schedule (one form for reminders, tasks, habits, study, events, dates) ---------- */
+  const SKINDS = [["reminder", "⏰ Reminder"], ["task", "✓ New task (To-Do)"], ["habit", "◎ Habit"], ["study", "📖 Study session"], ["event", "📅 Event / appointment"], ["wellbeing", "❀ Journal · affirmation · mood"], ["date", "✿ Birthday / anniversary"]];
+  const SLABEL = { reminder: "Reminder", task: "Task", habit: "Habit", study: "Study", event: "Event", wellbeing: "Wellbeing", date: "Special date" };
+  const SPRI = [["low", "Low"], ["med", "Medium"], ["high", "High"], ["urgent", "Urgent"]];
+  const PRICOL = { low: "2", med: "5", high: "6", urgent: "11" };
+  const PRICLS = { low: "pri-low", med: "pri-med", high: "pri-high", urgent: "pri-urg" };
+  const SREM = [["", "No reminder"], ["0", "At the time"], ["5", "5 min before"], ["10", "10 min before"], ["15", "15 min before"], ["30", "30 min before"], ["60", "1 hour before"], ["1440", "1 day before"]];
+  const SREP = [["", "Does not repeat"], ["DAILY", "Every day"], ["WEEKLY", "Every week"], ["MONTHLY", "Every month"], ["YEARLY", "Every year"]];
+  /* does event e happen on date k (handles repeats)? */
+  const occurs = (e, k) => {
+    if (!e || !e.d || k < e.d) return false; if (e.d === k) return true;
+    const a = parseISO(e.d), b = parseISO(k);
+    return e.rep === "DAILY" || (e.rep === "WEEKLY" && a.getDay() === b.getDay()) || (e.rep === "MONTHLY" && a.getDate() === b.getDate()) || (e.rep === "YEARLY" && e.d.slice(5) === k.slice(5));
+  };
+  const evOn = (k) => live("events").filter(([, e]) => occurs(e, k)).map(([id, e]) => Object.assign({ id }, e)).sort((a, b) => (a.time || "99").localeCompare(b.time || "99"));
+  /* the Google Calendar event for one of our events */
+  function buildEv(e) {
+    const title = (e.kind && e.kind !== "event" ? SLABEL[e.kind] + " · " : "") + e.t;
+    const desc = [e.pri ? "Priority: " + (SPRI.find((p) => p[0] === e.pri) || [, ""])[1] : "", e.note || "", "Added from My Planner"].filter(Boolean).join("\n");
+    const rec = e.rep ? "RRULE:FREQ=" + e.rep : null;
+    const hasRem = e.rem !== undefined && e.rem !== null && e.rem !== "";
+    let ev;
+    if (e.time) {
+      ev = timedEv(title, e.d, e.time, e.end && e.end > e.time ? e.end : minToT(Math.min(tMin(e.time) + (e.kind === "study" ? 50 : 30), 1439)), rec);
+      ev.reminders = e.rem === undefined ? remind(P().alerts || 10) : hasRem ? remind(Number(e.rem)) : { useDefault: false, overrides: [] };
+    } else {
+      ev = allDayEv(title, e.d, rec);
+      ev.reminders = hasRem || e.rem === undefined ? remind(900) : { useDefault: false, overrides: [] }; /* all-day: 9 AM the day before */
+    }
+    ev.description = desc; if (e.pri) ev.colorId = PRICOL[e.pri];
+    return ev;
+  }
+  function schedDialog(id, preset) {
+    const e = id ? Object.assign({}, MP.S.events[id]) : Object.assign({ kind: "reminder", d: iso(today()), time: "", end: "", pri: "med", rem: "10", rep: "" }, preset || {});
+    const signed = mode === "google", inCal = id && MP.S.sent["ev-" + id] && !MP.S.sent["ev-" + id].del;
+    const habOpts = [["", "— choose a habit —"], ...P().habits.filter((h) => h.active !== false).map((h) => [h.id, h.name]), ["__new", "+ New habit (uses the title)"]];
+    modal(`<div class="between"><h2>${id ? "Edit" : "Add / schedule"}</h2><button class="tool" data-close aria-label="Close">✕</button></div>
+      <label class="stack small">What is it?${sel('id="skind" data-skind', SKINDS, e.kind)}</label>
+      <label class="stack small"><span id="stlab">${e.kind === "date" ? "Name" : "Title"}</span><input class="f" id="stitle" maxlength="120" value="${E(e.t || "")}" placeholder="e.g. Call Dr. Mehta · Revise Unit 3 · Drink water"></label>
+      <div class="sk-habit stack small" ${e.kind === "habit" ? "" : "hidden"}><label class="stack small">Which habit?${sel('id="shab"', habOpts, e.hab || "")}</label></div>
+      <div class="sk-date grid g2" ${e.kind === "date" ? "" : "hidden"}><label class="stack small">Type${sel('id="sdtype"', ["Birthday", "Anniversary"], "Birthday")}</label><label class="stack small">Relation<input class="f" id="srel" maxlength="40" placeholder="e.g. Cousin"></label></div>
+      <div class="grid g3"><label class="stack small">Date<input class="f" type="date" id="sdate" value="${E(e.d)}"></label><label class="stack small sk-time">Start time<input class="f" type="time" id="stime" value="${E(e.time || "")}"></label><label class="stack small sk-time">End time (optional)<input class="f" type="time" id="send" value="${E(e.end || "")}"></label></div>
+      <div class="grid g3"><label class="stack small">Priority${sel('id="spri"', SPRI, e.pri || "med")}</label><label class="stack small">Reminder${sel('id="srem"', SREM, e.rem ?? "")}</label><label class="stack small sk-rep">Repeat${sel('id="srep"', SREP, e.rep || "")}</label></div>
+      <label class="stack small">Notes (optional)<textarea class="f" id="snote" rows="2" maxlength="500">${E(e.note || "")}</textarea></label>
+      <label class="row small" style="gap:8px"><input type="checkbox" id="scal" ${signed && (inCal || !id) ? "checked" : ""} ${signed ? "" : "disabled"}> ${inCal ? "Keep in Google Calendar (updates it)" : "Also add to Google Calendar"}${signed ? "" : ' <span class="muted">(sign in with Google to use)</span>'}</label>
+      <span class="tiny muted" id="shint">With a time, the reminder pops up on your phone through Google Calendar, and in the app while it is open. Without a time it is an all-day item; the reminder comes at 9 AM the day before.</span>
+      <div class="row" style="justify-content:flex-end">${id ? `<button class="btn ghost danger" data-sdel="${E(id)}">Delete</button>` : ""}<button class="btn ghost" data-close>Cancel</button><button class="btn" data-ssave="${E(id || "")}">${id ? "Save" : "Add"}</button></div>`);
+    schedKind();
+  }
+  function schedKind() {
+    const k = field("skind"), q = (s) => document.querySelectorAll(s);
+    q(".sk-habit").forEach((x) => (x.hidden = k !== "habit")); q(".sk-date").forEach((x) => (x.hidden = k !== "date"));
+    q(".sk-time,.sk-rep").forEach((x) => (x.hidden = k === "date"));
+    const l = document.getElementById("stlab"); if (l) l.textContent = k === "date" ? "Name" : "Title";
+    if (k === "reminder" && !field("stime")) { const tm = document.getElementById("stime"); if (tm) tm.value = "09:00"; }
+  }
+  async function schedSave(id) {
+    const kind = field("skind"); let title = field("stitle").slice(0, 120); const d = field("sdate") || iso(today());
+    const toCal = (document.getElementById("scal") || {}).checked;
+    if (kind === "habit" && !title) { const h = P().habits.find((x) => x.id === field("shab")); if (h) title = h.name; }
+    if (!title) { MP.toast(kind === "date" ? "Add the person's name" : "Add a title"); return; }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) { MP.toast("Pick a date"); return; }
+    if (kind === "date") {
+      const did = uid(); putRec("dates", did, { n: title, rel: field("srel").slice(0, 40), type: field("sdtype") || "Birthday", md: d.slice(5) });
+      closeModal(); MP.render(); MP.toast("Saved in Special dates");
+      if (toCal) { await sendKey("date-" + did, { kind: "date", x: MP.S.dates[did] }); }
+      return;
+    }
+    const time = field("stime"), end = field("send"), pri = field("spri"), rem = field("srem"), rep = field("srep"), note = field("snote").slice(0, 500);
+    if (end && time && end <= time) { MP.toast("End time should be after the start time"); return; }
+    const eid = id || uid(), old = MP.S.events[eid] || {};
+    const rec = { d, time, end: time ? end : "", t: title, kind, pri, rem, rep, note };
+    if (kind === "habit") { let hid = field("shab"); if (hid === "__new" || (!hid && title)) { hid = uid(); P().habits.push({ id: hid, name: title.slice(0, 60), def: "", active: true }); touchP(); } rec.hab = hid; }
+    if (kind === "task") {
+      const tid = old.tid && MP.S.tasks[old.tid] && !MP.S.tasks[old.tid].del ? old.tid : uid(), prev = MP.S.tasks[tid] || {};
+      putRec("tasks", tid, Object.assign({ b: "", done: false }, prev, { t: title.slice(0, 160), due: d, urg: pri === "urgent" || pri === "high", imp: pri !== "low" }));
+      rec.tid = tid;
+    }
+    putRec("events", eid, rec); closeModal(); MP.render();
+    MP.toast(id ? "Saved" : kind === "task" ? "Added to Today and your To-Do list" : "Added to your schedule");
+    if (rem !== "" && time && "Notification" in window && Notification.permission === "default") { try { Notification.requestPermission(); } catch (er) {} }
+    const key = "ev-" + eid, sent = MP.S.sent[key], wasIn = sent && !sent.del;
+    if (mode !== "google") return;
+    try {
+      if (wasIn && (!toCal || id)) { try { await G.calDelete(sent.id); } catch (er) {} MP.S.sent[key] = { del: 1, u: Date.now() }; MP.changed(); }
+      if (toCal) await sendKey(key, { kind: "event", e: MP.S.events[eid] }, true);
+      else if (wasIn) MP.toast("Removed from Google Calendar");
+      MP.render();
+    } catch (er) { MP.toast(er.reauth ? "Saved. Tap sync to reconnect, then use Send to Calendar." : "Saved, but Calendar said: " + er.message); }
+  }
+  async function sendKey(key, spec, quiet) {
+    if (mode !== "google") return;
+    try {
+      let ev;
+      if (spec.kind === "event") ev = buildEv(spec.e);
+      else { const x = spec.x, [mm, dd] = x.md.split("-").map(Number); let y = today().getFullYear(); if (new Date(y, mm - 1, dd) < today()) y++; ev = allDayEv(`${x.n} · ${x.type}`, `${y}-${String(mm).padStart(2, "0")}-${String(dd).padStart(2, "0")}`, "RRULE:FREQ=YEARLY"); }
+      const cid = await G.calInsert(ev); MP.S.sent[key] = { id: cid, u: Date.now() }; MP.changed(); MP.render();
+      MP.toast(quiet ? "Saved and added to Google Calendar" : "Added to your Google Calendar");
+    } catch (er) { MP.toast(er.reauth ? "Saved. Tap sync to reconnect, then use Send to Calendar." : "Saved, but Calendar said: " + er.message); }
+  }
+  /* Today card: what's scheduled today, and the next few days */
+  const schedRow = (e, showDate) => `<div class="between wrap sched ${PRICLS[e.pri] || ""}"><button class="link left" data-sedit="${E(e.id)}" style="text-align:left"><b>${showDate ? fmt(parseISO(e.d), { weekday: "short", day: "numeric" }) + " · " : ""}${e.time ? fmtT(e.time) + (e.end ? "–" + fmtT(e.end) : "") : "All day"}</b> · ${E(e.t)}</button><span class="row" style="gap:6px"><span class="pill tiny">${E(SLABEL[e.kind] || "Event")}</span>${e.pri ? `<span class="pill tiny ${PRICLS[e.pri]}">${E((SPRI.find((p) => p[0] === e.pri) || [, ""])[1])}</span>` : ""}${e.rem !== undefined && e.rem !== "" ? '<span title="Reminder on" aria-label="Reminder on">🔔</span>' : ""}${e.rep ? '<span title="Repeats" aria-label="Repeats">↻</span>' : ""}${calBtn("ev-" + e.id, e.t, { kind: "event", e })}</span></div>`;
+  function schedCard() {
+    const t = today(), k = iso(t), now = minToT(new Date().getHours() * 60 + new Date().getMinutes());
+    const td = evOn(k), up = [];
+    for (let i = 1; i <= 7 && up.length < 4; i++) { const kk = iso(addD(t, i)); evOn(kk).forEach((e) => { if (up.length < 4 && !(e.rep === "DAILY")) up.push(Object.assign({}, e, { d: kk })); }); }
+    return `<section class="card stack mt"><div class="between"><span class="lab">Today's schedule</span><button class="btn sm" data-sched>${ic("plus", 16)} Add / schedule</button></div>
+      ${td.map((e) => `<div style="${e.time && (e.end || e.time) < now ? "opacity:.6" : ""}">${schedRow(e)}</div>`).join("") || '<span class="small muted">Nothing scheduled today. Tap Add / schedule for a reminder, task, habit, study session or event.</span>'}
+      ${up.length ? `<span class="lab mt">Coming up</span>${up.map((e) => schedRow(e, true)).join("")}` : ""}</section>`;
+  }
+  /* in-app reminders while the app is open (Calendar handles them when it is closed) */
+  const firedKey = "mp-fired";
+  setInterval(() => {
+    if (mode === "signin") return;
+    const n = new Date(), k = iso(n), nowM = n.getHours() * 60 + n.getMinutes();
+    let fired; try { fired = JSON.parse(sessionStorage.getItem(firedKey) || "{}"); } catch (er) { fired = {}; }
+    evOn(k).forEach((e) => {
+      if (!e.time || e.rem === undefined || e.rem === "" || Number(e.rem) >= 1440) return;
+      const at = tMin(e.time) - Number(e.rem), tag = e.id + "@" + k;
+      if (nowM >= at && nowM <= at + 10 && !fired[tag]) { fired[tag] = 1; notify((SLABEL[e.kind] || "Reminder") + " · " + fmtT(e.time), e.t); }
+    });
+    try { sessionStorage.setItem(firedKey, JSON.stringify(fired)); } catch (er) {}
+  }, 30000);
 
   /* ---------- event handling ---------- */
   const CYC = { e: "d", d: "p", p: "m", m: "e" };
@@ -739,6 +863,10 @@
     if (d.wipe !== undefined) return wipeDialog();
     if (d.dowipe !== undefined) return doWipe();
     if (d.learn !== undefined) return modal(learnHTML());
+    if (d.sched !== undefined) return schedDialog(null, d.sched ? { d: d.sched } : null);
+    if (d.sedit) return schedDialog(d.sedit);
+    if (d.ssave !== undefined) return schedSave(d.ssave || null);
+    if (d.sdel) { const ev = MP.S.events[d.sdel], key = "ev-" + d.sdel, s2 = MP.S.sent[key]; if (s2 && !s2.del && mode === "google") G.calDelete(s2.id).catch(() => {}); if (s2 && !s2.del) MP.S.sent[key] = { del: 1, u: Date.now() }; delRec("events", d.sdel); closeModal(); MP.render(); MP.toast(ev && ev.tid ? "Deleted (the To-Do task stays)" : "Deleted"); return; }
     if (d.cal) return calDialog(d.cal);
     if (d.calgo) return calSend(d.calgo);
     if (d.calrm) return calRemove(d.calrm);
@@ -833,6 +961,7 @@
     if (d.sndbreak !== undefined) { SND().breakStop = t.checked; touchP(); }
     if (d.snddef !== undefined) { SND().type = t.value; touchP(); }
     if (d.fbshare !== undefined) { if (t.checked) { t.checked = false; modal(`<h2>Share your suggestions?</h2><p class="small">My Planner will keep your suggestions (only the suggestions, never your planner entries) in a Google Doc in your Drive, shared view-only with <b>${E(fbTo())}</b>. It updates each time you add one. Turn it off any time and the doc is deleted.</p><div class="row" style="justify-content:flex-end"><button class="btn ghost" data-close>Cancel</button><button class="btn" data-fbyes>Yes, share</button></div>`); } else { const fs = P().fbShare; fs.on = false; if (fs.docId && mode === "google") G.deleteFile(fs.docId).catch(() => {}); fs.docId = ""; touchP(); MP.render(); MP.toast("Stopped sharing; the suggestions doc was deleted."); } }
+    if (d.skind !== undefined) return schedKind();
     if (d.tviewsel !== undefined) { P().todayView = t.value; touchP(); MP.render(); }
     if (d.printsel !== undefined) { P().printView = t.value; touchP(); MP.render(); }
     if (d.ttf === "type" || d.ttf === "start" || d.ttf === "end") { setTT(d.id, d.ttf, t.value); MP.render(); }
@@ -897,7 +1026,7 @@
   document.addEventListener("pointerup", (e) => { if (!drag) return; if (drag.moved) { drag.el.remove(); const u = document.elementFromPoint(e.clientX, e.clientY), q = u && u.closest("[data-quad]"); if (q) { const x = MP.S.tasks[drag.id], m = { q1: [true, true], q2: [false, true], q3: [true, false], q4: [false, false] }[q.dataset.quad]; x.urg = m[0]; x.imp = m[1]; x.u = Date.now(); MP.changed(); MP.toast("Moved to " + q.querySelector("h3").textContent); } } drag = null; MP.render(); });
 
   /* ---------- start-up ---------- */
-  MP.VERSION = "1.5";
+  MP.VERSION = "1.6";
   if (MP.sound) MP.sound.onchange = () => { miniPlayer(); if (route === "study") MP.render(); };
   /* Public, read-only helpers for future modules and connectors. */
   MP.api = { today, iso, dayPct, studyHours, streak, tasks, feed: () => MP.buildFeed(MP.S), version: MP.VERSION, schemaVersion: MP.SCHEMA_VERSION };

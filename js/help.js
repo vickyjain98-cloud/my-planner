@@ -76,6 +76,41 @@ window.MP_HELP = [
 ]
 },
 {
+"id": "schedule",
+"title": "Add / schedule (reminders, tasks, events)",
+"route": "today",
+"body": [
+[
+"p",
+"The Add / schedule button at the top of Today (also in Today's schedule, and in any day you tap on the Planner) opens one form for everything you want to plan."
+],
+[
+"steps",
+[
+"Tap Add / schedule.",
+"Choose what it is: Reminder, New task, Habit, Study session, Event / appointment, Journal · affirmation · mood, or Birthday / anniversary.",
+"Type a title, then pick the date, start time and (optional) end time. Leave the time empty for an all-day item.",
+"Set the priority: Low, Medium, High or Urgent. It shows as a coloured bar in the app and the same colour in Google Calendar.",
+"Pick a reminder (at the time, 5 min to 1 day before) and whether it repeats (daily, weekly, monthly, yearly).",
+"Keep Also add to Google Calendar ticked to send it to your Calendar with that reminder, then tap Add."
+]
+],
+[
+"list",
+[
+"New task also adds it to your To-Do list with the due date (High and Urgent become urgent in the matrix).",
+"Habit lets you pick one of your habits, or create a new habit from the title.",
+"Birthday / anniversary saves it in Special dates and repeats every year.",
+"Tap any item in Today's schedule to edit or delete it; edits update Google Calendar too."
+]
+],
+[
+"tip",
+"Reminders pop up in the app while it is open, and on your phone through Google Calendar even when the app is closed."
+]
+]
+},
+{
 "id": "timetable",
 "title": "Timetable",
 "route": "timetable",

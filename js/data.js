@@ -56,6 +56,7 @@ window.MP_DATA = {
   },
   /* Version history: newest first. Shown once per person after an update ("What's new"). */
   changelog: [
+    { v: "1.6", date: "2026-11-17", items: ["New Add / schedule button on Today: one form for a reminder, new task, habit, study session, event, journal/mood practice or birthday.", "Set date, start and end time, priority (Low to Urgent), a reminder and repeats; tick to add it to Google Calendar in the priority colour.", "Today's schedule card shows what is on today and coming up; tap any item to edit or delete it."] },
     { v: "1.5", date: "2026-11-17", items: ["New Suggestions screen: send ideas and problems straight to Vicky as a ready-written email.", "Suggestions are saved in the app, and can also be kept in a shared Google Doc (optional)."] },
     { v: "1.4", date: "2026-11-17", items: ["New Help & Guide in the menu: a searchable user guide with an index and Open this screen buttons.", "A Help & user guide link at the bottom of Settings."] },
     { v: "1.3", date: "2026-11-17", items: ["A \u201cWhat\u2019s new\u201d card appears on Today after each update.", "Version history is in Settings."] },

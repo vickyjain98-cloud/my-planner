@@ -19,3 +19,8 @@ Each release bumps `MP.VERSION` in `js/app.js`, adds an entry to `changelog` in 
 
 ## 1.0 · 17 Nov 2026
 - First release: timetable, habits, dashboards, study, planner with Purnima/Amavasya and portals, Eisenhower to-do + 1-3-5, journal, affirmations, 3-6-9 with S Pen, mood & wellness, special dates, history & search, print layouts, settings, Google Drive sync, Calendar sending, family summary, Buddy OS connection.
+
+## 1.6 — 17 Nov 2026
+- Add / schedule on Today: one form for reminders, tasks, habits, study sessions, events, wellbeing practice and birthdays.
+- Date, start/end time, priority (Low–Urgent), reminder, repeat, notes; optional Google Calendar sync in the priority colour.
+- Today's schedule card (today + coming up), tap to edit/delete; in-app reminder pop-ups while the app is open.

@@ -199,3 +199,9 @@ a.pill{text-decoration:none;display:inline-flex;align-items:center}
  #printarea{position:absolute;left:0;top:0;width:100%;max-width:none;box-shadow:none;aspect-ratio:auto;min-height:277mm}
  .noprint{display:none!important}
 }
+/* Add / schedule */
+.sched{padding:6px 0 6px 10px;border-left:4px solid var(--line);border-radius:2px}
+.sched.pri-low{border-left-color:#8DB596}.sched.pri-med{border-left-color:#E2C26B}.sched.pri-high{border-left-color:#E39A5B}.sched.pri-urg{border-left-color:#D9534F}
+.pill.pri-low{background:#E3F0E6;color:#2F5A3A}.pill.pri-med{background:#F7EDCB;color:#5A4A12}.pill.pri-high{background:#F8E0CC;color:#7A3F12}.pill.pri-urg{background:#F6D5D4;color:#7A1F1C}
+.link.left{text-align:left;font-weight:400}
+[hidden]{display:none!important}

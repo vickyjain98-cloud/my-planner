@@ -496,7 +496,7 @@
       <section class="card stack"><span class="lab">Your data</span><span class="small">${mode === "google" ? `Saved privately in the <b>My Planner</b> folder of your Google Drive. Only this app and you can see it.` : `Demo mode: saved in this browser only.`}</span>
       <div class="row"><button class="btn ghost sm" data-backup>Download backup</button><label class="btn ghost sm" style="cursor:pointer">Restore backup<input type="file" accept="application/json,.json" data-restore hidden></label><button class="btn ghost sm" data-csv>Export daily log (CSV)</button></div>
       <button class="btn danger sm" data-wipe style="align-self:flex-start">Delete all my data…</button></section></div>
-      <p class="tiny muted c mt">My Planner ${MP.VERSION} · <button class="learnlink" data-go="help">Help & user guide</button> · <button class="learnlink" data-vhist>Version history</button> · no ads, no tracking, no analytics.</p>`;
+      <p class="tiny muted c mt">My Planner ${MP.VERSION} · <button class="learnlink" data-go="help">Help & user guide</button> · <button class="learnlink" data-vhist>Version history</button> · <a class="learnlink" href="privacy.html" target="_blank" rel="noopener">Privacy policy</a> · <a class="learnlink" href="terms.html" target="_blank" rel="noopener">Terms</a> · no ads, no tracking, no analytics.</p>`;
   };
 
   const weekSummary = () => {
@@ -559,7 +559,7 @@
   /* ---------- shell ---------- */
   const signinHTML = (msg) => `<div class="signin"><div class="card stack center" style="max-width:440px;padding:28px"><div class="brand big2">My <span>Planner</span></div><p class="small muted">Your private planner. Everything you write is saved in your own Google Drive, and only you can see it.</p>
     ${msg ? `<p class="small over" role="alert">${E(msg)}</p>` : ""}${CFG.clientId ? `<button class="btn gbtn" data-signin><svg aria-hidden="true" width="18" height="18" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg> Sign in with Google</button>` : `<p class="small over">This copy isn't connected to Google yet. Follow the setup guide to add your client ID.</p>`}
-    <button class="link" data-demo>Try it without signing in (saved on this device only)</button><p class="tiny muted">${ic("lock", 12)} No ads, no tracking. My Planner only sees the files it creates in your Drive.</p></div></div>`;
+    <button class="link" data-demo>Try it without signing in (saved on this device only)</button><p class="tiny muted">${ic("lock", 12)} No ads, no tracking. My Planner only sees the files it creates in your Drive.</p><p class="tiny muted"><a href="privacy.html" target="_blank" rel="noopener">Privacy policy</a> · <a href="terms.html" target="_blank" rel="noopener">Terms of use</a></p></div></div>`;
 
   function shell() {
     const inApp = mode !== "signin" && P().setupDone;
@@ -1098,7 +1098,7 @@
   document.addEventListener("pointerup", (e) => { if (!drag) return; if (drag.moved) { drag.el.remove(); const u = document.elementFromPoint(e.clientX, e.clientY), q = u && u.closest("[data-quad]"); if (q) { const x = MP.S.tasks[drag.id], m = { q1: [true, true], q2: [false, true], q3: [true, false], q4: [false, false] }[q.dataset.quad]; x.urg = m[0]; x.imp = m[1]; x.u = Date.now(); MP.changed(); MP.toast("Moved to " + q.querySelector("h3").textContent); } } drag = null; MP.render(); });
 
   /* ---------- start-up ---------- */
-  MP.VERSION = "1.7";
+  MP.VERSION = "1.8";
   if (MP.sound) MP.sound.onchange = () => { miniPlayer(); if (route === "study") MP.render(); };
   /* Public, read-only helpers for future modules and connectors. */
   MP.api = { today, iso, dayPct, studyHours, streak, tasks, feed: () => MP.buildFeed(MP.S), version: MP.VERSION, schemaVersion: MP.SCHEMA_VERSION };
@@ -1107,7 +1107,8 @@
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") { MP.render(); syncNow(); } });
   setInterval(() => { if (mode === "google" && document.visibilityState === "visible") syncNow(); }, 60000);
   setInterval(() => { if (document.visibilityState === "visible" && route === "today" && !document.activeElement.matches("input,textarea,canvas")) MP.render(); }, 60000);
-  window.addEventListener("hashchange", () => { const h = location.hash.slice(1); if (V[h] && h !== route && h !== "setup") { route = h; MP.render(); } });
+  const openAddLink = () => { if (location.hash === "#add" && mode !== "signin" && P().setupDone) { try { history.replaceState(null, "", "#" + route); } catch (er) {} schedDialog(); } };
+  window.addEventListener("hashchange", () => { if (location.hash === "#add") return openAddLink(); const h = location.hash.slice(1); if (V[h] && h !== route && h !== "setup") { route = h; MP.render(); } });
 
   MP.boot = async () => {
     document.body.dataset.theme = MP.pref.get("theme") || "sage";
@@ -1116,7 +1117,7 @@
     if (sub && CFG.clientId) {
       /* Returning on this device: open instantly from the device copy; syncing needs one tap (browsers block automatic sign-in pop-ups). */
       const cached = await MP.idbGet("state:" + sub);
-      if (cached) { mode = "google"; G.user = { sub, email: MP.pref.get("hint") || "" }; MP.S = MP.sanitize(cached); G.status = "need"; MP.render(); return; }
+      if (cached) { mode = "google"; G.user = { sub, email: MP.pref.get("hint") || "" }; MP.S = MP.sanitize(cached); G.status = "need"; MP.render(); openAddLink(); return; }
     }
     mode = "signin"; MP.render();
   };

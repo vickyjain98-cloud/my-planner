@@ -28,3 +28,8 @@ Each release bumps `MP.VERSION` in `js/app.js`, adds an entry to `changelog` in 
 ## 1.7 — 17 Nov 2026
 - One-time or recurring (daily, weekdays, weekends, chosen days, fortnightly, monthly by date / nth weekday, yearly) with end rules; same RRULE in Google Calendar.
 - Birthdays/anniversaries auto-added to Calendar yearly (Settings toggle); Add all to Calendar on Special dates.
+
+## 1.8 — 17 Nov 2026
+- privacy.html and terms.html; links on sign-in and Settings.
+- Manifest: id, categories, lang, home-screen shortcuts (#add opens Add / schedule).
+- PLAYSTORE.md launch kit.

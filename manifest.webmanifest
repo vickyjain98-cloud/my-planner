@@ -1,16 +1,81 @@
 {
+  "id": "./",
   "name": "My Planner",
   "short_name": "My Planner",
   "description": "A private daily planner: timetable, habits, study, journal, affirmations and more. Your data stays in your own Google Drive.",
+  "lang": "en-IN",
+  "dir": "ltr",
   "start_url": "./#today",
   "scope": "./",
   "display": "standalone",
   "orientation": "any",
   "background_color": "#F4F1EA",
   "theme_color": "#5B765F",
+  "categories": [
+    "productivity",
+    "lifestyle",
+    "education"
+  ],
   "icons": [
-    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
-    { "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Add / schedule",
+      "short_name": "Add",
+      "description": "Add a reminder, task, habit, study session or event",
+      "url": "./#add",
+      "icons": [
+        {
+          "src": "icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Today",
+      "url": "./#today",
+      "icons": [
+        {
+          "src": "icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "To-Do",
+      "url": "./#todo",
+      "icons": [
+        {
+          "src": "icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Journal",
+      "url": "./#journal",
+      "icons": [
+        {
+          "src": "icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
   ]
 }

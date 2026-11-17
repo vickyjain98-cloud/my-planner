@@ -34,9 +34,12 @@ Every record carries `u` (updated-at, epoch ms). Sync merges record by record: t
 
 ## 3. Buddy OS → reading (`buddy-feed.json`)
 ```
-{ "schema": "my-planner-feed", "schemaVersion": 1, "generatedAt": ISO, "categories": [...],
+{ "schema": "my-planner-feed", "schemaVersion": 1, "appVersion", "timeZone", "generatedAt": ISO, "categories": [...],
   "data": { "name", "habits": {list, days:[{date,pct,marks}], streak}, "study": [{date,hours,focus}],
-            "tasks": [{id,title,due,urgent,important,size,done}], "events": [...], "specialDates": [...],
+            "tasks": [{id,title,due,urgent,important,size,done}],
+            "studyPlan": {weekday:[{id,start,end,text}], weekend},
+            "events": [{id,title,kind,date,time,end,priority,reminderMin,repeat:{rule,days,ends,until,count,text}}],
+            "upcoming": [{id,date,time,end,title,kind,priority}] (next 14 days, repeats expanded), "specialDates": [...],
             "mood": [...] (only if allowed), "journal": [...] (typed text only, only if allowed),
             "inboxDecisions": [{id,status}] } }
 ```
@@ -45,12 +48,17 @@ The feed is rewritten on each sync while the connection is on, and deleted when 
 ## 4. Buddy OS → suggesting (`buddy-inbox.json`)
 Buddy creates or updates this file in the **My Planner** folder:
 ```
-{ "items": [ { "id": "unique-id", "kind": "task"|"event"|"habit"|"affirmation"|"note",
-               "title": "Revise Unit 2", "date": "2026-11-20", "time": "16:00", "why": "You marked Unit 2 as weak" } ] }
+{ "items": [ { "id": "unique-id", "kind": "task"|"event"|"reminder"|"study"|"habit"|"affirmation"|"note",
+               "title": "Revise Unit 2", "date": "2026-11-20", "time": "16:00", "end": "17:00",
+               "priority": "low"|"med"|"high"|"urgent", "why": "You marked Unit 2 as weak" } ],
+  "withdrawn": ["id-of-an-undecided-item"] }
 ```
 - Up to 100 items are read; text is trimmed and always shown as plain text (never run as code).
 - Each item appears once on Today under **Suggestions from Buddy** with **Approve / Dismiss**.
-- Decisions come back to Buddy through `inboxDecisions` in the feed. This is the human approval gate.
+- Decisions come back to Buddy through `inboxDecisions` in the feed (`approved`, `dismissed`, `withdrawn`). This is the human approval gate.
+- Ids listed in `withdrawn` are taken back if the person hasn't decided yet.
+
+The ready-made Buddy-side client (feed, approval inbox, Diary entries, ChromaDB memory, LangGraph tools, FastAPI router) is in `buddy-connector/` — see its README.
 
 ## 5. In-app hooks for future modules
 - `MP.bus.on(event, fn)`: events such as `day.updated`, `tasks.saved`, `tasks.deleted`, `events.saved`, `inbox.approved`.

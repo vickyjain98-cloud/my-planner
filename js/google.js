@@ -155,10 +155,13 @@
         const box = await G.download(files["buddy-inbox.json"].id);
         versions["buddy-inbox.json"] = files["buddy-inbox.json"].version;
         (Array.isArray(box && box.items) ? box.items : []).slice(0, 100).forEach((it) => {
-          if (!it || !it.id || merged.inbox[it.id]) return;
-          const kind = ["task", "event", "habit", "affirmation", "note"].includes(it.kind) ? it.kind : "note";
-          merged.inbox[it.id] = { kind, title: String(it.title || "").slice(0, 160), date: /^\d{4}-\d{2}-\d{2}$/.test(it.date || "") ? it.date : "", time: /^\d{2}:\d{2}$/.test(it.time || "") ? it.time : "", why: String(it.why || "").slice(0, 240), status: "pending", u: Date.now() };
+          if (!it || !it.id || merged.inbox[String(it.id).slice(0, 80)]) return;
+          const kind = ["task", "event", "reminder", "study", "habit", "affirmation", "note"].includes(it.kind) ? it.kind : "note";
+          const hm = (x) => (/^\d{2}:\d{2}$/.test(x || "") ? x : "");
+          merged.inbox[String(it.id).slice(0, 80)] = { kind, title: String(it.title || "").slice(0, 160), date: /^\d{4}-\d{2}-\d{2}$/.test(it.date || "") ? it.date : "", time: hm(it.time), end: hm(it.end), priority: ["low", "med", "high", "urgent"].includes(it.priority) ? it.priority : "", why: String(it.why || "").slice(0, 240), status: "pending", u: Date.now() };
         });
+        /* Buddy can take back a suggestion the person hasn't decided on yet */
+        (Array.isArray(box && box.withdrawn) ? box.withdrawn : []).slice(0, 200).forEach((wid) => { const x = merged.inbox[String(wid).slice(0, 80)]; if (x && x.status === "pending") { x.status = "withdrawn"; x.u = Date.now(); } });
       }
     } else if (files["buddy-feed.json"]) { try { await G.deleteFile(files["buddy-feed.json"].id); } catch (e) {} delete pushed["buddy-feed.json"]; }
     return merged;

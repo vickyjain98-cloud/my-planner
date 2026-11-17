@@ -33,3 +33,8 @@ Each release bumps `MP.VERSION` in `js/app.js`, adds an entry to `changelog` in 
 - privacy.html and terms.html; links on sign-in and Settings.
 - Manifest: id, categories, lang, home-screen shortcuts (#add opens Add / schedule).
 - PLAYSTORE.md launch kit.
+
+## 1.9 — 17 Nov 2026
+- Buddy feed: appVersion, timeZone, studyPlan, events with kind/priority/repeat, 14-day upcoming list.
+- Inbox: reminder/study kinds, priority, end time; Buddy can withdraw undecided suggestions; card shows how many more wait.
+- Help: Buddy OS connection section.

@@ -506,6 +506,30 @@ window.MP_HELP = [
 ]
 },
 {
+"id": "buddy",
+"title": "Buddy OS connection",
+"route": "prefs",
+"body": [
+[
+"p",
+"Buddy OS is Vicky's personal AI assistant. If you switch it on, Buddy can read a summary of the parts of your planner you choose, write a daily diary entry from it, and suggest things for you to add. Nothing is added to your planner unless you approve it."
+],
+[
+"steps",
+[
+"Open Settings → Connections and switch on Buddy OS, then tap Connect.",
+"Tick what Buddy may read: habits, study, to-dos, events & dates, mood & sleep, journal (typed). Mood and journal stay off unless you tick them.",
+"Keep “Show Buddy's suggestions on Today” ticked if you want Buddy's ideas.",
+"Suggestions appear on Today under Suggestions from Buddy, each with a reason. Tap Approve to add it (as a task, reminder, study session, event, habit or affirmation) or Dismiss."
+]
+],
+[
+"tip",
+"Switching Buddy off deletes the shared summary file from your Drive straight away. Handwriting is never shared."
+]
+]
+},
+{
 "id": "privacy",
 "title": "Privacy and your data",
 "route": null,

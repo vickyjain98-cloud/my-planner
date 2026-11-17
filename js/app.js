@@ -513,13 +513,20 @@
   MP.buildFeed = (S) => {
     const cats = (S.profile.links.buddy || {}).cats || {}, t = today(), past = [...Array(30)].map((_, i) => addD(t, -i)), data = { name: S.profile.name || "" };
     if (cats.habits) data.habits = { list: S.profile.habits.filter((h) => h.active !== false).map((h) => ({ id: h.id, name: h.name })), days: past.map((d) => ({ date: iso(d), pct: dayPct(d), marks: ((S.days[iso(d)] || {}).h) || {} })).filter((x) => x.pct !== null), streak: streak() };
-    if (cats.study) data.study = past.map((d) => ({ date: iso(d), hours: +studyHours(d).toFixed(2), focus: (S.days[iso(d)] || {}).focus || null })).filter((x) => x.hours || x.focus);
+    if (cats.study) {
+      data.study = past.map((d) => ({ date: iso(d), hours: +studyHours(d).toFixed(2), focus: (S.days[iso(d)] || {}).focus || null, blocksDone: Object.values((S.days[iso(d)] || {}).study || {}).filter(Boolean).length })).filter((x) => x.hours || x.focus);
+      const blk = (rows) => (Array.isArray(rows) ? rows : []).filter((r) => r.type === "Study").map((r) => ({ id: r.id, start: r.start, end: r.end || null, text: r.text }));
+      data.studyPlan = { weekday: blk(S.profile.timetable), weekend: Array.isArray(S.profile.weekend) ? blk(S.profile.weekend) : null };
+    }
     if (cats.tasks) data.tasks = Object.entries(S.tasks).filter(([, v]) => v && !v.del).map(([id, v]) => ({ id, title: v.t, due: v.due || null, urgent: !!v.urg, important: !!v.imp, size: v.b || null, done: !!v.done }));
-    if (cats.events) { data.events = Object.entries(S.events).filter(([, v]) => v && !v.del && v.d >= iso(t)).map(([id, v]) => ({ id, title: v.t, date: v.d, time: v.time || null })); data.specialDates = Object.entries(S.dates).filter(([, v]) => v && !v.del).map(([id, v]) => ({ id, name: v.n, relation: v.rel, type: v.type, monthDay: v.md })); }
+    if (cats.events) {
+      const evx = ([id, v]) => ({ id, title: v.t, kind: v.kind || "event", date: v.d, time: v.time || null, end: v.end || null, priority: v.pri || null, reminderMin: v.rem === undefined || v.rem === "" ? null : +v.rem, repeat: v.rep ? { rule: v.rep, days: v.repDays || [], ends: v.repEnd || "never", until: v.repUntil || null, count: v.repCount ? +v.repCount : null, text: repText(v) } : null });
+      data.events = Object.entries(S.events).filter(([, v]) => v && !v.del && (v.d >= iso(t) || v.rep)).map(evx);
+      data.upcoming = [...Array(14)].flatMap((_, i) => { const k = iso(addD(t, i)); return Object.entries(S.events).filter(([, v]) => v && !v.del && occurs(v, k)).map(([id, v]) => ({ id, date: k, time: v.time || null, end: v.end || null, title: v.t, kind: v.kind || "event", priority: v.pri || null })); }); data.specialDates = Object.entries(S.dates).filter(([, v]) => v && !v.del).map(([id, v]) => ({ id, name: v.n, relation: v.rel, type: v.type, monthDay: v.md })); }
     if (cats.mood) data.mood = past.map((d) => { const r = S.days[iso(d)] || {}; return { date: iso(d), am: (r.mood || {}).am || null, pm: (r.mood || {}).pm || null, sleep: r.sleep ?? null }; }).filter((x) => x.am || x.pm || x.sleep);
     if (cats.journal) data.journal = Object.entries(S.typed).filter(([k, v]) => /^(jr-|journal-)/.test(k) && v && v.l && v.l.some(Boolean)).map(([k, v]) => ({ key: k, date: (k.match(/\d{4}-\d{2}-\d{2}/) || [""])[0], text: v.l.filter(Boolean).join("\n") }));
     data.inboxDecisions = Object.entries(S.inbox).filter(([, v]) => v && v.status !== "pending").map(([id, v]) => ({ id, status: v.status }));
-    return { schema: "my-planner-feed", schemaVersion: MP.SCHEMA_VERSION, generatedAt: new Date().toISOString(), categories: Object.keys(cats).filter((k) => cats[k]), data };
+    return { schema: "my-planner-feed", schemaVersion: MP.SCHEMA_VERSION, appVersion: MP.VERSION, timeZone: TZ, generatedAt: new Date().toISOString(), categories: Object.keys(cats).filter((k) => cats[k]), data };
   };
   /* ---------- What's new ---------- */
   const vNum = (v) => String(v || "0").split(".").map((n) => +n || 0);
@@ -530,13 +537,14 @@
   const inboxPending = () => live("inbox").filter(([, v]) => v.status === "pending");
   function approveInbox(id) {
     const it = MP.S.inbox[id]; if (!it) return;
-    if (it.kind === "task") putRec("tasks", uid(), { t: it.title, due: it.date, done: false, b: "", urg: false, imp: true });
-    else if (it.kind === "event") putRec("events", uid(), { d: it.date || iso(today()), time: it.time, t: it.title });
+    const pri = it.priority || "";
+    if (it.kind === "task") putRec("tasks", uid(), { t: it.title, due: it.date, done: false, b: "", urg: pri === "high" || pri === "urgent", imp: pri !== "low" });
+    else if (["event", "reminder", "study"].includes(it.kind)) putRec("events", uid(), { d: it.date || iso(today()), time: it.time, end: it.time ? it.end || "" : "", t: it.title, kind: it.kind, pri: pri || "med", rem: it.kind === "reminder" || it.time ? "10" : "", rep: "", note: it.why ? "Suggested by Buddy: " + it.why : "" });
     else if (it.kind === "habit") { P().habits.push({ id: uid(), name: it.title.slice(0, 60), def: "", active: true }); touchP(); }
     else if (it.kind === "affirmation") { P().mine.push(it.title); touchP(); }
     it.status = "approved"; it.u = Date.now(); MP.changed(); MP.bus.emit("inbox.approved", { id, kind: it.kind }); MP.toast("Added to your planner"); MP.render();
   }
-  const inboxCard = () => { const pend = inboxPending(); if (!pend.length) return ""; return `<section class="card stack mt" style="box-shadow:inset 0 0 0 2px var(--acc2)"><div class="between"><span class="lab">Suggestions from Buddy · ${pend.length}</span><span class="tiny muted">Nothing is added until you approve</span></div>${pend.slice(0, 5).map(([id, v]) => `<div class="between wrap"><span class="small"><span class="pill tiny">${E(v.kind)}</span> <b>${E(v.title)}</b>${v.date ? " · " + fmt(parseISO(v.date), { day: "numeric", month: "short" }) : ""}${v.why ? `<br><span class="tiny muted">${E(v.why)}</span>` : ""}</span><span class="row" style="gap:6px"><button class="btn sm" data-inok="${E(id)}">Approve</button><button class="btn ghost sm" data-inno="${E(id)}">Dismiss</button></span></div>`).join("")}</section>`; };
+  const inboxCard = () => { const pend = inboxPending(); if (!pend.length) return ""; return `<section class="card stack mt" style="box-shadow:inset 0 0 0 2px var(--acc2)"><div class="between"><span class="lab">Suggestions from Buddy · ${pend.length}</span><span class="tiny muted">Nothing is added until you approve</span></div>${pend.slice(0, 5).map(([id, v]) => `<div class="between wrap"><span class="small"><span class="pill tiny">${E(v.kind)}</span>${v.priority ? ` <span class="pill tiny ${PRICLS[v.priority] || ""}">${E(v.priority)}</span>` : ""} <b>${E(v.title)}</b>${v.date ? " · " + fmt(parseISO(v.date), { day: "numeric", month: "short" }) : ""}${v.time ? " · " + fmtT(v.time) + (v.end ? "–" + fmtT(v.end) : "") : ""}${v.why ? `<br><span class="tiny muted">${E(v.why)}</span>` : ""}</span><span class="row" style="gap:6px"><button class="btn sm" data-inok="${E(id)}">Approve</button><button class="btn ghost sm" data-inno="${E(id)}">Dismiss</button></span></div>`).join("")}${pend.length > 5 ? `<span class="tiny muted">${pend.length - 5} more appear as you decide on these.</span>` : ""}</section>`; };
 
   /* ---------- onboarding: blank, with suggestions ---------- */
   let wiz = { step: 1, name: "", theme: "sage", routine: true, habits: [], cols: { classic: true, secret: true, love: true, study: true } };
@@ -1098,7 +1106,7 @@
   document.addEventListener("pointerup", (e) => { if (!drag) return; if (drag.moved) { drag.el.remove(); const u = document.elementFromPoint(e.clientX, e.clientY), q = u && u.closest("[data-quad]"); if (q) { const x = MP.S.tasks[drag.id], m = { q1: [true, true], q2: [false, true], q3: [true, false], q4: [false, false] }[q.dataset.quad]; x.urg = m[0]; x.imp = m[1]; x.u = Date.now(); MP.changed(); MP.toast("Moved to " + q.querySelector("h3").textContent); } } drag = null; MP.render(); });
 
   /* ---------- start-up ---------- */
-  MP.VERSION = "1.8";
+  MP.VERSION = "1.9";
   if (MP.sound) MP.sound.onchange = () => { miniPlayer(); if (route === "study") MP.render(); };
   /* Public, read-only helpers for future modules and connectors. */
   MP.api = { today, iso, dayPct, studyHours, streak, tasks, feed: () => MP.buildFeed(MP.S), version: MP.VERSION, schemaVersion: MP.SCHEMA_VERSION };

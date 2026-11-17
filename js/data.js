@@ -56,6 +56,7 @@ window.MP_DATA = {
   },
   /* Version history: newest first. Shown once per person after an update ("What's new"). */
   changelog: [
+    { v: "1.9", date: "2026-11-17", items: ["Buddy OS link, part 1: Buddy can now see your schedule (with priorities and repeats) and study plan, if you allow it, and can suggest reminders and study sessions with a priority and time. Nothing is added until you tap Approve."] },
     { v: "1.8", date: "2026-11-17", items: ["Privacy policy and terms of use pages (links on the sign-in screen and at the bottom of Settings).", "Long-press the My Planner icon on your phone for shortcuts: Add / schedule, Today, To-Do and Journal."] },
     { v: "1.7", date: "2026-11-17", items: ["Recurring or one-time: in Add / schedule choose Recurring, then every day, weekdays (Mon–Fri), weekends, chosen days of the week, every 2 weeks, monthly by date or by weekday (e.g. third Tuesday), or yearly.", "Set when it ends: never, on a date, or after a number of times. Google Calendar gets exactly the same pattern.", "Birthdays and anniversaries are added to Google Calendar automatically as yearly events (switch off in Settings); Special dates has an Add all to Calendar button.", "Habits and study sessions start as recurring by default."] },
     { v: "1.6.1", date: "2026-11-17", items: ["Add / schedule is now also at the top of the side menu (and the ☰ menu on phones), so you can add from any screen."] },

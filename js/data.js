@@ -56,6 +56,7 @@ window.MP_DATA = {
   },
   /* Version history: newest first. Shown once per person after an update ("What's new"). */
   changelog: [
+    { v: "1.7", date: "2026-11-17", items: ["Recurring or one-time: in Add / schedule choose Recurring, then every day, weekdays (Mon–Fri), weekends, chosen days of the week, every 2 weeks, monthly by date or by weekday (e.g. third Tuesday), or yearly.", "Set when it ends: never, on a date, or after a number of times. Google Calendar gets exactly the same pattern.", "Birthdays and anniversaries are added to Google Calendar automatically as yearly events (switch off in Settings); Special dates has an Add all to Calendar button.", "Habits and study sessions start as recurring by default."] },
     { v: "1.6.1", date: "2026-11-17", items: ["Add / schedule is now also at the top of the side menu (and the ☰ menu on phones), so you can add from any screen."] },
     { v: "1.6", date: "2026-11-17", items: ["New Add / schedule button on Today: one form for a reminder, new task, habit, study session, event, journal/mood practice or birthday.", "Set date, start and end time, priority (Low to Urgent), a reminder and repeats; tick to add it to Google Calendar in the priority colour.", "Today's schedule card shows what is on today and coming up; tap any item to edit or delete it."] },
     { v: "1.5", date: "2026-11-17", items: ["New Suggestions screen: send ideas and problems straight to Vicky as a ready-written email.", "Suggestions are saved in the app, and can also be kept in a shared Google Doc (optional)."] },

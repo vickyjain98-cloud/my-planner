@@ -91,7 +91,8 @@ window.MP_HELP = [
 "Choose what it is: Reminder, New task, Habit, Study session, Event / appointment, Journal · affirmation · mood, or Birthday / anniversary.",
 "Type a title, then pick the date, start time and (optional) end time. Leave the time empty for an all-day item.",
 "Set the priority: Low, Medium, High or Urgent. It shows as a coloured bar in the app and the same colour in Google Calendar.",
-"Pick a reminder (at the time, 5 min to 1 day before) and whether it repeats (daily, weekly, monthly, yearly).",
+"Pick a reminder (at the time, 5 min to 1 day before).",
+"How often? Choose One-time, or Recurring and then the pattern: every day, weekdays (Mon–Fri), weekends, chosen days of the week, every 2 weeks, monthly on the same date, monthly on the same weekday (e.g. third Tuesday), or every year. Then choose when it ends: never, on a date, or after a number of times.",
 "Keep Also add to Google Calendar ticked to send it to your Calendar with that reminder, then tap Add."
 ]
 ],
@@ -100,7 +101,9 @@ window.MP_HELP = [
 [
 "New task also adds it to your To-Do list with the due date (High and Urgent become urgent in the matrix).",
 "Habit lets you pick one of your habits, or create a new habit from the title.",
-"Birthday / anniversary saves it in Special dates and repeats every year.",
+"Birthday / anniversary saves it in Special dates, repeats every year, and is added to Google Calendar automatically as a yearly event (you can switch this off in Settings).",
+"Habits start as recurring every day and study sessions as every weekday; change it if you like.",
+"If a recurring item can't start on the date you picked (e.g. weekdays from a Saturday), it starts on the next day that fits.",
 "Tap any item in Today's schedule to edit or delete it; edits update Google Calendar too."
 ]
 ],

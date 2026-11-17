@@ -268,7 +268,7 @@
         if (mo) ch.push(`<span class="chip ${mo === "P" ? "c-moon" : "c-ama"}">${mo === "P" ? "○" : "●"} ${moonName(mo)}</span>`);
         if (po) ch.push(`<span class="chip c-portal">✦ ${E(po.replace(" Portal", ""))}</span>`);
         DT.forEach((x) => { if (x.md === md) ch.push(`<span class="chip c-bday">${x.type === "Birthday" ? "✿" : "♥"} ${E(x.n)}</span>`); });
-        EV.forEach((x) => { if (x.d === iso(d)) ch.push(`<span class="chip c-ev">${x.time ? fmtT(x.time) + " " : ""}${E(x.t)}</span>`); });
+        EV.forEach((x) => { if (occurs(x, iso(d))) ch.push(`<span class="chip c-ev">${x.time ? fmtT(x.time) + " " : ""}${E(x.t)}</span>`); });
         const h = d <= t ? studyHours(d) : 0; if (h) ch.push(`<span class="c-study">${h.toFixed(1)} h study</span>`);
         cells += `<button class="day ${d.getMonth() !== m.getMonth() ? "out" : ""} ${iso(d) === iso(t) ? "today" : ""}" data-day="${iso(d)}" aria-label="${fmt(d, { weekday: "long", day: "numeric", month: "long" })}"><span class="n">${d.getDate()}</span>${ch.join("")}</button>`;
       }
@@ -380,7 +380,7 @@
   V.dates = () => {
     const t = today(), DT = live("dates").map(([id, x]) => Object.assign({ id }, x)).map((x) => { const [mm, dd] = String(x.md).split("-").map(Number); let nx = new Date(t.getFullYear(), mm - 1, dd); if (nx < t) nx = new Date(t.getFullYear() + 1, mm - 1, dd); return Object.assign(x, { nx, days: Math.round((nx - t) / 864e5) }); }).sort((a, b) => a.days - b.days);
     return `${head("Birthdays and anniversaries", "Special Dates")}
-      <section class="card stack mb"><span class="lab">Add someone</span><div class="row"><input class="f" id="dn" maxlength="60" placeholder="Name" style="flex:1;min-width:120px"><input class="f" id="dr" maxlength="40" placeholder="Relation (e.g. Cousin)" style="flex:1;min-width:120px">${sel('id="dty"', ["Birthday", "Anniversary"], "Birthday", 'style="width:auto"')}<input class="f" id="dd" type="date" style="width:auto" aria-label="Date"><button class="btn" data-adddate>Add</button></div></section>
+      <section class="card stack mb"><div class="between wrap"><span class="lab">Add someone · repeats every year</span>${mode === "google" && live("dates").some(([id]) => !(MP.S.sent["date-" + id] && !MP.S.sent["date-" + id].del)) ? `<button class="link" data-dallcal>${ic("cal", 16)} Add all to Google Calendar</button>` : ""}</div><div class="row"><input class="f" id="dn" maxlength="60" placeholder="Name" style="flex:1;min-width:120px"><input class="f" id="dr" maxlength="40" placeholder="Relation (e.g. Cousin)" style="flex:1;min-width:120px">${sel('id="dty"', ["Birthday", "Anniversary"], "Birthday", 'style="width:auto"')}<input class="f" id="dd" type="date" style="width:auto" aria-label="Date"><button class="btn" data-adddate>Add</button></div></section>
       <section class="card tablewrap"><table class="t"><thead><tr><th>Name</th><th>Relation</th><th>Type</th><th>Next</th><th></th></tr></thead><tbody>
       ${DT.map((x) => `<tr><td><b>${E(x.n)}</b></td><td>${E(x.rel || "")}</td><td><span class="chip c-bday">${E(x.type)}</span></td><td class="small">${fmt(x.nx, { day: "numeric", month: "short" })} · ${x.days === 0 ? "today" : "in " + x.days + " days"}</td><td><span class="row" style="gap:6px;flex-wrap:nowrap">${calBtn("date-" + x.id, x.n + " · " + x.type, { kind: "date", x })}<button class="tool" data-ddel="${E(x.id)}" aria-label="Delete">${ic("trash", 16)}</button></span></td></tr>`).join("") || `<tr><td colspan="5" class="small muted">No dates yet.</td></tr>`}
       </tbody></table><p class="tiny muted">Each one repeats every year. "Send to Calendar" adds a yearly event with a reminder at 9 AM the day before.</p></section>`;
@@ -482,7 +482,7 @@
       ${P().timetable.filter((r) => r.type === "Study").sort((a, b) => a.start.localeCompare(b.start)).map((r) => `<div class="row small" style="gap:8px"><b style="width:70px">${fmtT(r.start)}</b><span style="flex:1">${E(r.text)}</span>${sel(`data-blen="${E(r.id)}"`, [25, 30, 40, 45, 50, 60, 90].map((n) => [n, n + " min"]), rowLen(r), 'style="width:auto" aria-label="Length"')}</div>`).join("")}<span class="tiny muted">Rename or move blocks in Timetable.</span></section>
       <section class="card stack"><span class="lab">Study music</span>
       <label class="stack small">My study playlist link (optional, e.g. Spotify or YouTube)<input class="f" type="url" maxlength="300" placeholder="https://…" value="${E(SND().playlist)}" data-playlist></label><span class="tiny muted">It appears as a button on the Study screen, next to the YouTube suggestions.</span></section>
-      <section class="card stack"><span class="lab">Google Calendar</span><label class="between small">Alert for timed items${sel("data-alert", [5, 10, 15, 30, 60].map((n) => [n, n + " min before"]), P().alerts, 'style="width:auto"')}</label><span class="tiny muted">Nothing is added to your Calendar unless you tap "Send to Calendar" on that item. Calendar permission is asked for only the first time.</span></section>
+      <section class="card stack"><span class="lab">Google Calendar</span><label class="between small">Alert for timed items${sel("data-alert", [5, 10, 15, 30, 60].map((n) => [n, n + " min before"]), P().alerts, 'style="width:auto"')}</label><label class="between small">Add birthdays & anniversaries automatically (every year)<input type="checkbox" class="cb" data-autodates ${P().autoDates !== false ? "checked" : ""}></label><span class="tiny muted">Other items go to your Calendar only when you choose (the tick box in Add / schedule, or Send to Calendar). Calendar permission is asked for only the first time.</span></section>
       <section class="card stack"><span class="lab">Family progress summary · opt-in</span><label class="row small"><input type="checkbox" data-shareon ${sh.on ? "checked" : ""} ${mode !== "google" ? "disabled" : ""}> Share a weekly progress summary</label>
       <label class="stack small">Parent emails (comma separated)<input class="f" maxlength="200" value="${E(sh.emails.join(", "))}" data-shareemails placeholder="papa@gmail.com" ${mode !== "google" ? "disabled" : ""}></label>
       <span class="tiny muted">Shared as a view-only Google Doc: habit %, study hours, winning streak and days studied. <b>Never shared:</b> entries, notes, to-dos, affirmations, handwriting, mood or Year in Pixels. Turn it off any time; the doc is deleted.</span><button class="btn ghost sm" data-go="family" style="align-self:flex-start">Preview what's shared</button></section>
@@ -713,7 +713,7 @@
   }
 
   function dayDialog(k) {
-    const d = parseISO(k), EV = live("events").filter(([, e]) => e.d === k), mo = moonOf(d), po = portalOf(d);
+    const d = parseISO(k), EV = live("events").filter(([, e]) => occurs(e, k)), mo = moonOf(d), po = portalOf(d);
     const md = k.slice(5), DT = live("dates").filter(([, x]) => x.md === md);
     modal(`<div class="between"><h2>${fmt(d, { weekday: "long", day: "numeric", month: "long" })}</h2><button class="tool" data-close aria-label="Close">✕</button></div>
       ${mo ? `<div class="small">${mo === "P" ? "○" : "●"} ${moonName(mo)}</div>` : ""}${po ? `<div class="small">✦ ${E(po)}</div>` : ""}
@@ -731,19 +731,61 @@
   const PRICOL = { low: "2", med: "5", high: "6", urgent: "11" };
   const PRICLS = { low: "pri-low", med: "pri-med", high: "pri-high", urgent: "pri-urg" };
   const SREM = [["", "No reminder"], ["0", "At the time"], ["5", "5 min before"], ["10", "10 min before"], ["15", "15 min before"], ["30", "30 min before"], ["60", "1 hour before"], ["1440", "1 day before"]];
-  const SREP = [["", "Does not repeat"], ["DAILY", "Every day"], ["WEEKLY", "Every week"], ["MONTHLY", "Every month"], ["YEARLY", "Every year"]];
+  /* Repeats: one model for the app and Google Calendar (RRULE). Older items used DAILY/WEEKLY/MONTHLY/YEARLY and still work. */
+  const WD = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"], WDN = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const ORD = ["", "first", "second", "third", "fourth"];
+  const nthOf = (dt) => { const n = Math.ceil(dt.getDate() / 7); return n >= 5 ? -1 : n; };
+  const isLastWk = (dt) => addD(dt, 7).getMonth() !== dt.getMonth();
+  const ordTxt = (n) => (n === -1 ? "last" : ORD[n]);
+  const dayNum = (n) => n + (n % 10 === 1 && n !== 11 ? "st" : n % 10 === 2 && n !== 12 ? "nd" : n % 10 === 3 && n !== 13 ? "rd" : "th");
+  const repOpts = (dk) => { const dt = parseISO(dk || iso(today())), wn = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][dt.getDay()];
+    return [["DAILY", "Every day (all 7 days)"], ["WEEKDAYS", "Every weekday (Mon–Fri)"], ["WEEKENDS", "Weekends (Sat–Sun)"], ["WEEKLY", "Weekly on chosen days"], ["BIWEEKLY", "Every 2 weeks on " + wn], ["MONTHLY", "Monthly on the " + dayNum(dt.getDate())], ["MONTHLY_NTH", "Monthly on the " + ordTxt(nthOf(dt)) + " " + wn], ["YEARLY", "Every year on " + fmt(dt, { day: "numeric", month: "short" })]]; };
+  const repDaysOf = (e) => (Array.isArray(e.repDays) && e.repDays.length ? e.repDays : [WD[parseISO(e.d).getDay()]]);
+  /* does date k fit the pattern (ignoring the end rule)? */
+  const repMatch = (e, k) => {
+    const a = parseISO(e.d), b = parseISO(k), wd = WD[b.getDay()];
+    switch (e.rep) {
+      case "DAILY": return true;
+      case "WEEKDAYS": return b.getDay() >= 1 && b.getDay() <= 5;
+      case "WEEKENDS": return b.getDay() === 0 || b.getDay() === 6;
+      case "WEEKLY": return repDaysOf(e).includes(wd);
+      case "BIWEEKLY": return a.getDay() === b.getDay() && Math.round((b - a) / 864e5) % 14 === 0;
+      case "MONTHLY": return a.getDate() === b.getDate();
+      case "MONTHLY_NTH": { const n = nthOf(a); return a.getDay() === b.getDay() && (n === -1 ? isLastWk(b) : nthOf(b) === n); }
+      case "YEARLY": return e.d.slice(5) === k.slice(5);
+      default: return false;
+    }
+  };
+  const repText = (e) => {
+    if (!e.rep) return "One-time";
+    const o = repOpts(e.d).find((x) => x[0] === e.rep); let t2 = e.rep === "WEEKLY" ? "Weekly on " + repDaysOf(e).map((x) => WDN[WD.indexOf(x)]).join(", ") : o ? o[1].replace(" (all 7 days)", "") : "Repeats";
+    if (e.repEnd === "until" && e.repUntil) t2 += " · until " + fmt(parseISO(e.repUntil), { day: "numeric", month: "short", year: "numeric" });
+    if (e.repEnd === "count" && e.repCount) t2 += " · " + e.repCount + " times";
+    return t2;
+  };
+  const rrule = (e, timed) => {
+    if (!e.rep) return null;
+    const a = parseISO(e.d), n = nthOf(a);
+    let r = { DAILY: "FREQ=DAILY", WEEKDAYS: "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR", WEEKENDS: "FREQ=WEEKLY;BYDAY=SA,SU", WEEKLY: "FREQ=WEEKLY;BYDAY=" + repDaysOf(e).join(","), BIWEEKLY: "FREQ=WEEKLY;INTERVAL=2;BYDAY=" + WD[a.getDay()], MONTHLY: "FREQ=MONTHLY;BYMONTHDAY=" + a.getDate(), MONTHLY_NTH: "FREQ=MONTHLY;BYDAY=" + n + WD[a.getDay()], YEARLY: "FREQ=YEARLY" }[e.rep];
+    if (!r) return null;
+    if (e.repEnd === "until" && e.repUntil) r += ";UNTIL=" + e.repUntil.replace(/-/g, "") + (timed ? "T235959Z" : "");
+    else if (e.repEnd === "count" && +e.repCount > 0) r += ";COUNT=" + Math.min(+e.repCount, 999);
+    return "RRULE:" + r;
+  };
   /* does event e happen on date k (handles repeats)? */
   const occurs = (e, k) => {
     if (!e || !e.d || k < e.d) return false; if (e.d === k) return true;
-    const a = parseISO(e.d), b = parseISO(k);
-    return e.rep === "DAILY" || (e.rep === "WEEKLY" && a.getDay() === b.getDay()) || (e.rep === "MONTHLY" && a.getDate() === b.getDate()) || (e.rep === "YEARLY" && e.d.slice(5) === k.slice(5));
+    if (!e.rep || !repMatch(e, k)) return false;
+    if (e.repEnd === "until" && e.repUntil && k > e.repUntil) return false;
+    if (e.repEnd === "count" && +e.repCount > 0) { let c = 0; for (let dt = parseISO(e.d), i = 0; i < 4000; i++, dt = addD(dt, 1)) { const dk = iso(dt); if (dk === e.d || repMatch(e, dk)) c++; if (dk === k) return c <= +e.repCount; } return false; }
+    return true;
   };
   const evOn = (k) => live("events").filter(([, e]) => occurs(e, k)).map(([id, e]) => Object.assign({ id }, e)).sort((a, b) => (a.time || "99").localeCompare(b.time || "99"));
   /* the Google Calendar event for one of our events */
   function buildEv(e) {
     const title = (e.kind && e.kind !== "event" ? SLABEL[e.kind] + " · " : "") + e.t;
     const desc = [e.pri ? "Priority: " + (SPRI.find((p) => p[0] === e.pri) || [, ""])[1] : "", e.note || "", "Added from My Planner"].filter(Boolean).join("\n");
-    const rec = e.rep ? "RRULE:FREQ=" + e.rep : null;
+    const rec = rrule(e, !!e.time);
     const hasRem = e.rem !== undefined && e.rem !== null && e.rem !== "";
     let ev;
     if (e.time) {
@@ -765,20 +807,44 @@
       <label class="stack small"><span id="stlab">${e.kind === "date" ? "Name" : "Title"}</span><input class="f" id="stitle" maxlength="120" value="${E(e.t || "")}" placeholder="e.g. Call Dr. Mehta · Revise Unit 3 · Drink water"></label>
       <div class="sk-habit stack small" ${e.kind === "habit" ? "" : "hidden"}><label class="stack small">Which habit?${sel('id="shab"', habOpts, e.hab || "")}</label></div>
       <div class="sk-date grid g2" ${e.kind === "date" ? "" : "hidden"}><label class="stack small">Type${sel('id="sdtype"', ["Birthday", "Anniversary"], "Birthday")}</label><label class="stack small">Relation<input class="f" id="srel" maxlength="40" placeholder="e.g. Cousin"></label></div>
-      <div class="grid g3"><label class="stack small">Date<input class="f" type="date" id="sdate" value="${E(e.d)}"></label><label class="stack small sk-time">Start time<input class="f" type="time" id="stime" value="${E(e.time || "")}"></label><label class="stack small sk-time">End time (optional)<input class="f" type="time" id="send" value="${E(e.end || "")}"></label></div>
-      <div class="grid g3"><label class="stack small">Priority${sel('id="spri"', SPRI, e.pri || "med")}</label><label class="stack small">Reminder${sel('id="srem"', SREM, e.rem ?? "")}</label><label class="stack small sk-rep">Repeat${sel('id="srep"', SREP, e.rep || "")}</label></div>
+      <div class="grid g3"><label class="stack small">Date<input class="f" type="date" id="sdate" data-skind value="${E(e.d)}"></label><label class="stack small sk-time">Start time<input class="f" type="time" id="stime" value="${E(e.time || "")}"></label><label class="stack small sk-time">End time (optional)<input class="f" type="time" id="send" value="${E(e.end || "")}"></label></div>
+      <div class="grid g3"><label class="stack small">Priority${sel('id="spri"', SPRI, e.pri || "med")}</label><label class="stack small">Reminder${sel('id="srem"', SREM, e.rem ?? "")}</label><label class="stack small sk-rep">How often?${sel('id="soften" data-skind', [["once", "One-time"], ["rep", "Recurring"]], e.rep ? "rep" : "once")}</label></div>
+      <div class="sk-repbox stack card soft" style="gap:10px;padding:12px" ${e.rep ? "" : "hidden"}>
+        <label class="stack small">Repeats${sel('id="srep" data-skind', repOpts(e.d), e.rep || (e.kind === "study" ? "WEEKDAYS" : "DAILY"))}</label>
+        <div class="sk-wdays row small" style="gap:6px;flex-wrap:wrap" ${e.rep === "WEEKLY" ? "" : "hidden"}>${[1, 2, 3, 4, 5, 6, 0].map((i) => `<label class="pill row"><input type="checkbox" data-skind data-swd="${WD[i]}" ${(e.rep === "WEEKLY" ? repDaysOf(e) : [WD[parseISO(e.d).getDay()]]).includes(WD[i]) ? "checked" : ""}> ${WDN[i]}</label>`).join("")}</div>
+        <div class="grid g2"><label class="stack small">Ends${sel('id="sendby" data-skind', [["never", "Never"], ["until", "On a date"], ["count", "After a number of times"]], e.repEnd || "never")}</label>
+        <label class="stack small sk-until" ${e.repEnd === "until" ? "" : "hidden"}>End date<input class="f" type="date" id="suntil" data-skind value="${E(e.repUntil || "")}"></label>
+        <label class="stack small sk-count" ${e.repEnd === "count" ? "" : "hidden"}>Number of times<input class="f" type="number" min="1" max="999" id="scount" data-skind value="${E(e.repCount || 10)}"></label></div>
+        <span class="tiny muted" id="sreptxt"></span></div>
+      <div class="sk-yearly small muted" ${e.kind === "date" ? "" : "hidden"}>↻ Repeats every year automatically.</div>
       <label class="stack small">Notes (optional)<textarea class="f" id="snote" rows="2" maxlength="500">${E(e.note || "")}</textarea></label>
       <label class="row small" style="gap:8px"><input type="checkbox" id="scal" ${signed && (inCal || !id) ? "checked" : ""} ${signed ? "" : "disabled"}> ${inCal ? "Keep in Google Calendar (updates it)" : "Also add to Google Calendar"}${signed ? "" : ' <span class="muted">(sign in with Google to use)</span>'}</label>
       <span class="tiny muted" id="shint">With a time, the reminder pops up on your phone through Google Calendar, and in the app while it is open. Without a time it is an all-day item; the reminder comes at 9 AM the day before.</span>
       <div class="row" style="justify-content:flex-end">${id ? `<button class="btn ghost danger" data-sdel="${E(id)}">Delete</button>` : ""}<button class="btn ghost" data-close>Cancel</button><button class="btn" data-ssave="${E(id || "")}">${id ? "Save" : "Add"}</button></div>`);
     schedKind();
   }
-  function schedKind() {
+  function schedKind(src) {
     const k = field("skind"), q = (s) => document.querySelectorAll(s);
+    if (src === "skind" && (k === "habit" || k === "study")) { const o = document.getElementById("soften"), r = document.getElementById("srep"); if (o && o.value === "once") { o.value = "rep"; if (r) r.value = k === "habit" ? "DAILY" : "WEEKDAYS"; } }
     q(".sk-habit").forEach((x) => (x.hidden = k !== "habit")); q(".sk-date").forEach((x) => (x.hidden = k !== "date"));
-    q(".sk-time,.sk-rep").forEach((x) => (x.hidden = k === "date"));
+    q(".sk-time,.sk-rep").forEach((x) => (x.hidden = k === "date")); q(".sk-yearly").forEach((x) => (x.hidden = k !== "date"));
+    const recur = k !== "date" && field("soften") === "rep"; q(".sk-repbox").forEach((x) => (x.hidden = !recur));
+    if (src === "sdate" && field("sdate")) { const on = [...document.querySelectorAll("[data-swd]:checked")]; if (on.length <= 1) { const w2 = WD[parseISO(field("sdate")).getDay()]; document.querySelectorAll("[data-swd]").forEach((x) => (x.checked = x.dataset.swd === w2)); } }
+    const rs = document.getElementById("srep"), dk = field("sdate");
+    if (rs && dk) { const cur = rs.value; rs.innerHTML = repOpts(dk).map(([v, l]) => `<option value="${v}" ${v === cur ? "selected" : ""}>${E(l)}</option>`).join(""); }
+    q(".sk-wdays").forEach((x) => (x.hidden = field("srep") !== "WEEKLY"));
+    const eb = field("sendby"); q(".sk-until").forEach((x) => (x.hidden = eb !== "until")); q(".sk-count").forEach((x) => (x.hidden = eb !== "count"));
+    const tx = document.getElementById("sreptxt"); if (tx && recur && dk) tx.textContent = "Summary: " + repText(schedRep({ d: dk }));
     const l = document.getElementById("stlab"); if (l) l.textContent = k === "date" ? "Name" : "Title";
     if (k === "reminder" && !field("stime")) { const tm = document.getElementById("stime"); if (tm) tm.value = "09:00"; }
+  }
+  /* read the repeat fields from the form into an event */
+  function schedRep(o) {
+    if (field("soften") !== "rep") return Object.assign(o, { rep: "", repDays: [], repEnd: "", repUntil: "", repCount: "" });
+    o.rep = field("srep"); o.repDays = o.rep === "WEEKLY" ? [...document.querySelectorAll("[data-swd]:checked")].map((x) => x.dataset.swd) : [];
+    if (o.rep === "WEEKLY" && !o.repDays.length) o.repDays = [WD[parseISO(o.d).getDay()]];
+    o.repEnd = field("sendby") || "never"; o.repUntil = o.repEnd === "until" ? field("suntil") : ""; o.repCount = o.repEnd === "count" ? String(Math.max(1, Math.min(999, parseInt(field("scount"), 10) || 1))) : "";
+    return o;
   }
   async function schedSave(id) {
     const kind = field("skind"); let title = field("stitle").slice(0, 120); const d = field("sdate") || iso(today());
@@ -792,10 +858,12 @@
       if (toCal) { await sendKey("date-" + did, { kind: "date", x: MP.S.dates[did] }); }
       return;
     }
-    const time = field("stime"), end = field("send"), pri = field("spri"), rem = field("srem"), rep = field("srep"), note = field("snote").slice(0, 500);
+    const time = field("stime"), end = field("send"), pri = field("spri"), rem = field("srem"), note = field("snote").slice(0, 500);
     if (end && time && end <= time) { MP.toast("End time should be after the start time"); return; }
     const eid = id || uid(), old = MP.S.events[eid] || {};
-    const rec = { d, time, end: time ? end : "", t: title, kind, pri, rem, rep, note };
+    const rec = schedRep({ d, time, end: time ? end : "", t: title, kind, pri, rem, note });
+    if (rec.rep && rec.repEnd === "until" && (!rec.repUntil || rec.repUntil < d)) { MP.toast("Pick an end date after the start date"); return; }
+    if (rec.rep && !repMatch(rec, rec.d)) { for (let i = 1; i < 400; i++) { const dk = iso(addD(parseISO(rec.d), i)); if (repMatch(rec, dk)) { rec.d = dk; break; } } } /* start on the first day that fits */
     if (kind === "habit") { let hid = field("shab"); if (hid === "__new" || (!hid && title)) { hid = uid(); P().habits.push({ id: hid, name: title.slice(0, 60), def: "", active: true }); touchP(); } rec.hab = hid; }
     if (kind === "task") {
       const tid = old.tid && MP.S.tasks[old.tid] && !MP.S.tasks[old.tid].del ? old.tid : uid(), prev = MP.S.tasks[tid] || {};
@@ -824,12 +892,14 @@
       MP.toast(quiet ? "Saved and added to Google Calendar" : "Added to your Google Calendar");
     } catch (er) { MP.toast(er.reauth ? "Saved. Tap sync to reconnect, then use Send to Calendar." : "Saved, but Calendar said: " + er.message); }
   }
+  /* birthdays & anniversaries go to Google Calendar as yearly events automatically (Settings can turn this off) */
+  const autoDate = (did) => { if (mode === "google" && P().autoDates !== false && MP.S.dates[did]) sendKey("date-" + did, { kind: "date", x: MP.S.dates[did] }, true); };
   /* Today card: what's scheduled today, and the next few days */
-  const schedRow = (e, showDate) => `<div class="between wrap sched ${PRICLS[e.pri] || ""}"><button class="link left" data-sedit="${E(e.id)}" style="text-align:left"><b>${showDate ? fmt(parseISO(e.d), { weekday: "short", day: "numeric" }) + " · " : ""}${e.time ? fmtT(e.time) + (e.end ? "–" + fmtT(e.end) : "") : "All day"}</b> · ${E(e.t)}</button><span class="row" style="gap:6px"><span class="pill tiny">${E(SLABEL[e.kind] || "Event")}</span>${e.pri ? `<span class="pill tiny ${PRICLS[e.pri]}">${E((SPRI.find((p) => p[0] === e.pri) || [, ""])[1])}</span>` : ""}${e.rem !== undefined && e.rem !== "" ? '<span title="Reminder on" aria-label="Reminder on">🔔</span>' : ""}${e.rep ? '<span title="Repeats" aria-label="Repeats">↻</span>' : ""}${calBtn("ev-" + e.id, e.t, { kind: "event", e })}</span></div>`;
+  const schedRow = (e, showDate) => `<div class="between wrap sched ${PRICLS[e.pri] || ""}"><button class="link left" data-sedit="${E(e.id)}" style="text-align:left"><b>${showDate ? fmt(parseISO(e.d), { weekday: "short", day: "numeric" }) + " · " : ""}${e.time ? fmtT(e.time) + (e.end ? "–" + fmtT(e.end) : "") : "All day"}</b> · ${E(e.t)}</button><span class="row" style="gap:6px"><span class="pill tiny">${E(SLABEL[e.kind] || "Event")}</span>${e.pri ? `<span class="pill tiny ${PRICLS[e.pri]}">${E((SPRI.find((p) => p[0] === e.pri) || [, ""])[1])}</span>` : ""}${e.rem !== undefined && e.rem !== "" ? '<span title="Reminder on" aria-label="Reminder on">🔔</span>' : ""}${e.rep ? `<span class="tiny muted" title="${E(repText(e))}">↻ ${E(repText(e).split(" · ")[0])}</span>` : ""}${calBtn("ev-" + e.id, e.t, { kind: "event", e })}</span></div>`;
   function schedCard() {
     const t = today(), k = iso(t), now = minToT(new Date().getHours() * 60 + new Date().getMinutes());
     const td = evOn(k), up = [];
-    for (let i = 1; i <= 7 && up.length < 4; i++) { const kk = iso(addD(t, i)); evOn(kk).forEach((e) => { if (up.length < 4 && !(e.rep === "DAILY")) up.push(Object.assign({}, e, { d: kk })); }); }
+    for (let i = 1; i <= 7 && up.length < 4; i++) { const kk = iso(addD(t, i)); evOn(kk).forEach((e) => { if (up.length < 4 && !["DAILY", "WEEKDAYS", "WEEKENDS"].includes(e.rep)) up.push(Object.assign({}, e, { d: kk })); }); }
     return `<section class="card stack mt"><div class="between"><span class="lab">Today's schedule</span><button class="btn sm" data-sched>${ic("plus", 16)} Add / schedule</button></div>
       ${td.map((e) => `<div style="${e.time && (e.end || e.time) < now ? "opacity:.6" : ""}">${schedRow(e)}</div>`).join("") || '<span class="small muted">Nothing scheduled today. Tap Add / schedule for a reminder, task, habit, study session or event.</span>'}
       ${up.length ? `<span class="lab mt">Coming up</span>${up.map((e) => schedRow(e, true)).join("")}` : ""}</section>`;
@@ -927,8 +997,9 @@
     if (d.ms) { const [s, n] = d.ms.split(":"), k = iso(today()), r = dayRec(k); r.mood = r.mood || {}; r.mood[s] = Object.assign({ w: "calm" }, r.mood[s], { s: +n }); touchDay(k); return MP.render(); }
     if (d.water) { const k = iso(today()), r = dayRec(k); r.water = r.water === +d.water ? +d.water - 1 : +d.water; touchDay(k); return MP.render(); }
     if (d.energy) { const k = iso(today()); dayRec(k).energy = +d.energy; touchDay(k); return MP.render(); }
-    if (d.adddate !== undefined) { const n = field("dn"), dv = field("dd"); if (n && dv) { putRec("dates", uid(), { n: n.slice(0, 60), rel: field("dr").slice(0, 40), type: field("dty") || "Birthday", md: dv.slice(5) }); MP.render(); } else MP.toast("Add a name and a date"); return; }
-    if (d.ddel) { delRec("dates", d.ddel); return MP.render(); }
+    if (d.adddate !== undefined) { const n = field("dn"), dv = field("dd"); if (n && dv) { const did = uid(); putRec("dates", did, { n: n.slice(0, 60), rel: field("dr").slice(0, 40), type: field("dty") || "Birthday", md: dv.slice(5) }); MP.render(); autoDate(did); } else MP.toast("Add a name and a date"); return; }
+    if (d.ddel) { const key = "date-" + d.ddel, s2 = MP.S.sent[key]; if (s2 && !s2.del) { if (mode === "google") G.calDelete(s2.id).catch(() => {}); MP.S.sent[key] = { del: 1, u: Date.now() }; } delRec("dates", d.ddel); return MP.render(); }
+    if (d.dallcal !== undefined) { const todo = live("dates").filter(([id]) => !(MP.S.sent["date-" + id] && !MP.S.sent["date-" + id].del)); (async () => { for (const [id, x] of todo) await sendKey("date-" + id, { kind: "date", x }, true); MP.toast(todo.length + " added to Google Calendar, repeating every year"); })(); return; }
     if (d.themePick) { P().theme = d.themePick; touchP(); return MP.render(); }
     if (d.wtheme) { wiz.name = field("wname") || wiz.name; wiz.theme = d.wtheme; document.body.dataset.theme = d.wtheme; return MP.render(); }
     if (d.whab) { const i = wiz.habits.indexOf(d.whab); i >= 0 ? wiz.habits.splice(i, 1) : wiz.habits.push(d.whab); return MP.render(); }
@@ -951,6 +1022,7 @@
     if (d.sit) { const k = iso(today()), r = dayRec(k); r.sits = r.sits || {}; r.sits[d.sit] = t.checked; touchDay(k); if (r.sits.m && r.sits.a && r.sits.n) MP.toast("Day complete · dot added"); MP.render(); }
     if (d.hist !== undefined) { view.hist = t.value; MP.render(); }
     if (d.alert) { P().alerts = +t.value; touchP(); }
+    if (d.autodates !== undefined) { P().autoDates = t.checked; touchP(); }
     if (d.blen) { const r = P().timetable.find((x) => x.id === d.blen); if (r) { r.end = minToT(tMin(r.start) + +t.value); touchP(); MP.render(); } }
     if (d.jtpl !== undefined) { view.jt = t.value; view.jshuf = 0; P().journalTpl = t.value; touchP(); MP.render(); }
     if (d.jdate !== undefined) { view.jd = t.value; MP.render(); }
@@ -961,7 +1033,7 @@
     if (d.sndbreak !== undefined) { SND().breakStop = t.checked; touchP(); }
     if (d.snddef !== undefined) { SND().type = t.value; touchP(); }
     if (d.fbshare !== undefined) { if (t.checked) { t.checked = false; modal(`<h2>Share your suggestions?</h2><p class="small">My Planner will keep your suggestions (only the suggestions, never your planner entries) in a Google Doc in your Drive, shared view-only with <b>${E(fbTo())}</b>. It updates each time you add one. Turn it off any time and the doc is deleted.</p><div class="row" style="justify-content:flex-end"><button class="btn ghost" data-close>Cancel</button><button class="btn" data-fbyes>Yes, share</button></div>`); } else { const fs = P().fbShare; fs.on = false; if (fs.docId && mode === "google") G.deleteFile(fs.docId).catch(() => {}); fs.docId = ""; touchP(); MP.render(); MP.toast("Stopped sharing; the suggestions doc was deleted."); } }
-    if (d.skind !== undefined) return schedKind();
+    if (d.skind !== undefined) return schedKind(t.id);
     if (d.tviewsel !== undefined) { P().todayView = t.value; touchP(); MP.render(); }
     if (d.printsel !== undefined) { P().printView = t.value; touchP(); MP.render(); }
     if (d.ttf === "type" || d.ttf === "start" || d.ttf === "end") { setTT(d.id, d.ttf, t.value); MP.render(); }
@@ -1026,7 +1098,7 @@
   document.addEventListener("pointerup", (e) => { if (!drag) return; if (drag.moved) { drag.el.remove(); const u = document.elementFromPoint(e.clientX, e.clientY), q = u && u.closest("[data-quad]"); if (q) { const x = MP.S.tasks[drag.id], m = { q1: [true, true], q2: [false, true], q3: [true, false], q4: [false, false] }[q.dataset.quad]; x.urg = m[0]; x.imp = m[1]; x.u = Date.now(); MP.changed(); MP.toast("Moved to " + q.querySelector("h3").textContent); } } drag = null; MP.render(); });
 
   /* ---------- start-up ---------- */
-  MP.VERSION = "1.6.1";
+  MP.VERSION = "1.7";
   if (MP.sound) MP.sound.onchange = () => { miniPlayer(); if (route === "study") MP.render(); };
   /* Public, read-only helpers for future modules and connectors. */
   MP.api = { today, iso, dayPct, studyHours, streak, tasks, feed: () => MP.buildFeed(MP.S), version: MP.VERSION, schemaVersion: MP.SCHEMA_VERSION };

@@ -24,3 +24,7 @@ Each release bumps `MP.VERSION` in `js/app.js`, adds an entry to `changelog` in 
 - Add / schedule on Today: one form for reminders, tasks, habits, study sessions, events, wellbeing practice and birthdays.
 - Date, start/end time, priority (Low–Urgent), reminder, repeat, notes; optional Google Calendar sync in the priority colour.
 - Today's schedule card (today + coming up), tap to edit/delete; in-app reminder pop-ups while the app is open.
+
+## 1.7 — 17 Nov 2026
+- One-time or recurring (daily, weekdays, weekends, chosen days, fortnightly, monthly by date / nth weekday, yearly) with end rules; same RRULE in Google Calendar.
+- Birthdays/anniversaries auto-added to Calendar yearly (Settings toggle); Add all to Calendar on Special dates.

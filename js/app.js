@@ -563,10 +563,10 @@
 
   function shell() {
     const inApp = mode !== "signin" && P().setupDone;
-    document.getElementById("side").innerHTML = inApp ? `<div class="brand">My <span>Planner</span></div>${statusPill()}` + SCREENS.map((s) => `<button class="navbtn ${route === s[0] ? "on" : ""}" data-go="${s[0]}">${ic(s[0])}${s[1]}</button>`).join("") : "";
+    document.getElementById("side").innerHTML = inApp ? `<div class="brand">My <span>Planner</span></div>${statusPill()}<button class="navbtn navadd" data-sched>${ic("plus")}Add / schedule</button>` + SCREENS.map((s) => `<button class="navbtn ${route === s[0] ? "on" : ""}" data-go="${s[0]}">${ic(s[0])}${s[1]}</button>`).join("") : "";
     const quick = [["today", "Today"], ["planner", "Planner"], ["habits", "Habits"], ["todo", "To-Do"], ["more", "More"]];
     document.getElementById("bottom").innerHTML = inApp ? quick.map((q) => `<button class="${route === q[0] || (q[0] === "more" && !quick.some((x) => x[0] === route)) ? "on" : ""}" data-go="${q[0]}">${ic(q[0], 22)}${q[1]}</button>`).join("") : "";
-    document.getElementById("sheetin").innerHTML = SCREENS.map((s) => `<button class="navbtn ${route === s[0] ? "on" : ""}" data-go="${s[0]}">${ic(s[0], 22)}${s[1]}</button>`).join("");
+    document.getElementById("sheetin").innerHTML = `<button class="navbtn navadd" data-sched>${ic("plus", 22)}Add / schedule</button>` + SCREENS.map((s) => `<button class="navbtn ${route === s[0] ? "on" : ""}" data-go="${s[0]}">${ic(s[0], 22)}${s[1]}</button>`).join("");
     document.body.classList.toggle("bare", !inApp);
   }
   function statusPill() {
@@ -863,7 +863,7 @@
     if (d.wipe !== undefined) return wipeDialog();
     if (d.dowipe !== undefined) return doWipe();
     if (d.learn !== undefined) return modal(learnHTML());
-    if (d.sched !== undefined) return schedDialog(null, d.sched ? { d: d.sched } : null);
+    if (d.sched !== undefined) { document.getElementById("sheet").classList.remove("on"); return schedDialog(null, d.sched ? { d: d.sched } : null); }
     if (d.sedit) return schedDialog(d.sedit);
     if (d.ssave !== undefined) return schedSave(d.ssave || null);
     if (d.sdel) { const ev = MP.S.events[d.sdel], key = "ev-" + d.sdel, s2 = MP.S.sent[key]; if (s2 && !s2.del && mode === "google") G.calDelete(s2.id).catch(() => {}); if (s2 && !s2.del) MP.S.sent[key] = { del: 1, u: Date.now() }; delRec("events", d.sdel); closeModal(); MP.render(); MP.toast(ev && ev.tid ? "Deleted (the To-Do task stays)" : "Deleted"); return; }
@@ -1026,7 +1026,7 @@
   document.addEventListener("pointerup", (e) => { if (!drag) return; if (drag.moved) { drag.el.remove(); const u = document.elementFromPoint(e.clientX, e.clientY), q = u && u.closest("[data-quad]"); if (q) { const x = MP.S.tasks[drag.id], m = { q1: [true, true], q2: [false, true], q3: [true, false], q4: [false, false] }[q.dataset.quad]; x.urg = m[0]; x.imp = m[1]; x.u = Date.now(); MP.changed(); MP.toast("Moved to " + q.querySelector("h3").textContent); } } drag = null; MP.render(); });
 
   /* ---------- start-up ---------- */
-  MP.VERSION = "1.6";
+  MP.VERSION = "1.6.1";
   if (MP.sound) MP.sound.onchange = () => { miniPlayer(); if (route === "study") MP.render(); };
   /* Public, read-only helpers for future modules and connectors. */
   MP.api = { today, iso, dayPct, studyHours, streak, tasks, feed: () => MP.buildFeed(MP.S), version: MP.VERSION, schemaVersion: MP.SCHEMA_VERSION };

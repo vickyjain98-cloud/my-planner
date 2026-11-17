@@ -205,3 +205,5 @@ a.pill{text-decoration:none;display:inline-flex;align-items:center}
 .pill.pri-low{background:#E3F0E6;color:#2F5A3A}.pill.pri-med{background:#F7EDCB;color:#5A4A12}.pill.pri-high{background:#F8E0CC;color:#7A3F12}.pill.pri-urg{background:#F6D5D4;color:#7A1F1C}
 .link.left{text-align:left;font-weight:400}
 [hidden]{display:none!important}
+.navbtn.navadd{background:var(--acc);color:var(--onacc);font-weight:700;margin:4px 0 10px}
+.navbtn.navadd svg{stroke:currentColor}

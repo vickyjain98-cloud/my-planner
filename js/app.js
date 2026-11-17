@@ -223,18 +223,15 @@
   const SND = () => P().sound || (P().sound = { auto: true, type: "brown", vol: 0.5, breakStop: true, playlist: "" });
   const safeUrl = (u) => /^https:\/\/[^\s"'<>]+$/i.test(u || "") ? u : "";
   function soundCard() {
-    const sd = SND(), on = MP.sound && MP.sound.playing();
-    return `<section class="card stack mt"><div class="between wrap"><span class="lab">Focus sounds</span><span class="row" style="gap:8px">${on ? `<button class="btn sm" data-snd="stop">■ Stop</button>` : `<button class="btn sm" data-snd="play">▶ Play</button>`}<label class="row tiny muted" style="gap:6px">Volume<input type="range" min="0" max="100" value="${Math.round(sd.vol * 100)}" data-sndvol style="width:110px" aria-label="Volume"></label></span></div>
-      <div class="row">${MP.SOUNDS.map((x) => `<button class="pill ${sd.type === x[0] ? "sel" : "out"}" data-sndtype="${x[0]}" title="${E(x[2])}">${on === x[0] ? "♪ " : ""}${E(x[1])}</button>`).join("")}</div>
-      <label class="row small"><input type="checkbox" class="cb" data-sndauto ${sd.auto ? "checked" : ""}> Play automatically when a focus round starts; stop on pause, break or finish</label>
-      <div class="stack" style="gap:8px;border-top:1px solid var(--line);padding-top:10px"><div class="between wrap"><span class="lab">Online · opens YouTube</span><span class="tiny muted">${navigator.onLine ? "Needs internet" : "You're offline: use the built-in sounds"}</span></div>
+    const sd = SND();
+    return `<section class="card stack mt"><div class="between wrap"><span class="lab">Study music · opens YouTube</span><span class="tiny muted">${navigator.onLine ? "Needs internet" : "You're offline right now"}</span></div>
       <div class="row">${YT.map((x) => `<a class="pill out ytl" href="${ytUrl(x[1])}" target="_blank" rel="noopener noreferrer">▶ ${E(x[0])}</a>`).join("")}${safeUrl(sd.playlist) ? `<a class="pill sel ytl" href="${E(sd.playlist)}" target="_blank" rel="noopener noreferrer">♫ My playlist</a>` : ""}</div>
-      <span class="tiny muted">Opens in the YouTube app or a new tab, outside My Planner. Built-in sounds stop automatically when you open one. Add your own playlist link in Settings.</span></div>
-      <span class="tiny muted">Sounds are made inside the app: no internet or downloads needed. On phones, sound may pause when the screen turns off.</span></section>`;
+      <span class="tiny muted">Opens in the YouTube app or a new tab, outside My Planner. Save your own Spotify or YouTube playlist in Settings.</span></section>`;
   }
   const YT = [["Lo-fi study beats", "lofi hip hop study music"], ["Classical for studying", "classical music for studying concentration"], ["Piano for focus", "calm piano music for focus"], ["Indian flute & sitar", "indian classical instrumental flute sitar for study"], ["Rain sounds", "rain sounds for studying 1 hour"], ["Brown noise", "brown noise for focus 1 hour"], ["Deep focus ambient", "deep focus ambient music for studying"], ["Nature · forest", "forest nature sounds for concentration"], ["Alpha waves", "alpha waves focus music"], ["Instrumental Bollywood", "bollywood instrumental music for study"]];
   const ytUrl = (q) => "https://www.youtube.com/results?search_query=" + encodeURIComponent(q);
-  const startSound = () => { const sd = SND(); if (MP.sound) MP.sound.play(sd.type, sd.vol); };
+  const BUILTIN_SOUNDS = false; /* built-in generated sounds switched off at Vicky's request; YouTube links only */
+  const startSound = () => { if (!BUILTIN_SOUNDS) return; const sd = SND(); if (MP.sound) MP.sound.play(sd.type, sd.vol); };
   const stopSound = () => { if (MP.sound) MP.sound.stop(); };
   function miniPlayer() {
     const el = document.getElementById("mini"); if (!el) return;
@@ -428,11 +425,8 @@
       <div class="grid g2"><section class="card stack"><span class="lab">Profile</span><label class="stack small">Name on Today<input class="f" maxlength="40" value="${E(P().name)}" data-name></label><div class="small">Signed in as <b>${acc}</b></div><div class="row"><button class="btn ghost sm" data-signout>Sign out</button></div></section>
       <section class="card stack"><span class="lab">Study blocks</span><div class="between small"><span>Blocks per day (weekdays)</span><span class="row" style="gap:4px"><button class="pill num" data-blk-n="-1" aria-label="One fewer block">−</button><b style="min-width:24px;text-align:center">${P().timetable.filter((r) => r.type === "Study").length}</b><button class="pill num" data-blk-n="1" aria-label="One more block">+</button></span></div>
       ${P().timetable.filter((r) => r.type === "Study").sort((a, b) => a.start.localeCompare(b.start)).map((r) => `<div class="row small" style="gap:8px"><b style="width:70px">${fmtT(r.start)}</b><span style="flex:1">${E(r.text)}</span>${sel(`data-blen="${E(r.id)}"`, [25, 30, 40, 45, 50, 60, 90].map((n) => [n, n + " min"]), rowLen(r), 'style="width:auto" aria-label="Length"')}</div>`).join("")}<span class="tiny muted">Rename or move blocks in Timetable.</span></section>
-      <section class="card stack"><span class="lab">Focus sounds</span>
-      <label class="row small"><input type="checkbox" class="cb" data-sndauto ${SND().auto ? "checked" : ""}> Start automatically with a focus round</label>
-      <label class="row small"><input type="checkbox" class="cb" data-sndbreak ${SND().breakStop ? "checked" : ""}> Stop during breaks</label>
-      <label class="stack small">Default sound${sel("data-snddef", MP.SOUNDS.map((x) => [x[0], x[1]]), SND().type, 'aria-label="Default focus sound"')}</label>
-      <label class="stack small">My study playlist link (optional, e.g. Spotify or YouTube)<input class="f" type="url" maxlength="300" placeholder="https://…" value="${E(SND().playlist)}" data-playlist></label></section>
+      <section class="card stack"><span class="lab">Study music</span>
+      <label class="stack small">My study playlist link (optional, e.g. Spotify or YouTube)<input class="f" type="url" maxlength="300" placeholder="https://…" value="${E(SND().playlist)}" data-playlist></label><span class="tiny muted">It appears as a button on the Study screen, next to the YouTube suggestions.</span></section>
       <section class="card stack"><span class="lab">Google Calendar</span><label class="between small">Alert for timed items${sel("data-alert", [5, 10, 15, 30, 60].map((n) => [n, n + " min before"]), P().alerts, 'style="width:auto"')}</label><span class="tiny muted">Nothing is added to your Calendar unless you tap "Send to Calendar" on that item. Calendar permission is asked for only the first time.</span></section>
       <section class="card stack"><span class="lab">Family progress summary · opt-in</span><label class="row small"><input type="checkbox" data-shareon ${sh.on ? "checked" : ""} ${mode !== "google" ? "disabled" : ""}> Share a weekly progress summary</label>
       <label class="stack small">Parent emails (comma separated)<input class="f" maxlength="200" value="${E(sh.emails.join(", "))}" data-shareemails placeholder="papa@gmail.com" ${mode !== "google" ? "disabled" : ""}></label>
@@ -829,7 +823,7 @@
   document.addEventListener("pointerup", (e) => { if (!drag) return; if (drag.moved) { drag.el.remove(); const u = document.elementFromPoint(e.clientX, e.clientY), q = u && u.closest("[data-quad]"); if (q) { const x = MP.S.tasks[drag.id], m = { q1: [true, true], q2: [false, true], q3: [true, false], q4: [false, false] }[q.dataset.quad]; x.urg = m[0]; x.imp = m[1]; x.u = Date.now(); MP.changed(); MP.toast("Moved to " + q.querySelector("h3").textContent); } } drag = null; MP.render(); });
 
   /* ---------- start-up ---------- */
-  MP.VERSION = "1.1";
+  MP.VERSION = "1.2";
   if (MP.sound) MP.sound.onchange = () => { miniPlayer(); if (route === "study") MP.render(); };
   /* Public, read-only helpers for future modules and connectors. */
   MP.api = { today, iso, dayPct, studyHours, streak, tasks, feed: () => MP.buildFeed(MP.S), version: MP.VERSION, schemaVersion: MP.SCHEMA_VERSION };

@@ -25,12 +25,13 @@
     penm: '<path d="M4 20l4-1 11-11-3-3L5 16z"/><path d="M14 6l3 3"/>', search: '<circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/>',
     journal: '<path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h11M9 8h6"/>',
     help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.5V14"/><circle cx="12" cy="17" r=".8"/>',
+    ideas: '<path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/>',
     lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>'
   };
   MP.ic = (k, s = 20) => `<svg aria-hidden="true" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${ICON[k] || ""}</svg>`;
   const ic = MP.ic;
 
-  const SCREENS = [["today", "Today"], ["timetable", "Timetable"], ["habits", "Habits"], ["dash", "Habit Dashboard"], ["study", "Study"], ["planner", "Planner"], ["todo", "To-Do"], ["affirm", "Affirmations"], ["journal", "Journal"], ["three", "3-6-9"], ["mood", "Mood & Wellness"], ["dates", "Special Dates"], ["history", "History & Search"], ["print", "Print"], ["prefs", "Settings"], ["help", "Help & Guide"]];
+  const SCREENS = [["today", "Today"], ["timetable", "Timetable"], ["habits", "Habits"], ["dash", "Habit Dashboard"], ["study", "Study"], ["planner", "Planner"], ["todo", "To-Do"], ["affirm", "Affirmations"], ["journal", "Journal"], ["three", "3-6-9"], ["mood", "Mood & Wellness"], ["dates", "Special Dates"], ["history", "History & Search"], ["print", "Print"], ["prefs", "Settings"], ["ideas", "Suggestions"], ["help", "Help & Guide"]];
   const THEMES = [["sage", "Sage Botanical"], ["lavender", "Lavender Dream"], ["beige", "Beige Minimal"], ["blush", "Blush Floral"], ["midnight", "Midnight Moon"], ["ocean", "Ocean Calm"]];
   const TYPES = ["Study", "Fixed", "Break", "Rest", "Planning", "Morning", "Free"];
   const TCOL = { Study: "var(--acc)", Fixed: "var(--acc2)", Break: "#CFE0D3", Rest: "#D3E3EA", Planning: "#F1DFAE", Morning: "#F4D3BB", Free: "#E1D7EF" };
@@ -418,6 +419,46 @@
   };
   V.print = () => { const pv = P().printView || "detailed"; return `${head("Preview before printing", "Print", `<button class="btn" data-print>${ic("print", 16)} Print / save as PDF</button>`)}<div class="row noprint mb"><label class="row small" style="gap:8px"><span class="lab">Layout</span>${sel("data-printsel", [["summary", "Summary one-pager"], ["detailed", "Detailed Daily Rhythm"], ["hourly", "Hourly time-block sheet"], ["journal", "Journal spread"]], pv, 'style="width:auto;font-weight:700" aria-label="Print layout"')}</label><span class="tiny muted">A4 portrait · uses your theme · typed and handwritten entries print too</span></div><section class="card a4" id="printarea">${PV[pv]()}</section>`; };
 
+  /* ---------- Suggestions & feedback ---------- */
+  const FB_TYPES = ["New feature", "Improve something", "Problem / bug", "Design & look", "Other"];
+  const FB_IMP = ["Nice to have", "Important", "Urgent problem"];
+  const fbTo = () => String(CFG.feedbackEmail || "").trim();
+  const fbList = () => live("feedback").map(([id, f]) => Object.assign({ id }, f)).sort((a, b) => (b.at || "").localeCompare(a.at || ""));
+  const fbLine = (f) => `• [${f.type} · ${f.imp}${f.screen ? " · " + f.screen : ""}] ${f.text}`;
+  const fbBrief = (items) => `My Planner suggestions from ${P().name || "a user"}${G.user && G.user.email ? " (" + G.user.email + ")" : ""}\nVersion ${MP.VERSION} · ${fmt(today(), { day: "numeric", month: "short", year: "numeric" })}\n\n` + items.map((f) => `${fmt(new Date(f.at), { day: "numeric", month: "short" })} ${fbLine(f)}`).join("\n\n");
+  const fbDocHTML = () => `<html><body style="font-family:Arial"><h1>My Planner suggestions · ${E(P().name || "")}</h1><p>Shared with ${E(fbTo())} from My Planner. Only suggestions are in this document, never planner entries.</p>${fbList().map((f) => `<h3>${E(fmt(new Date(f.at), { day: "numeric", month: "long", year: "numeric" }))} · ${E(f.type)} · ${E(f.imp)}${f.screen ? " · " + E(f.screen) : ""}</h3><p>${E(f.text).replace(/\n/g, "<br>")}</p>`).join("")}</body></html>`;
+  function openEmail(items) {
+    const to = fbTo(); if (!to) { MP.toast("No feedback email is set up in this copy."); return; }
+    const body = fbBrief(items).slice(0, 1800);
+    const url = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent("My Planner suggestion" + (items.length > 1 ? "s" : "") + " · " + (P().name || ""))}&body=${encodeURIComponent(body)}`;
+    window.location.href = url;
+  }
+  async function syncFeedbackDoc() {
+    const fs = P().fbShare; if (!fs.on || mode !== "google" || !fbTo()) return false;
+    const id = await G.writeSummaryDoc(fbDocHTML(), fs.docId, `My Planner suggestions · ${P().name || "user"}`);
+    if (id !== fs.docId) { await G.shareReader(id, fbTo()); fs.docId = id; touchP(); }
+    return true;
+  }
+  V.ideas = () => {
+    const list = fbList();
+    return `${head("Tell us what would make My Planner better", "Suggestions")}
+      <section class="card stack mb"><span class="lab">New suggestion</span>
+      <div class="grid g3"><label class="stack small">Type${sel('id="fbtype"', FB_TYPES, FB_TYPES[0])}</label><label class="stack small">Which screen?${sel('id="fbscreen"', [["", "Whole app / not sure"], ...SCREENS.map((x) => [x[1], x[1]])], "")}</label><label class="stack small">How important?${sel('id="fbimp"', FB_IMP, FB_IMP[0])}</label></div>
+      <label class="stack small">Your suggestion<textarea class="f" id="fbtext" rows="5" maxlength="2000" placeholder="Describe what you'd like added or changed, and why it would help you. (On a Samsung tab you can handwrite here with the S Pen.)"></textarea></label>
+      <div class="row"><button class="btn" data-fbsend>Save & send to ${E(fbTo() ? "Vicky" : "the owner")}</button><button class="btn ghost" data-fbsave>Just save it for now</button></div>
+      <span class="tiny muted">Sending opens a ready-written email to ${E(fbTo() || "the app owner")}; tap Send in your email app.${mode === "google" ? (P().fbShare.on ? " Your suggestions are also kept in a Google Doc shared with " + E(fbTo()) + "." : " You can also keep a running Google Doc of your suggestions shared with " + E(fbTo()) + ".") : ""}</span></section>
+      <section class="card stack"><div class="between wrap"><span class="lab">My suggestions · ${list.length}</span>${list.length ? `<span class="row" style="gap:6px"><button class="btn ghost sm" data-fbbrief>View brief</button><button class="btn ghost sm" data-fbemailall>Email all</button></span>` : ""}</div>
+      ${list.map((f) => `<div class="stack" style="gap:4px;border-bottom:1px solid var(--line);padding-bottom:10px"><div class="between wrap"><span class="small"><span class="pill tiny">${E(f.type)}</span> <span class="pill tiny out">${E(f.imp)}</span>${f.screen ? ` <span class="tiny muted">${E(f.screen)}</span>` : ""}</span><span class="tiny muted">${fmt(new Date(f.at), { day: "numeric", month: "short", year: "numeric" })} · ${f.status === "sent" ? "✓ sent" : "saved"}</span></div><span class="small" style="white-space:pre-wrap">${E(f.text)}</span><span class="row" style="gap:8px"><button class="link tiny" data-fbone="${E(f.id)}">Email this</button><button class="link tiny" data-fbdel="${E(f.id)}">Delete</button></span></div>`).join("") || '<span class="small muted">No suggestions yet. Your ideas are saved here and in your Google Drive.</span>'}
+      ${mode === "google" && fbTo() ? `<label class="row small"><input type="checkbox" class="cb" data-fbshare ${P().fbShare.on ? "checked" : ""}> Keep my suggestions in a Google Doc shared with ${E(fbTo())}</label>` : ""}</section>`;
+  };
+  async function fbSubmit(send) {
+    const text = field("fbtext"); if (text.length < 3) { MP.toast("Please write your suggestion first."); return; }
+    const id = uid(), rec = { at: new Date().toISOString(), type: field("fbtype") || FB_TYPES[0], screen: field("fbscreen"), imp: field("fbimp") || FB_IMP[0], text: text.slice(0, 2000), status: send ? "sent" : "saved" };
+    putRec("feedback", id, rec); MP.render();
+    try { if (await syncFeedbackDoc()) MP.toast("Saved and added to your shared suggestions doc"); else MP.toast(send ? "Saved · opening your email" : "Saved"); } catch (e) { MP.toast("Saved. The shared doc will update at the next sync."); }
+    if (send) openEmail([rec]);
+  }
+
   /* ---------- Help & User Guide ---------- */
   const blockHTML = (b) => { const [k, v] = b; if (k === "p") return `<p class="small" style="margin:0;line-height:1.55">${E(v)}</p>`; if (k === "steps") return `<ol class="small hlist">${v.map((x) => `<li>${E(x)}</li>`).join("")}</ol>`; if (k === "list") return `<ul class="small hlist">${v.map((x) => `<li>${E(x)}</li>`).join("")}</ul>`; if (k === "tip") return `<div class="small soft" style="border-radius:12px;padding:10px 12px">💡 ${E(v)}</div>`.replace("💡", "Tip:"); return ""; };
   V.help = () => {
@@ -703,6 +744,14 @@
     if (d.calrm) return calRemove(d.calrm);
     if (d.write) { MP.inputMode = d.write; MP.pref.set("input", d.write); return go("three"); }
     if (d.tdv) { view.tdv = d.tdv; return MP.render(); }
+    if (d.fbsend !== undefined) return fbSubmit(true);
+    if (d.fbsave !== undefined) return fbSubmit(false);
+    if (d.fbone) { const f = MP.S.feedback[d.fbone]; if (f) { f.status = "sent"; f.u = Date.now(); MP.changed(); MP.render(); openEmail([f]); } return; }
+    if (d.fbemailall !== undefined) { const l = fbList(); l.forEach((f) => { MP.S.feedback[f.id].status = "sent"; MP.S.feedback[f.id].u = Date.now(); }); MP.changed(); MP.render(); return openEmail(l); }
+    if (d.fbdel) { delRec("feedback", d.fbdel); MP.render(); syncFeedbackDoc().catch(() => {}); return; }
+    if (d.fbbrief !== undefined) return modal(`<div class="between"><h2>Suggestions brief</h2><button class="tool" data-close aria-label="Close">✕</button></div><textarea class="f" rows="14" readonly id="fbb">${E(fbBrief(fbList()))}</textarea><div class="row" style="justify-content:flex-end"><button class="btn ghost" data-fbcopy>Copy</button><button class="btn" data-fbemailall>Email it</button></div>`);
+    if (d.fbcopy !== undefined) { const t2 = document.getElementById("fbb"); t2.select(); try { navigator.clipboard.writeText(t2.value).then(() => MP.toast("Brief copied")); } catch (er) { document.execCommand && document.execCommand("copy"); MP.toast("Brief copied"); } return; }
+    if (d.fbyes !== undefined) { P().fbShare.on = true; touchP(); closeModal(); MP.render(); syncFeedbackDoc().then(() => MP.toast("Shared suggestions doc created")).catch((er) => MP.toast("Couldn't create the doc yet: " + er.message)); return; }
     if (d.hsec) { view.hq = ""; if (route !== "help") go("help"); else MP.render(); const el = document.getElementById("help-" + d.hsec); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); return; }
     if (d.wnseen !== undefined) { P().seenVersion = MP.VERSION; touchP(); return MP.render(); }
     if (d.vhist !== undefined) return modal(historyHTML());
@@ -783,6 +832,7 @@
     if (d.sndauto !== undefined) { SND().auto = t.checked; touchP(); }
     if (d.sndbreak !== undefined) { SND().breakStop = t.checked; touchP(); }
     if (d.snddef !== undefined) { SND().type = t.value; touchP(); }
+    if (d.fbshare !== undefined) { if (t.checked) { t.checked = false; modal(`<h2>Share your suggestions?</h2><p class="small">My Planner will keep your suggestions (only the suggestions, never your planner entries) in a Google Doc in your Drive, shared view-only with <b>${E(fbTo())}</b>. It updates each time you add one. Turn it off any time and the doc is deleted.</p><div class="row" style="justify-content:flex-end"><button class="btn ghost" data-close>Cancel</button><button class="btn" data-fbyes>Yes, share</button></div>`); } else { const fs = P().fbShare; fs.on = false; if (fs.docId && mode === "google") G.deleteFile(fs.docId).catch(() => {}); fs.docId = ""; touchP(); MP.render(); MP.toast("Stopped sharing; the suggestions doc was deleted."); } }
     if (d.tviewsel !== undefined) { P().todayView = t.value; touchP(); MP.render(); }
     if (d.printsel !== undefined) { P().printView = t.value; touchP(); MP.render(); }
     if (d.ttf === "type" || d.ttf === "start" || d.ttf === "end") { setTT(d.id, d.ttf, t.value); MP.render(); }
@@ -847,7 +897,7 @@
   document.addEventListener("pointerup", (e) => { if (!drag) return; if (drag.moved) { drag.el.remove(); const u = document.elementFromPoint(e.clientX, e.clientY), q = u && u.closest("[data-quad]"); if (q) { const x = MP.S.tasks[drag.id], m = { q1: [true, true], q2: [false, true], q3: [true, false], q4: [false, false] }[q.dataset.quad]; x.urg = m[0]; x.imp = m[1]; x.u = Date.now(); MP.changed(); MP.toast("Moved to " + q.querySelector("h3").textContent); } } drag = null; MP.render(); });
 
   /* ---------- start-up ---------- */
-  MP.VERSION = "1.4";
+  MP.VERSION = "1.5";
   if (MP.sound) MP.sound.onchange = () => { miniPlayer(); if (route === "study") MP.render(); };
   /* Public, read-only helpers for future modules and connectors. */
   MP.api = { today, iso, dayPct, studyHours, streak, tasks, feed: () => MP.buildFeed(MP.S), version: MP.VERSION, schemaVersion: MP.SCHEMA_VERSION };

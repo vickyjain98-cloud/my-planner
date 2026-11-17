@@ -7,5 +7,8 @@ window.MP_CONFIG = {
 
   /* Family allowed-list (lower-case Gmail addresses). Leave empty to allow anyone you added as a
      "test user" in Google Cloud. The real lock is the test-user list in Google Cloud; this is a second check. */
-  allowedEmails: []
+  allowedEmails: [],
+
+  /* Where suggestions and feedback from the Suggestions screen are sent. */
+  feedbackEmail: "vickyjain98@gmail.com"
 };

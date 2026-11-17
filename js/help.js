@@ -444,6 +444,30 @@ window.MP_HELP = [
 ]
 },
 {
+"id": "ideas",
+"title": "Suggestions and feedback",
+"route": "ideas",
+"body": [
+[
+"p",
+"Have an idea, or found a problem? Tell Vicky from inside the app. Every suggestion is saved in your planner."
+],
+[
+"steps",
+[
+"Open Suggestions from the menu.",
+"Choose the type, the screen it's about and how important it is.",
+"Write your suggestion (type, or handwrite with the S Pen on a Samsung tab).",
+"Tap Save & send to Vicky: your email app opens with a ready-written message; tap Send."
+]
+],
+[
+"tip",
+"View brief puts all your suggestions into one summary you can email or copy. You can also keep them in a Google Doc shared with Vicky (tick the box at the bottom)."
+]
+]
+},
+{
 "id": "privacy",
 "title": "Privacy and your data",
 "route": null,

@@ -2,6 +2,9 @@
 
 Each release bumps `MP.VERSION` in `js/app.js`, adds an entry to `changelog` in `js/data.js` (shown in the app's What's new card), and changes the cache name in `sw.js` so every device picks up the update.
 
+## 1.5 · 17 Nov 2026
+- Suggestions screen: saved in the app, emailed to the owner as a brief, optional shared Google Doc of suggestions.
+
 ## 1.4 · 17 Nov 2026
 - Help & Guide: searchable in-app user guide with contents and Open this screen buttons.
 

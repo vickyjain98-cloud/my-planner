@@ -31,6 +31,7 @@
       practice: { text: "", start: "", len: 33 },
       share: { on: false, emails: [], docId: "", last: "" },
       links: { buddy: { on: false, cats: { habits: true, study: true, tasks: true, events: true, mood: false, journal: false }, inbox: true } },
+      sound: { auto: true, type: "brown", vol: 0.5, breakStop: true, playlist: "" },
       setupDone: false
     },
     days: {}, tasks: {}, events: {}, dates: {}, weeks: {}, ink: {}, typed: {}, sent: {}, inbox: {}

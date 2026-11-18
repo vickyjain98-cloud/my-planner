@@ -23,7 +23,7 @@ Every record carries `u` (updated-at, epoch ms). Sync merges record by record: t
 { "v": 1,
   "profile": { "u", "name", "theme", "timetable": [{ "id","start":"HH:MM","end":"HH:MM","text","type" }],
                "weekend": null | [...], "habits": [{ "id","name","def","active" }], "collections", "mine", "practice",
-               "share", "links": { "buddy": { "on", "cats": {habits,study,tasks,events,mood,journal}, "inbox" } } },
+               "share", "links": { "buddy": { "on", "cats": {habits,study,tasks,events,mood,journal}, "inbox", "auto", "ring" } } },
   "days":   { "YYYY-MM-DD": { "u", "h": {habitId: "d"|"p"|"m"}, "study": {rowId: true}, "focus", "phone",
                               "mood": { "am": {"w","s"}, "pm": {"w","s"} }, "note", "sleep", "water", "energy", "sits": {m,a,n} } },
   "tasks":  { id: { "u","t","due","done","b": "big"|"med"|"small"|"", "urg","imp" } },
@@ -48,15 +48,25 @@ The feed is rewritten on each sync while the connection is on, and deleted when 
 ## 4. Buddy OS → suggesting (`buddy-inbox.json`)
 Buddy creates or updates this file in the **My Planner** folder:
 ```
-{ "items": [ { "id": "unique-id", "kind": "task"|"event"|"reminder"|"study"|"habit"|"affirmation"|"note",
+{ "items": [ { "id": "unique-id", "kind": "task"|"event"|"reminder"|"study"|"habit"|"affirmation"|"note"|"mood"|"journal",
                "title": "Revise Unit 2", "date": "2026-11-20", "time": "16:00", "end": "17:00",
-               "priority": "low"|"med"|"high"|"urgent", "why": "You marked Unit 2 as weak" } ],
+               "priority": "low"|"med"|"high"|"urgent", "why": "You marked Unit 2 as weak",
+               "by": "owner"|"buddy", "note": "full journal text (journal only, up to 4000 chars)" } ],
   "withdrawn": ["id-of-an-undecided-item"] }
 ```
 - Up to 100 items are read; text is trimmed and always shown as plain text (never run as code).
 - Each item appears once on Today under **Suggestions from Buddy** with **Approve / Dismiss**.
 - Decisions come back to Buddy through `inboxDecisions` in the feed (`approved`, `dismissed`, `withdrawn`). This is the human approval gate.
 - Ids listed in `withdrawn` are taken back if the person hasn't decided yet.
+- **`"by": "owner"`** means the person said it to Buddy themselves. While Settings → Connections → Buddy OS →
+  **"Add what I tell Buddy without asking"** is on (the default, since 1.10), these items are added straight
+  away, never shown for approval, and reported back as `approved`. The feed then carries
+  `"autoAddFromBuddy": true` in `data`. `"by": "buddy"` (or no `by`) always waits for Approve / Dismiss.
+- `mood`: `title` is 1–5; it fills an empty mood for that day (morning before 3 pm, evening after) and never
+  overwrites one the person set. `journal`: `note` (or `title`) is added after that day's free-write journal lines.
+- Records added from the inbox get the id `bd-<inbox id>`, so two devices adding the same item end up with one.
+- The inbox is read on open, when the app comes back into view, and every minute while it's open.
+- **"Let Buddy ring my reminders"** (off by default) silences this app's own in-app alerts, because Buddy rings them.
 
 The ready-made Buddy-side client (feed, approval inbox, Diary entries, ChromaDB memory, LangGraph tools, FastAPI router) is in `buddy-connector/` — see its README.
 

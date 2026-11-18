@@ -31,7 +31,7 @@
       practice: { text: "", start: "", len: 33 },
       share: { on: false, emails: [], docId: "", last: "" },
       fbShare: { on: false, docId: "" },
-      links: { buddy: { on: false, cats: { habits: true, study: true, tasks: true, events: true, mood: false, journal: false }, inbox: true } },
+      links: { buddy: { on: false, cats: { habits: true, study: true, tasks: true, events: true, mood: false, journal: false }, inbox: true, auto: true, ring: false } },
       sound: { auto: true, type: "brown", vol: 0.5, breakStop: true, playlist: "" },
       setupDone: false
     },

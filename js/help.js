@@ -512,14 +512,16 @@ window.MP_HELP = [
 "body": [
 [
 "p",
-"Buddy OS is Vicky's personal AI assistant. If you switch it on, Buddy can read a summary of the parts of your planner you choose, write a daily diary entry from it, and suggest things for you to add. Nothing is added to your planner unless you approve it."
+"Buddy OS is Vicky's personal AI assistant. If you switch it on, Buddy can read a summary of the parts of your planner you choose, write a daily diary entry from it, and suggest things for you to add. What you tell Buddy yourself (a reminder, meeting, follow-up, your mood or a journal note) goes straight into your planner; Buddy's own ideas wait for your approval."
 ],
 [
 "steps",
 [
 "Open Settings → Connections and switch on Buddy OS, then tap Connect.",
 "Tick what Buddy may read: habits, study, to-dos, events & dates, mood & sleep, journal (typed). Mood and journal stay off unless you tick them.",
-"Keep “Show Buddy's suggestions on Today” ticked if you want Buddy's ideas.",
+"“Add what I tell Buddy without asking” is on by default: say “remind me at 6 pm to call the bank” to Buddy and it appears here within a minute. Untick it to approve each one yourself.",
+"Keep “Show Buddy's own suggestions on Today” ticked if you want Buddy's ideas.",
+"Tick “Let Buddy ring my reminders” if Buddy already alerts you on Telegram or email, so you aren't reminded twice.",
 "Suggestions appear on Today under Suggestions from Buddy, each with a reason. Tap Approve to add it (as a task, reminder, study session, event, habit or affirmation) or Dismiss."
 ]
 ],

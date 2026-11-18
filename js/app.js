@@ -490,7 +490,7 @@
       <div class="between small"><span><b>Google Drive</b> · private storage</span><span class="pill tiny">${mode === "google" ? "Connected" : "Off in demo"}</span></div>
       <div class="between small"><span><b>Google Calendar</b> · only items you send</span><span class="pill tiny">${G.hasCal ? "Allowed" : "Asks when first used"}</span></div>
       <label class="between small"><span><b>Buddy OS</b> · share a feed, receive suggestions</span><input type="checkbox" class="cb" data-buddy ${P().links.buddy.on ? "checked" : ""} ${mode !== "google" ? "disabled" : ""}></label>
-      ${P().links.buddy.on ? `<div class="stack" style="gap:6px;padding-left:8px;border-left:3px solid var(--soft)"><span class="tiny muted">What Buddy may read (written to <b>buddy-feed.json</b> in your My Planner folder):</span><div class="row">${[["habits", "Habits"], ["study", "Study"], ["tasks", "To-dos"], ["events", "Events & dates"], ["mood", "Mood & sleep"], ["journal", "Journal (typed)"]].map((c) => `<label class="pill row"><input type="checkbox" data-bcat="${c[0]}" ${P().links.buddy.cats[c[0]] ? "checked" : ""}> ${c[1]}</label>`).join("")}</div><label class="row small"><input type="checkbox" data-binbox ${P().links.buddy.inbox ? "checked" : ""}> Show Buddy's suggestions on Today for my approval</label></div>` : ""}
+      ${P().links.buddy.on ? `<div class="stack" style="gap:6px;padding-left:8px;border-left:3px solid var(--soft)"><span class="tiny muted">What Buddy may read (written to <b>buddy-feed.json</b> in your My Planner folder):</span><div class="row">${[["habits", "Habits"], ["study", "Study"], ["tasks", "To-dos"], ["events", "Events & dates"], ["mood", "Mood & sleep"], ["journal", "Journal (typed)"]].map((c) => `<label class="pill row"><input type="checkbox" data-bcat="${c[0]}" ${P().links.buddy.cats[c[0]] ? "checked" : ""}> ${c[1]}</label>`).join("")}</div><label class="row small"><input type="checkbox" data-bauto ${P().links.buddy.auto !== false ? "checked" : ""}> Add what I tell Buddy without asking (reminders, meetings, follow-ups, mood and journal I dictate)</label><label class="row small"><input type="checkbox" data-binbox ${P().links.buddy.inbox ? "checked" : ""}> Show Buddy's own suggestions on Today for my approval</label><label class="row small"><input type="checkbox" data-bring ${P().links.buddy.ring ? "checked" : ""}> Let Buddy ring my reminders (this app stays quiet, so I'm not alerted twice)</label></div>` : ""}
       <div class="between small"><span class="muted">More apps (health, notes, task apps, webhooks)</span><span class="pill tiny out">Ready to add later</span></div>
       <span class="tiny muted">Every connection is off until you switch it on, shows exactly what it can read, and anything it suggests needs your approval.</span></section>
       <section class="card stack"><span class="lab">Your data</span><span class="small">${mode === "google" ? `Saved privately in the <b>My Planner</b> folder of your Google Drive. Only this app and you can see it.` : `Demo mode: saved in this browser only.`}</span>
@@ -525,6 +525,7 @@
       data.upcoming = [...Array(14)].flatMap((_, i) => { const k = iso(addD(t, i)); return Object.entries(S.events).filter(([, v]) => v && !v.del && occurs(v, k)).map(([id, v]) => ({ id, date: k, time: v.time || null, end: v.end || null, title: v.t, kind: v.kind || "event", priority: v.pri || null })); }); data.specialDates = Object.entries(S.dates).filter(([, v]) => v && !v.del).map(([id, v]) => ({ id, name: v.n, relation: v.rel, type: v.type, monthDay: v.md })); }
     if (cats.mood) data.mood = past.map((d) => { const r = S.days[iso(d)] || {}; return { date: iso(d), am: (r.mood || {}).am || null, pm: (r.mood || {}).pm || null, sleep: r.sleep ?? null }; }).filter((x) => x.am || x.pm || x.sleep);
     if (cats.journal) data.journal = Object.entries(S.typed).filter(([k, v]) => /^(jr-|journal-)/.test(k) && v && v.l && v.l.some(Boolean)).map(([k, v]) => ({ key: k, date: (k.match(/\d{4}-\d{2}-\d{2}/) || [""])[0], text: v.l.filter(Boolean).join("\n") }));
+    if ((S.profile.links.buddy || {}).auto !== false) data.autoAddFromBuddy = true;
     data.inboxDecisions = Object.entries(S.inbox).filter(([, v]) => v && v.status !== "pending").map(([id, v]) => ({ id, status: v.status }));
     return { schema: "my-planner-feed", schemaVersion: MP.SCHEMA_VERSION, appVersion: MP.VERSION, timeZone: TZ, generatedAt: new Date().toISOString(), categories: Object.keys(cats).filter((k) => cats[k]), data };
   };
@@ -535,16 +536,52 @@
   const whatsNewCard = () => { const list = unseen(); if (!list.length) return ""; return `<section class="card stack mb" style="box-shadow:inset 0 0 0 2px var(--acc)"><div class="between"><span class="lab">✨ What's new in My Planner ${E(MP.VERSION)}</span><button class="btn sm" data-wnseen>Got it</button></div>${list.map((c) => `<div class="stack" style="gap:4px"><b class="small">Version ${E(c.v)}</b>${c.items.map((x) => `<span class="small">• ${E(x)}</span>`).join("")}</div>`).join("")}</section>`; };
   const historyHTML = () => `<div class="between"><h2>Version history</h2><button class="tool" data-close aria-label="Close">✕</button></div><span class="small muted">You're on version ${E(MP.VERSION)}. Updates arrive automatically the next time you open the app while online.</span>${(D.changelog || []).map((c) => `<div class="stack" style="gap:4px"><b>Version ${E(c.v)} · <span class="muted small">${fmt(parseISO(c.date), { day: "numeric", month: "short", year: "numeric" })}</span></b>${c.items.map((x) => `<span class="small">• ${E(x)}</span>`).join("")}</div>`).join("")}<button class="btn" data-close style="align-self:flex-end">Close</button>`;
   const inboxPending = () => live("inbox").filter(([, v]) => v.status === "pending");
+  /* Buddy's mood 1-5 as the planner's mood word + strength (the reverse of Buddy's own mapping). */
+  const BUDDY_MOOD = { 5: ["happy", 5], 4: ["calm", 3], 3: ["calm", 1], 2: ["low", 3], 1: ["low", 5] };
+  /* Put one inbox item into the planner. Record ids come from the inbox id, so two devices adding
+     the same item at once end up with one record after sync, not two. Returns a short label. */
+  function applyInbox(id, it) {
+    const pri = it.priority || "", rid = "bd-" + id.replace(/[^\w-]/g, "").slice(0, 60), by = it.by === "owner" ? "You asked Buddy" : "Suggested by Buddy";
+    if (it.kind === "task") putRec("tasks", rid, { t: it.title, due: it.date, done: false, b: "", urg: pri === "high" || pri === "urgent", imp: pri !== "low" });
+    else if (["event", "reminder", "study"].includes(it.kind)) putRec("events", rid, { d: it.date || iso(today()), time: it.time, end: it.time ? it.end || "" : "", t: it.title, kind: it.kind, pri: pri || "med", rem: it.kind === "reminder" || it.time ? (it.kind === "reminder" ? "0" : "10") : "", rep: "", note: it.why ? by + ": " + it.why : by });
+    else if (it.kind === "habit") { P().habits.push({ id: rid, name: it.title.slice(0, 60), def: "", active: true }); touchP(); }
+    else if (it.kind === "affirmation") { P().mine.push(it.title); touchP(); }
+    else if (it.kind === "mood") {
+      const m = BUDDY_MOOD[Math.round(+it.title)]; if (!m) return "";
+      const k = it.date || iso(today()), r = dayRec(k), slot = it.time ? (tMin(it.time) < 900 ? "am" : "pm") : new Date().getHours() < 15 ? "am" : "pm";
+      r.mood = r.mood || {};
+      if (r.mood[slot] && r.mood[slot].w) return "mood (kept the one you set)"; /* never overwrite the person's own mood */
+      r.mood[slot] = { w: m[0], s: m[1] }; touchDay(k); return "mood";
+    } else if (it.kind === "journal") {
+      const k = "journal-" + (it.date || iso(today())), text = (it.note || it.title || "").trim(); if (!text) return "";
+      const rec = MP.S.typed[k] || { u: 0, l: [] }, lines = (rec.l || []).slice(), chunks = [];
+      text.split(/\n+/).forEach((ln) => { let s = ln.trim(); while (s.length > 300) { const cut = s.lastIndexOf(" ", 300) > 200 ? s.lastIndexOf(" ", 300) : 300; chunks.push(s.slice(0, cut)); s = s.slice(cut).trim(); } if (s) chunks.push(s); });
+      let i = lines.length; while (i > 0 && !lines[i - 1]) i--; /* straight after the last line already written */
+      chunks.forEach((c) => { lines[i++] = c; });
+      MP.S.typed[k] = { u: Date.now(), l: lines }; MP.changed(); return "journal";
+    } else return "";
+    return it.kind;
+  }
   function approveInbox(id) {
     const it = MP.S.inbox[id]; if (!it) return;
-    const pri = it.priority || "";
-    if (it.kind === "task") putRec("tasks", uid(), { t: it.title, due: it.date, done: false, b: "", urg: pri === "high" || pri === "urgent", imp: pri !== "low" });
-    else if (["event", "reminder", "study"].includes(it.kind)) putRec("events", uid(), { d: it.date || iso(today()), time: it.time, end: it.time ? it.end || "" : "", t: it.title, kind: it.kind, pri: pri || "med", rem: it.kind === "reminder" || it.time ? "10" : "", rep: "", note: it.why ? "Suggested by Buddy: " + it.why : "" });
-    else if (it.kind === "habit") { P().habits.push({ id: uid(), name: it.title.slice(0, 60), def: "", active: true }); touchP(); }
-    else if (it.kind === "affirmation") { P().mine.push(it.title); touchP(); }
+    applyInbox(id, it);
     it.status = "approved"; it.u = Date.now(); MP.changed(); MP.bus.emit("inbox.approved", { id, kind: it.kind }); MP.toast("Added to your planner"); MP.render();
   }
-  const inboxCard = () => { const pend = inboxPending(); if (!pend.length) return ""; return `<section class="card stack mt" style="box-shadow:inset 0 0 0 2px var(--acc2)"><div class="between"><span class="lab">Suggestions from Buddy · ${pend.length}</span><span class="tiny muted">Nothing is added until you approve</span></div>${pend.slice(0, 5).map(([id, v]) => `<div class="between wrap"><span class="small"><span class="pill tiny">${E(v.kind)}</span>${v.priority ? ` <span class="pill tiny ${PRICLS[v.priority] || ""}">${E(v.priority)}</span>` : ""} <b>${E(v.title)}</b>${v.date ? " · " + fmt(parseISO(v.date), { day: "numeric", month: "short" }) : ""}${v.time ? " · " + fmtT(v.time) + (v.end ? "–" + fmtT(v.end) : "") : ""}${v.why ? `<br><span class="tiny muted">${E(v.why)}</span>` : ""}</span><span class="row" style="gap:6px"><button class="btn sm" data-inok="${E(id)}">Approve</button><button class="btn ghost sm" data-inno="${E(id)}">Dismiss</button></span></div>`).join("")}${pend.length > 5 ? `<span class="tiny muted">${pend.length - 5} more appear as you decide on these.</span>` : ""}</section>`; };
+  /* What the person told Buddy goes straight in when "Add what I tell Buddy without asking" is on.
+     Buddy's own ideas (by: "buddy") always wait for Approve / Dismiss. */
+  MP.autoAddFromBuddy = () => {
+    const L = P().links.buddy; if (!L || !L.on || L.auto === false) return 0;
+    const done = [];
+    live("inbox").forEach(([id, it]) => {
+      if (it.status !== "pending" || it.by !== "owner") return;
+      const what = applyInbox(id, it);
+      it.status = "approved"; it.u = Date.now(); MP.bus.emit("inbox.approved", { id, kind: it.kind, auto: true });
+      if (what) done.push(it.kind === "mood" || it.kind === "journal" ? what : it.title);
+    });
+    if (done.length) { MP.changed(); MP.toast(done.length === 1 ? "From Buddy: added " + done[0] : `From Buddy: added ${done.length} items to your planner`); }
+    return done.length;
+  };
+  const inboxCard = () => { const pend = inboxPending(); if (!pend.length) return ""; return `<section class="card stack mt" style="box-shadow:inset 0 0 0 2px var(--acc2)"><div class="between"><span class="lab">Suggestions from Buddy · ${pend.length}</span><span class="tiny muted">Nothing is added until you approve</span></div>${pend.slice(0, 5).map(([id, v]) => `<div class="between wrap"><span class="small"><span class="pill tiny">${E(v.kind)}</span>${v.by === "owner" ? ' <span class="pill tiny">you asked</span>' : ""}${v.priority ? ` <span class="pill tiny ${PRICLS[v.priority] || ""}">${E(v.priority)}</span>` : ""} <b>${E(v.kind === "mood" ? "Mood " + v.title + " / 5" : v.title)}</b>${v.date ? " · " + fmt(parseISO(v.date), { day: "numeric", month: "short" }) : ""}${v.time ? " · " + fmtT(v.time) + (v.end ? "–" + fmtT(v.end) : "") : ""}${v.why ? `<br><span class="tiny muted">${E(v.why)}</span>` : ""}</span><span class="row" style="gap:6px"><button class="btn sm" data-inok="${E(id)}">Approve</button><button class="btn ghost sm" data-inno="${E(id)}">Dismiss</button></span></div>`).join("")}${pend.length > 5 ? `<span class="tiny muted">${pend.length - 5} more appear as you decide on these.</span>` : ""}</section>`; };
 
   /* ---------- onboarding: blank, with suggestions ---------- */
   let wiz = { step: 1, name: "", theme: "sage", routine: true, habits: [], cols: { classic: true, secret: true, love: true, study: true } };
@@ -627,7 +664,9 @@
       const before = JSON.stringify(MP.S);
       const merged = await G.sync(MP.S);
       const changed = JSON.stringify(merged) !== before;
-      MP.S = MP.sanitize(merged); await MP.idbSet(cacheKey(), MP.S);
+      MP.S = MP.sanitize(merged);
+      if (MP.autoAddFromBuddy() && !again) again = true; /* send the decisions straight back to Buddy */
+      await MP.idbSet(cacheKey(), MP.S);
       G.status = "ok";
       if (changed && !document.activeElement.matches("input,textarea")) MP.render();
       maybeSummary();
@@ -916,6 +955,7 @@
   const firedKey = "mp-fired";
   setInterval(() => {
     if (mode === "signin") return;
+    const BL = P().links && P().links.buddy; if (BL && BL.on && BL.ring) return; /* Buddy rings them on Telegram, email and its command centre */
     const n = new Date(), k = iso(n), nowM = n.getHours() * 60 + n.getMinutes();
     let fired; try { fired = JSON.parse(sessionStorage.getItem(firedKey) || "{}"); } catch (er) { fired = {}; }
     evOn(k).forEach((e) => {
@@ -1034,9 +1074,11 @@
     if (d.blen) { const r = P().timetable.find((x) => x.id === d.blen); if (r) { r.end = minToT(tMin(r.start) + +t.value); touchP(); MP.render(); } }
     if (d.jtpl !== undefined) { view.jt = t.value; view.jshuf = 0; P().journalTpl = t.value; touchP(); MP.render(); }
     if (d.jdate !== undefined) { view.jd = t.value; MP.render(); }
-    if (d.buddy !== undefined) { if (t.checked) { modal(`<h2>Connect Buddy OS?</h2><p class="small">My Planner will write a feed file (<b>buddy-feed.json</b>) in your private My Planner folder with only the categories you tick. Buddy OS, signed in with your Google account, can read it. Buddy can leave suggestions in <b>buddy-inbox.json</b>; they appear on Today and nothing is added without your approval. Mood and journal are off unless you turn them on.</p><div class="row" style="justify-content:flex-end"><button class="btn ghost" data-close>Cancel</button><button class="btn" data-buddyyes>Connect</button></div>`); t.checked = false; } else { P().links.buddy.on = false; touchP(); MP.render(); MP.toast("Buddy OS disconnected; its feed file will be removed."); } }
+    if (d.buddy !== undefined) { if (t.checked) { modal(`<h2>Connect Buddy OS?</h2><p class="small">My Planner will write a feed file (<b>buddy-feed.json</b>) in your private My Planner folder with only the categories you tick. Buddy OS, signed in with your Google account, can read it. Buddy can leave items in <b>buddy-inbox.json</b>: what you tell Buddy yourself is added straight away (you can turn this off), and Buddy's own ideas wait on Today for your approval. Mood and journal are off unless you turn them on.</p><div class="row" style="justify-content:flex-end"><button class="btn ghost" data-close>Cancel</button><button class="btn" data-buddyyes>Connect</button></div>`); t.checked = false; } else { P().links.buddy.on = false; touchP(); MP.render(); MP.toast("Buddy OS disconnected; its feed file will be removed."); } }
     if (d.bcat) { P().links.buddy.cats[d.bcat] = t.checked; touchP(); }
     if (d.binbox !== undefined) { P().links.buddy.inbox = t.checked; touchP(); }
+    if (d.bauto !== undefined) { P().links.buddy.auto = t.checked; touchP(); if (t.checked) MP.autoAddFromBuddy(); }
+    if (d.bring !== undefined) { P().links.buddy.ring = t.checked; touchP(); }
     if (d.sndauto !== undefined) { SND().auto = t.checked; touchP(); }
     if (d.sndbreak !== undefined) { SND().breakStop = t.checked; touchP(); }
     if (d.snddef !== undefined) { SND().type = t.value; touchP(); }
@@ -1106,7 +1148,7 @@
   document.addEventListener("pointerup", (e) => { if (!drag) return; if (drag.moved) { drag.el.remove(); const u = document.elementFromPoint(e.clientX, e.clientY), q = u && u.closest("[data-quad]"); if (q) { const x = MP.S.tasks[drag.id], m = { q1: [true, true], q2: [false, true], q3: [true, false], q4: [false, false] }[q.dataset.quad]; x.urg = m[0]; x.imp = m[1]; x.u = Date.now(); MP.changed(); MP.toast("Moved to " + q.querySelector("h3").textContent); } } drag = null; MP.render(); });
 
   /* ---------- start-up ---------- */
-  MP.VERSION = "1.9";
+  MP.VERSION = "1.10";
   if (MP.sound) MP.sound.onchange = () => { miniPlayer(); if (route === "study") MP.render(); };
   /* Public, read-only helpers for future modules and connectors. */
   MP.api = { today, iso, dayPct, studyHours, streak, tasks, feed: () => MP.buildFeed(MP.S), version: MP.VERSION, schemaVersion: MP.SCHEMA_VERSION };

@@ -471,7 +471,7 @@
     if (tv === "clock") return headr + dayClock();
     if (tv === "journal") return headr + (lockOn() && !unlocked ? `<section class="card stack center"><span class="small">${ic("lock", 16)} Your journal is locked.</span><button class="btn sm" data-go="journal">Unlock</button></section>` : journalSpread());
     const hs = activeHabits().filter((h) => dueOn(h, t) || (h.freq && h.freq.k === "week")), pct = dayPct(t) || 0, tm = moodOf(t);
-    const ritBar = `<div class="row ritbar">${!(MP.S.days[k] || {}).plan && RIT().plan !== false && new Date().getHours() < 17 ? `<button class="btn ghost sm" data-planopen>☀ Plan my day</button>` : ""}${new Date().getHours() >= 16 && RIT().shut !== false ? `<button class="btn ${(MP.S.days[k] || {}).shut ? "ghost" : ""} sm" data-shutopen>🌙 ${(MP.S.days[k] || {}).shut ? "Shut down again" : "Shut down my day"}</button>` : ""}${t.getDay() === 0 || t.getDay() === 6 ? `<button class="btn ghost sm" data-go="review">📊 Your weekly review</button>` : ""}</div>`;
+    const ritBar = `<div class="row ritbar">${!(MP.S.days[k] || {}).plan && RIT().plan !== false && new Date().getHours() < 17 ? (() => { const g = taskGroups(), od = g.overdue.length, td = g.today.filter((x) => !x.done).length; return `<button class="planhero" data-planopen><span class="phsun" aria-hidden="true">☀</span><span class="phtxt"><b>Plan my day</b><span>${od ? `${od} left over from before · ` : ""}${td ? `${td} to-do${td > 1 ? "s" : ""} for today · ` : ""}about 2 minutes</span></span><span class="phgo">Start ›</span></button>`; })() : ""}${new Date().getHours() >= 16 && RIT().shut !== false ? `<button class="btn ${(MP.S.days[k] || {}).shut ? "ghost" : ""} sm" data-shutopen>🌙 ${(MP.S.days[k] || {}).shut ? "Shut down again" : "Shut down my day"}</button>` : ""}${t.getDay() === 0 || t.getDay() === 6 ? `<button class="btn ghost sm" data-go="review">📊 Your weekly review</button>` : ""}</div>`;
     return headr + whatsNewCard() + setupCard() + ritBar + quickBox() + `<div class="grid g2">
       <section class="card stack"><div class="between"><span class="lab">Today's affirmation</span>${writeBtns()}</div><p class="quote">“${E(a.text)}”</p><span class="tiny muted">${E(a.src)}</span></section>
       <section class="card hero stack">${sr.length ? (nb ? `<div class="between"><span class="lab inherit">Up next · ${fmtT(nb.start)}</span><span class="tiny" style="opacity:.85">${rowLen(nb)} min</span></div><h2 class="inherit">${E(nb.text)}</h2><span class="small" style="opacity:.85">${E(actOf(nb))}</span>` : `<h2 class="inherit">All activities done today</h2>`) : `<h2 class="inherit">No activities yet</h2><span class="small">Add Activity rows in your Timetable.</span>`}
@@ -1889,7 +1889,7 @@
   document.addEventListener("pointercancel", () => { if (drag) { drag.el.remove(); drag = null; MP.render(); } });
 
   /* ---------- start-up ---------- */
-  MP.VERSION = "1.16.1";
+  MP.VERSION = "1.16.2";
   if (MP.sound) MP.sound.onchange = () => { miniPlayer(); if (route === "study") MP.render(); };
   /* Public, read-only helpers for future modules and connectors. */
   MP.api = { today, iso, dayPct, studyHours, streak, tasks, feed: () => MP.buildFeed(MP.S), version: MP.VERSION, schemaVersion: MP.SCHEMA_VERSION };

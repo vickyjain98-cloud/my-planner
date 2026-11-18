@@ -349,3 +349,16 @@ input[type=time]{cursor:pointer}
 .pfloat.pstack{box-shadow:4px 4px 0 -1px rgba(255,255,255,.35),5px 5px 0 0 rgba(0,0,0,.10),9px 9px 0 -1px rgba(255,255,255,.25),10px 10px 0 0 rgba(0,0,0,.08),0 10px 18px -6px rgba(0,0,0,.35)}
 .pnav{display:flex;align-items:center;justify-content:center;gap:10px;margin-top:auto;font-size:12px;font-weight:600}
 .pnav .tool{font-size:20px;width:32px;height:28px;line-height:1;color:#3a3420}
+
+/* 1.16.2 Plan my day banner */
+.ritbar{flex-wrap:wrap}
+.planhero{flex:1 1 100%;display:flex;align-items:center;gap:16px;border:0;cursor:pointer;text-align:left;padding:16px 20px;border-radius:var(--r,20px);background:linear-gradient(120deg,#FFD27A 0%,#FFB36B 55%,#F59A7A 100%);color:#3B2410;box-shadow:0 8px 22px -8px rgba(232,140,60,.6);font-family:var(--body);transition:transform .15s,box-shadow .15s}
+.planhero:hover{transform:translateY(-1px);box-shadow:0 12px 26px -8px rgba(232,140,60,.75)}
+.phsun{font-size:38px;line-height:1;animation:phglow 2.8s ease-in-out infinite;display:inline-block}
+@keyframes phglow{0%,100%{transform:scale(1) rotate(0)}50%{transform:scale(1.12) rotate(18deg)}}
+.phtxt{display:flex;flex-direction:column;gap:2px;flex:1}
+.phtxt b{font-family:var(--disp);font-size:26px;font-weight:700;line-height:1.1}
+.phtxt span{font-size:14px;opacity:.85}
+.phgo{background:#3B2410;color:#FFE9C7;border-radius:999px;padding:8px 16px;font-weight:700;font-size:15px;white-space:nowrap}
+@media (max-width:600px){.planhero{padding:12px 14px;gap:10px}.phsun{font-size:30px}.phtxt b{font-size:21px}.phtxt span{font-size:12.5px}.phgo{padding:6px 12px;font-size:13px}}
+@media (prefers-reduced-motion:reduce){.phsun{animation:none}}

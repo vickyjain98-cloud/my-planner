@@ -635,7 +635,7 @@ window.MP_HELP = [
 [
 "steps",
 [
-"Plan my day opens by itself the first time you open the planner each morning (or tap ☀ Plan my day on Today): sort anything unfinished (Today, Tomorrow, Later or Drop), glance at today's calendar, pick your top 3 tasks and see today's activities. Skip it any time.",
+"Plan my day opens by itself the first time you open the planner each morning (or tap the orange ☀ Plan my day banner at the top of Today): sort anything unfinished (Today, Tomorrow, Later or Drop), glance at today's calendar, pick your top 3 tasks and see today's activities. Skip it any time.",
 "Your top 3 get a ★ on Today and fill the Top 3 box on the Detailed day sheet.",
 "Shut down (from 4 pm, 🌙 on Today, and a reminder at 9:30 pm): tick what you did, move what's left, write one line about the day and set your evening mood.",
 "Under Still open, each unfinished to-do for today (and any overdue one) has three buttons: Tomorrow moves it to tomorrow, Later puts it in the To-Do Inbox with no date, and Drop deletes it. If you have nothing open, this part says so.",

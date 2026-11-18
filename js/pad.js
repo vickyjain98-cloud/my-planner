@@ -41,6 +41,7 @@
 
   MP.setupPads = () => {
     document.querySelectorAll("[data-pad]").forEach((el) => {
+      if (el._size) { el._size(); return; } /* already set up (e.g. a pad in a pop-up when the page re-renders) */
       const key = el.dataset.pad, cv = el.querySelector("canvas"), ctx = cv.getContext("2d");
       const lh = +cv.dataset.lh, lines = +cv.dataset.lines;
       const css = (v) => getComputedStyle(document.body).getPropertyValue(v).trim();

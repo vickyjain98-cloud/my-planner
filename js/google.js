@@ -184,6 +184,7 @@
     const r = await api("https://www.googleapis.com/calendar/v3/calendars/primary/events", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(ev) });
     return (await r.json()).id;
   };
+  G.calPatch = async (id, ev) => { await G.ensureCal(); await api("https://www.googleapis.com/calendar/v3/calendars/primary/events/" + encodeURIComponent(id), { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(ev) }); };
   G.calDelete = async (id) => { await G.ensureCal(); try { await api("https://www.googleapis.com/calendar/v3/calendars/primary/events/" + encodeURIComponent(id), { method: "DELETE" }); } catch (e) { if (!/ 410| 404/.test(e.message)) throw e; } };
 
   /* ---------- Opt-in family progress summary (a view-only Google Doc, no entries or mood) ---------- */

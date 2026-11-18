@@ -43,6 +43,8 @@ Every record carries `u` (updated-at, epoch ms). Sync merges record by record: t
             "mood": [...] (only if allowed), "journal": [...] (typed text only, only if allowed),
             "inboxDecisions": [{id,status}] } }
 ```
+Tasks (since 1.11): `{ id, title, date, due, urgent, important, priority: "Do it now"|"Plan for later"|"Assign someone"|"Ignore", done, createdAt, completedAt, inbox, steps: {done,total}|null, size }`. `date` is the day the task is planned for (overdue when past and not done); `due` is an optional deadline; `size` is the old 1-3-5 value, kept for older tasks only.
+
 The feed is rewritten on each sync while the connection is on, and deleted when it is switched off.
 
 ## 4. Buddy OS → suggesting (`buddy-inbox.json`)

@@ -33,6 +33,10 @@
 
   const SCREENS = [["today", "Today"], ["timetable", "Timetable"], ["habits", "Habits"], ["dash", "Habit Dashboard"], ["study", "Study"], ["planner", "Planner"], ["todo", "To-Do"], ["affirm", "Affirmations"], ["journal", "Journal"], ["three", "3-6-9"], ["mood", "Mood & Wellness"], ["dates", "Special Dates"], ["history", "History & Search"], ["print", "Print"], ["prefs", "Settings"], ["ideas", "Suggestions"], ["help", "Help & Guide"]];
   const THEMES = [["sage", "Sage Botanical"], ["lavender", "Lavender Dream"], ["beige", "Beige Minimal"], ["blush", "Blush Floral"], ["midnight", "Midnight Moon"], ["ocean", "Ocean Calm"]];
+  /* Choose your menu (1.11): hidden screens keep all their data. People who set up before 1.11 keep the full menu. */
+  const MENU_SIMPLE = ["today", "planner", "todo", "study", "habits", "journal", "prefs", "help"];
+  const shownScreen = (r) => { const m = P().menu; return r === "today" || r === "prefs" || !m || !m.hide || !m.hide[r]; };
+  const menuSimple = () => ({ preset: "simple", hide: Object.fromEntries(SCREENS.filter((x) => !MENU_SIMPLE.includes(x[0])).map((x) => [x[0], true])) });
   const TYPES = ["Study", "Fixed", "Break", "Rest", "Planning", "Morning", "Free"];
   const TCOL = { Study: "var(--acc)", Fixed: "var(--acc2)", Break: "#CFE0D3", Rest: "#D3E3EA", Planning: "#F1DFAE", Morning: "#F4D3BB", Free: "#E1D7EF" };
   const MOODCOL = { calm: "#8FB6A3", happy: "#F2C66D", focused: "#7C9CC9", grateful: "#C99BC7", anxious: "#E59B7E", tired: "#B8B2A7", low: "#7E7FA8", irritable: "#D9776F" };
@@ -66,6 +70,26 @@
   const nextMoon = () => { const t = today(); for (let i = 0; i < 40; i++) { const d = addD(t, i); const m = moonOf(d); if (m) return { d, m: moonName(m), i }; } return null; };
   const moodOf = (d) => { const r = MP.S.days[iso(d)]; const m = r && r.mood; return m ? (m.pm || m.am || {}).w || "" : ""; };
   const tasks = () => live("tasks").map(([id, t]) => Object.assign({ id }, t));
+  /* ---------- To-Do (1.11): one list; priority is worked out from Urgent + Important ----------
+     Old tasks keep every field they had: their date is read from their old due date and the
+     1-3-5 size (b) is kept, only no longer shown. Nothing is rewritten until the person edits a task. */
+  const TPRI = [["Do it now", "pri-urg", "urgent"], ["Plan for later", "pri-med", "med"], ["Assign someone", "pri-high", "high"], ["Ignore", "pri-low", "low"]];
+  const tPri = (t) => (t.urg && t.imp ? 0 : t.imp ? 1 : t.urg ? 2 : 3);
+  const tDay = (t) => (t.inbox ? "" : t.d || t.due || "");
+  const dayOf = (ms) => iso(new Date(ms));
+  const tLate = (t) => { const d = tDay(t), k = iso(today()); return !t.done && d && d < k ? Math.round((parseISO(k) - parseISO(d)) / 864e5) : 0; };
+  const tCreated = (t) => (t.c > 1.5e12 ? dayOf(t.c) : tDay(t));
+  const tByPri = (a, b) => tPri(a) - tPri(b) || (a.due || "9").localeCompare(b.due || "9") || (a.c || 0) - (b.c || 0);
+  const taskGroups = () => {
+    const k = iso(today()), T = tasks(), doneToday = (t) => t.done && t.doneAt && dayOf(t.doneAt) === k;
+    return {
+      overdue: T.filter((t) => tLate(t) > 0).sort((a, b) => tPri(a) - tPri(b) || tLate(b) - tLate(a)),
+      today: [...T.filter((t) => !t.done && tDay(t) === k).sort(tByPri), ...T.filter(doneToday).sort((a, b) => a.doneAt - b.doneAt)],
+      upcoming: T.filter((t) => !t.done && tDay(t) > k).sort((a, b) => tDay(a).localeCompare(tDay(b)) || tByPri(a, b)),
+      inbox: T.filter((t) => !t.done && !tDay(t)).sort(tByPri),
+      done: T.filter((t) => t.done).sort((a, b) => (b.doneAt || 0) - (a.doneAt || 0))
+    };
+  };
 
   function dailyAff(d) {
     const w = moodOf(d), p = portalOf(d), mo = moonOf(d), n = Math.floor(d.getTime() / 864e5);
@@ -100,16 +124,31 @@
   /* ---------- screens ---------- */
   const V = {};
 
+  const shortD = (k) => fmt(parseISO(k), { weekday: "short", day: "numeric", month: "short" });
+  function taskRow(t) {
+    const p = TPRI[tPri(t)], late = tLate(t), k = iso(today()), subs = t.sub || [], sd = subs.filter((x) => x.done).length, inCal = MP.S.sent["task-" + t.id] && !MP.S.sent["task-" + t.id].del;
+    const meta = [tDay(t) && tDay(t) !== k && !late ? shortD(tDay(t)) : "", t.due ? `<span class="${!t.done && t.due < k ? "over" : ""}">due ${fmt(parseISO(t.due), { day: "numeric", month: "short" })}</span>` : "", subs.length ? `${sd} of ${subs.length} steps` : "", inCal && t.cal ? `${ic("cal", 12)} ${fmtT(t.cal.t)}` : ""].filter(Boolean).join(" · ");
+    return `<div class="trow ${t.done ? "done" : ""}"><input type="checkbox" class="cb" data-done="${E(t.id)}" ${t.done ? "checked" : ""} aria-label="Done"><div class="tbody">
+      <div class="tpills">${late ? `<span class="pill tiny late">Overdue ${late} day${late > 1 ? "s" : ""}</span>` : ""}<span class="pill tiny ${p[1]}">${p[0]}</span>${!t.done && t.due && t.due < k && t.due !== tDay(t) ? '<span class="pill tiny late">Past deadline</span>' : ""}</div>
+      <button class="ttext" data-tedit="${E(t.id)}">${E(t.t)}</button>${meta ? `<div class="tiny muted">${meta}</div>` : ""}
+      ${subs.length && !t.done ? `<div class="subs">${subs.map((x) => `<label class="row tiny ${x.done ? "sdone" : ""}"><input type="checkbox" class="cb sm" data-sub="${E(t.id)}|${E(x.id)}" ${x.done ? "checked" : ""}> ${E(x.t)}</label>`).join("")}</div>` : ""}</div>
+      <span class="row tacts"><button class="tool ${t.pin ? "on" : ""}" data-tpin="${E(t.id)}" title="${t.pin ? "Remove from post-its" : "Show as a post-it"}" aria-label="Post-it">📌</button></span></div>`;
+  }
+  const moveAll = () => `<span class="row" style="gap:6px"><button class="btn ghost sm" data-tmove="0">Move all to today</button><button class="btn ghost sm" data-tmove="1">Move all to tomorrow</button></span>`;
+  /* Today: the whole list. Overdue first, then today's tasks; anything ticked today stays, struck through, until midnight. */
   function todoCard() {
-    const tv = view.tdv;
-    const tabs = `<div class="tabs" role="tablist" aria-label="To-do view">${[["135", "1-3-5"], ["matrix", "Matrix"], ["due", "Due soon"]].map((x) => `<button class="${tv === x[0] ? "on" : ""}" data-tdv="${x[0]}">${x[1]}</button>`).join("")}</div>`;
-    const T = tasks();
-    const row = (t) => `<label class="row" style="gap:10px;font-size:13.5px"><input type="checkbox" data-done="${E(t.id)}" ${t.done ? "checked" : ""} class="cb"><span style="flex:1">${E(t.t)}</span>${t.b ? `<span class="pill tiny">${t.b === "big" ? "1 BIG" : t.b === "med" ? "3 MED" : "5 SMALL"}</span>` : ""}</label>`;
-    let body = "";
-    if (tv === "135") { const o = ["big", "med", "small"]; body = T.filter((t) => !t.done && t.b).sort((x, y) => o.indexOf(x.b) - o.indexOf(y.b)).slice(0, 9).map(row).join("") || '<span class="small muted">Pick today\'s 1 big, 3 medium and 5 small tasks on the To-Do page.</span>'; }
-    else if (tv === "matrix") { body = `<div class="grid g2" style="gap:8px">${QUADS.map((q) => { const ts = T.filter((t) => !!t.urg === q[2] && !!t.imp === q[3] && !t.done); return `<div class="quad ${q[0]}" style="min-height:96px;padding:10px;gap:6px"><div class="between"><b class="small">${q[1]}</b><span class="tiny muted">${ts.length}</span></div>${ts.slice(0, 3).map((t) => `<label class="row" style="gap:6px;font-size:12px"><input type="checkbox" data-done="${E(t.id)}" class="cb sm"><span style="flex:1">${E(t.t)}</span></label>`).join("")}${ts.length > 3 ? `<span class="tiny muted">+${ts.length - 3} more</span>` : ""}</div>`; }).join("")}</div>`; }
-    else { body = T.filter((t) => t.due && !t.done).sort((a, b) => a.due.localeCompare(b.due)).slice(0, 6).map((t) => `<div class="between small"><span>${E(t.t)}</span><span class="${t.due < iso(today()) ? "over" : "muted"}">${fmt(parseISO(t.due), { day: "numeric", month: "short" })}</span></div>`).join("") || '<span class="small muted">Nothing due.</span>'; }
-    return `<section class="card stack"><div class="between wrap"><span class="lab">Today's to-dos</span>${tabs}</div>${body}<button class="link" data-go="todo" style="align-self:flex-start">Open To-Do →</button></section>`;
+    const G = taskGroups(), n = G.overdue.length + G.today.length, dn = G.today.filter((t) => t.done).length;
+    return `<section class="card stack mt"><div class="between wrap"><span class="lab">To-dos · ${dn} of ${n} done</span><span class="row" style="gap:6px"><button class="btn sm" data-tnew>${ic("plus", 16)} Task</button><button class="link" data-go="todo">To-Do →</button></span></div>
+      ${G.overdue.length ? `<div class="between wrap"><span class="lab over">Overdue · ${G.overdue.length}</span>${moveAll()}</div>${G.overdue.map(taskRow).join("")}<span class="lab">Today</span>` : ""}
+      ${G.today.map(taskRow).join("") || '<span class="small muted">Nothing for today. Tap Task to add one.</span>'}</section>`;
+  }
+  /* Post-its: pinned tasks only, coloured by priority; write on them with the S Pen; drag the handle to reorder. */
+  function postitStrip() {
+    const k = iso(today()), T = tasks().filter((t) => t.pin && (!t.done || (t.doneAt && dayOf(t.doneAt) === k))).sort((a, b) => (a.pinO || 0) - (b.pinO || 0)).slice(0, 8);
+    if (!T.length) return "";
+    return `<section class="stack mt" style="gap:6px"><span class="lab">Post-its</span><div class="postits">${T.map((t) => { const ink = ((MP.S.ink["postit-" + t.id] || {}).s || []).length;
+      return `<div class="postit p${tPri(t)} ${t.done ? "done" : ""}" data-pid="${E(t.id)}"><div class="between"><span class="phandle" title="Drag to reorder" aria-label="Drag to reorder">⋮⋮</span><span class="row" style="gap:2px"><button class="tool" data-pnote="${E(t.id)}" title="Write on it" aria-label="Write on this post-it">${ic("penm", 15)}</button><input type="checkbox" class="cb sm" data-done="${E(t.id)}" ${t.done ? "checked" : ""} aria-label="Done"></span></div>
+        <button class="ptext" data-tedit="${E(t.id)}">${E(t.t)}</button>${ink ? `<canvas class="printink" data-printink="postit-${E(t.id)}" height="80"></canvas>` : ""}</div>`; }).join("")}</div></section>`;
   }
   const writeBtns = () => `<span class="row" style="gap:4px"><button class="link" data-write="pen">${ic("penm", 16)} Write</button><span class="muted">·</span><button class="link" data-write="type">${ic("kbd", 16)} Type</button></span>`;
 
@@ -176,7 +215,7 @@
       <div class="bar"><i style="width:${sr.length ? (doneB / sr.length) * 100 : 0}%"></i></div><div class="between wrap"><span class="small" style="opacity:.9">${doneB} of ${sr.length} blocks · ${studyHours(t).toFixed(1)} h studied</span><button class="btn inv" data-go="study">Focus timer</button></div></section></div>
       <section class="card stack mt"><div class="between"><span class="lab">Habits today</span><span class="small accb">${hs.filter((h) => (rec.h || {})[h.id] === "d").length} of ${hs.length} · ${Math.round(pct * 100)}%</span></div>
       ${hs.length ? `<div class="row habrow">${hs.map((h) => `<button class="hb" data-h="${E(h.id)}" aria-label="${E(h.name)}: tap to change">${dots((rec.h || {})[h.id] || "e", (rec.h || {})[h.id])}<span>${E(h.name.split(" ")[0])}</span></button>`).join("")}</div><span class="tiny muted">Tap a circle: empty → Done (100%) → Partial (50%) → Missed</span>` : `<span class="small muted">No habits yet. <button class="link" data-go="habits">Add habits →</button></span>`}</section>
-      ${schedCard()}${inboxCard()}<div class="grid g2 mt">${todoCard()}
+      ${schedCard()}${inboxCard()}${postitStrip()}${todoCard()}<div class="grid g2 mt">
       <section class="card stack"><div class="between"><span class="lab">Mood check-in</span><button class="link" data-go="mood">Open →</button></div>
       <div class="row">${Object.keys(MOODCOL).map((w) => `<button class="moodbtn" data-moodq="${w}" style="${tm === w ? `background:${MOODCOL[w]};color:#1d1d1d` : ""}">${w}</button>`).join("")}</div>
       <div class="between"><div><div class="lab">Winning streak</div><div class="big">${streak()} days</div></div><div class="row" style="gap:6px">${[...Array(7)].map((_, i) => { const d = addD(monday(t), i), q = dayPct(d), on = q !== null && q >= 0.7; return `<span class="wd"><span class="wdot ${on ? "on" : ""}"></span>${"MTWTFSS"[i]}</span>`; }).join("")}</div></div></section></div>`;
@@ -281,22 +320,77 @@
       <section class="card stack"><span class="lab">Week goals · saved per week</span>${[...Array(weeks)].map((_, w) => { const wk = iso(addD(st, w * 7)); return `<label class="row small" style="gap:8px"><b style="width:56px">Week ${w + 1}</b><input class="f" style="flex:1" maxlength="200" data-wkf="goal" data-wk="${wk}" value="${E((MP.S.weeks[wk] || {}).goal || "")}" placeholder="Goal for this week"></label>`; }).join("")}<span class="tiny muted">Purnima / Amavasya: tithi at sunrise, New Delhi. Fasting (vrat) days can fall a day earlier; check your family calendar for those.</span></section></div>`;
   };
 
-  const QUADS = [["q1", "Do now", true, true], ["q2", "Schedule", false, true], ["q3", "Delegate or pass", true, false], ["q4", "Drop", false, false]];
-  const learnHTML = () => `<div class="between"><h2 id="mt">How the matrix works</h2><button class="tool" data-close aria-label="Close">✕</button></div><span class="small muted">Ask two questions about each task: is it urgent? Is it important?</span>
-    <div class="learn"><span></span><b class="small c">Urgent<br><span class="tiny muted">deadline soon / someone waiting</span></b><b class="small c">Not urgent<br><span class="tiny muted">no pressing deadline</span></b>
-    <b class="small">Important<br><span class="tiny muted">moves my goals forward</span></b><div class="quad q1 s"><b>1 · Do now</b><span class="small">Urgent <u>and</u> important.</span><span class="tiny muted">e.g. a form due tomorrow</span></div><div class="quad q2 s"><b>2 · Schedule</b><span class="small">Important <u>but not</u> urgent.</span><span class="tiny muted">Give it a time or a study block.</span></div>
-    <b class="small">Not important<br><span class="tiny muted">doesn't serve my goals</span></b><div class="quad q3 s"><b>3 · Delegate or pass</b><span class="small">Urgent <u>but not</u> important.</span><span class="tiny muted">Hand it off, or do it in 5 minutes.</span></div><div class="quad q4 s"><b>4 · Drop</b><span class="small">Not important <u>and</u> not urgent.</span><span class="tiny muted">Let it go, or save it for free time.</span></div></div>
-    <span class="tiny muted">Pick today's 1-3-5 mostly from boxes 1 and 2. You can drag any card to another box later.</span><button class="btn" data-close style="align-self:flex-end">Got it</button>`;
   V.todo = () => {
-    const T = tasks(), big = T.filter((t) => t.b === "big" && !t.done), med = T.filter((t) => t.b === "med" && !t.done), sm = T.filter((t) => t.b === "small" && !t.done);
-    const card = (t) => `<div class="task ${t.done ? "done" : ""}" data-task="${E(t.id)}"><input type="checkbox" class="cb sm" ${t.done ? "checked" : ""} data-done="${E(t.id)}" aria-label="Done"><span style="flex:1"><span class="tt">${E(t.t)}</span>${t.due ? `<br><span class="tiny ${t.due < iso(today()) && !t.done ? "over" : "muted"}">due ${fmt(parseISO(t.due), { day: "numeric", month: "short" })}</span>` : ""}</span>${sel(`data-size135="${E(t.id)}"`, [["", "–"], ["big", "1 big"], ["med", "3 med"], ["small", "5 small"]], t.b || "", 'class="f xs" aria-label="1-3-5 size"').replace('class="f" data-size135', 'class="f xs" data-size135')}<button class="tool" data-tdel="${E(t.id)}" aria-label="Delete task">${ic("trash", 14)}</button></div>`;
-    return `${head("Eisenhower matrix + daily 1-3-5", "To-Do", `<div class="tabs"><button class="${view.todo === "matrix" ? "on" : ""}" data-tv="matrix">Matrix</button><button class="${view.todo === "135" ? "on" : ""}" data-tv="135">Today's 1-3-5</button><button class="${view.todo === "list" ? "on" : ""}" data-tv="list">All & reminders</button></div>`)}
-      <section class="card stack mb"><span class="lab">New task</span><div class="row"><input class="f" id="nt" maxlength="160" placeholder="What needs doing?" style="flex:1;min-width:180px" aria-label="Task"><input class="f" id="ndue" type="date" style="width:auto" aria-label="Due date"><label class="pill row"><input type="checkbox" id="nu" data-dest> Urgent</label><label class="pill row"><input type="checkbox" id="ni" checked data-dest> Important</label><button class="btn" data-addtask>${ic("plus", 16)} Add</button></div>
-      <span class="small accb" id="dest">→ This task will go to: Schedule</span><span class="small muted">Not sure? <b>Urgent</b> = deadline soon or someone is waiting. <b>Important</b> = moves your goals forward. <button class="learnlink" data-learn>Learn how</button></span></section>
-      ${view.todo === "matrix" ? `<div class="matrix">${QUADS.map((q) => `<div class="quad ${q[0]}" data-quad="${q[0]}"><h3>${q[1]}</h3>${T.filter((t) => !!t.urg === q[2] && !!t.imp === q[3]).map(card).join("") || '<span class="tiny muted">Drop tasks here</span>'}</div>`).join("")}</div>`
-      : view.todo === "135" ? `<div class="grid g3">${[["1 big thing", big, 1], ["3 medium", med, 3], ["5 small", sm, 5]].map((g) => `<section class="card stack"><div class="between"><span class="lab">${g[0]}</span><span class="tiny muted">${g[1].length}/${g[2]}</span></div>${g[1].map(card).join("")}${[...Array(Math.max(0, g[2] - g[1].length))].map(() => `<div class="slot tiny muted">Pick a task in the matrix and set its size</div>`).join("")}</section>`).join("")}</div>`
-      : `<section class="card stack">${T.sort((a, b) => (a.done - b.done) || (a.due || "9").localeCompare(b.due || "9")).map((t) => `<div class="between wrap">${card(t)}${t.due && !t.done ? calBtn("task-" + t.id, t.t, { kind: "task", t }) : ""}</div>`).join("") || '<span class="small muted">No tasks yet.</span>'}</section>`}`;
+    const G = taskGroups(), months = {};
+    G.done.forEach((t) => { const m = t.doneAt ? fmt(new Date(t.doneAt), { month: "long", year: "numeric" }) : "Before 18 Nov 2026"; (months[m] = months[m] || []).push(t); });
+    const sec = (title, arr, extra = "") => (arr.length ? `<section class="card stack mb"><div class="between wrap"><span class="lab">${title} · ${arr.length}</span>${extra}</div>${arr.map(taskRow).join("")}</section>` : "");
+    const fmtLong = (k) => (k ? fmt(parseISO(k), { day: "numeric", month: "short", year: "numeric" }) : "—");
+    return `${head("One list · priority is set from Urgent + Important", "To-Do", `<button class="btn" data-tnew>${ic("plus", 16)} New task</button>`)}
+      ${sec('<span class="over">Overdue</span>', G.overdue, moveAll())}
+      ${sec("Today", G.today) || '<section class="card mb"><span class="small muted">Nothing for today. Tap New task.</span></section>'}
+      ${sec("Upcoming", G.upcoming)}${sec("Inbox · no date yet", G.inbox)}
+      <section class="card stack"><div class="between wrap"><span class="lab">Completed tasks · ${G.done.length}</span><input class="f" data-tq placeholder="Search completed tasks" style="width:auto;min-width:200px" aria-label="Search completed tasks"></div>
+      ${Object.keys(months).map((m, i) => `<details ${i === 0 ? "open" : ""}><summary class="small b">${E(m)} · ${months[m].length}</summary><div class="ctab"><div class="ch">Task</div><div class="ch">Priority</div><div class="ch">Created</div><div class="ch">Completed</div><div class="ch"></div>
+        ${months[m].map((t) => `<div class="cr" data-ctrow="${E(t.t.toLowerCase())}"><div>${E(t.t)}</div><div><span class="pill tiny ${TPRI[tPri(t)][1]}">${TPRI[tPri(t)][0]}</span></div><div>${fmtLong(tCreated(t))}</div><div>${t.doneAt ? fmtLong(dayOf(t.doneAt)) : "before 18 Nov 2026"}</div><div><button class="link tiny" data-tundo="${E(t.id)}">Not done</button></div></div>`).join("")}</div></details>`).join("") || '<span class="small muted">Tasks you tick done are listed here with the date each was created and completed.</span>'}</section>`;
   };
+  /* The task form: Date, Task, Urgent, Important, Due date, sub-tasks, post-it, 5-minute Calendar block. */
+  const chk = (id) => !!(document.getElementById(id) || {}).checked;
+  function calSlot(dk) { /* 2 hours from now, rounded up to 5 minutes; past midnight goes to the next day */
+    const later = new Date(Date.now() + 2 * 3600e3); let m = Math.ceil((later.getHours() * 60 + later.getMinutes()) / 5) * 5, d = dk;
+    if (iso(later) !== iso(new Date()) || m >= 1440) d = iso(addD(parseISO(dk), 1));
+    if (m >= 1440) m -= 1440; return { d, t: minToT(Math.min(m, 1430)) };
+  }
+  function taskDialog(id, preset) {
+    const t = id ? Object.assign({}, MP.S.tasks[id]) : Object.assign({ t: "", d: iso(today()), urg: false, imp: true, due: "", pin: false, sub: [] }, preset || {});
+    const k = tDay(t), signed = mode === "google", sent = id && MP.S.sent["task-" + id] && !MP.S.sent["task-" + id].del;
+    modal(`<div class="between"><h2>${id ? "Edit task" : "New task"}</h2><button class="tool" data-close aria-label="Close">✕</button></div>
+      <div class="grid g2"><label class="stack small">Date<input class="f" type="date" id="tfd" value="${E(k || iso(today()))}"></label><label class="stack small">Due date (deadline, optional)<input class="f" type="date" id="tfdue" value="${E(t.due && t.due !== k ? t.due : t.due || "")}"></label></div>
+      <label class="row small"><input type="checkbox" id="tfinbox" data-tfp ${id && !k ? "checked" : ""}> No date yet: keep it in the Inbox</label>
+      <label class="stack small">Task<textarea class="f" id="tft" rows="3" maxlength="1000" placeholder="Write it in as much detail as you like">${E(t.t)}</textarea></label>
+      <div class="row"><label class="pill row"><input type="checkbox" id="tfu" data-tfp ${t.urg ? "checked" : ""}> Urgent</label><label class="pill row"><input type="checkbox" id="tfi" data-tfp ${t.imp ? "checked" : ""}> Important</label><span class="small accb" id="tfpri"></span></div>
+      <label class="stack small">Steps (optional, one per line)<textarea class="f" id="tfsub" rows="2" maxlength="3000" placeholder="e.g. Find the form&#10;Fill it in&#10;Post it">${E((t.sub || []).map((x) => x.t).join("\n"))}</textarea></label>
+      <label class="row small"><input type="checkbox" id="tfpin" ${t.pin ? "checked" : ""}> Show as a post-it on Today</label>
+      <div class="row small" style="gap:8px;flex-wrap:wrap"><label class="row"><input type="checkbox" id="tfcal" data-tfp ${sent ? "checked" : ""} ${signed ? "" : "disabled"}> Add to Google Calendar as a 5-minute block</label><label class="row tfcalt" ${sent ? "" : "hidden"}>at <input class="f" type="time" id="tfct" value="${E(sent && t.cal ? t.cal.t : calSlot(k || iso(today())).t)}" style="width:auto"></label>${signed ? "" : '<span class="muted">(sign in with Google to use)</span>'}</div>
+      <div class="row" style="justify-content:flex-end">${id ? `<button class="btn ghost danger" data-tdel="${E(id)}">Delete</button>` : ""}<button class="btn ghost" data-close>Cancel</button><button class="btn" data-tsave="${E(id || "")}">${id ? "Save" : "Add task"}</button></div>`);
+    tfRefresh();
+  }
+  function tfRefresh() {
+    const out = document.getElementById("tfpri"); if (!out) return;
+    out.textContent = "→ Priority: " + TPRI[tPri({ urg: chk("tfu"), imp: chk("tfi") })][0];
+    document.querySelectorAll(".tfcalt").forEach((x) => (x.hidden = !chk("tfcal")));
+    const d = document.getElementById("tfd"); if (d) d.disabled = chk("tfinbox");
+  }
+  async function taskSave(id) {
+    const txt = ((document.getElementById("tft") || {}).value || "").trim().slice(0, 1000); if (!txt) { MP.toast("Write the task first"); return; }
+    const inbox = chk("tfinbox"), d = inbox ? "" : field("tfd") || iso(today()), tid = id || uid(), old = MP.S.tasks[tid] || {};
+    const lines = ((document.getElementById("tfsub") || {}).value || "").split("\n").map((x) => x.trim()).filter(Boolean).slice(0, 30);
+    const sub = lines.map((x) => (old.sub || []).find((o) => o.t === x) || { id: uid(), t: x.slice(0, 200), done: false });
+    const rec = Object.assign({}, old, { t: txt, d, inbox, due: field("tfdue"), urg: chk("tfu"), imp: chk("tfi"), pin: chk("tfpin"), sub, c: old.c || Date.now(), done: !!old.done });
+    delete rec.del; delete rec.id; if (rec.pin && !old.pin) rec.pinO = Date.now();
+    if (chk("tfcal") && mode === "google") { const ct = field("tfct"), slot = calSlot(d || iso(today())); rec.cal = { d: !old.cal && ct === slot.t ? slot.d : (old.cal && old.cal.t === ct ? old.cal.d : d || iso(today())), t: ct || slot.t }; } else delete rec.cal;
+    putRec("tasks", tid, rec); closeModal(); MP.render(); MP.toast(id ? "Saved" : inbox ? "Added to the Inbox" : "Added to your list");
+    await taskCalSync(tid);
+  }
+  const taskEv = (t) => { const ev = timedEv((t.done ? "✓ " : "") + "To-do · " + t.t.split("\n")[0].slice(0, 100), t.cal.d, t.cal.t, minToT(tMin(t.cal.t) + 5)); ev.description = t.t + "\n\nPriority: " + TPRI[tPri(t)][0] + (t.due ? "\nDue: " + t.due : ""); ev.colorId = PRICOL[TPRI[tPri(t)][2]]; ev.reminders = remind(0); return ev; };
+  async function taskCalSync(tid) {
+    const t = MP.S.tasks[tid], key = "task-" + tid, s = MP.S.sent[key], had = s && !s.del;
+    if (mode !== "google" || (!had && (!t || !t.cal))) return;
+    try {
+      if (!t || t.del || !t.cal) { await calRemove(key); return; }
+      if (had) await G.calPatch(s.id, taskEv(t));
+      else { const cid = await G.calInsert(taskEv(t)); MP.S.sent[key] = { id: cid, u: Date.now() }; MP.changed(); MP.toast("Added to your Google Calendar"); MP.render(); }
+    } catch (e) { MP.toast(e.reauth ? "Please tap sync to reconnect, then try again." : "Calendar: " + e.message); }
+  }
+  function markDone(id, on) {
+    const x = MP.S.tasks[id]; if (!x) return;
+    x.done = on; x.doneAt = on ? Date.now() : null; x.u = Date.now(); MP.changed(); MP.render();
+    if (x.cal) taskCalSync(id);
+  }
+  function postitPad(id) {
+    const t = MP.S.tasks[id]; if (!t) return;
+    modal(`<div class="between"><h2>Post-it</h2><button class="tool" data-pclose aria-label="Close">✕</button></div><b class="small">${E(t.t)}</b>${MP.padHTML("postit-" + id, 5, 40)}<div class="row" style="justify-content:flex-end"><button class="btn" data-pclose>Done</button></div>`);
+    MP.setupPads();
+  }
 
   V.affirm = () => {
     const a = dailyAff(today()), C = P().collections;
@@ -413,7 +507,7 @@
   const typedOf = (key) => ((MP.S.typed[key] && MP.S.typed[key].l) || []).filter(Boolean);
   const PV = {
     summary: () => { const t = today(), a = dailyAff(t); return `${pHead("Summary")}<div class="pquote">“${E(a.text)}”</div><div class="grid g2"><div class="stack" style="gap:6px"><div class="lab">Study blocks</div>${studyRows(t).map((r) => `<div class="small">○ <b>${fmtT(r.start)}</b> ${E(r.text)}</div>`).join("")}</div><div class="stack" style="gap:6px"><div class="lab">Top 3</div>${tasks().filter((x) => !x.done && x.b).slice(0, 3).map((x) => `<div class="small">○ ${E(x.t)}</div>`).join("")}<div class="lab" style="margin-top:6px">Habits</div><div class="small">${activeHabits().map((h) => "○ " + E(h.name.split(" ")[0])).join("  ")}</div></div></div><div class="tiny muted c cut">✂ half page · two days fit on one A4 sheet</div>`; },
-    detailed: () => { const t = today(), a = dailyAff(t); let last = ""; const sec = { m: "Morning", a: "Afternoon", e: "Evening" }; return `${pHead("My daily rhythm")}<div class="pgrid"><div class="stack" style="gap:2px">${ttFor(t).map((r) => { let h = ""; const s = secOf(r.start); if (s !== last) { h = `<div class="psec">${sec[s]}</div>`; last = s; } return h + `<div class="prow ${r.type === "Study" ? "study" : ""}"><span>${fmtT(r.start)}${r.end ? "–" + fmtT(r.end) : ""}</span>${E(r.text)}</div>`; }).join("")}</div><div class="stack" style="gap:8px"><div class="pquote sm">“${E(a.text)}”</div><div class="lab">Top 3 to-dos</div>${tasks().filter((x) => !x.done && x.b).slice(0, 3).map((x) => `<div class="tiny">○ ${E(x.t)}</div>`).join("")}<div class="lab">Wellness</div><div class="tiny">Water ○○○○○○○○</div><div class="tiny">Mood 1 2 3 4 5 · Energy 1 2 3 4 5</div><div class="tiny">Slept ____ hrs</div><div class="lab">Grateful for</div><div class="pline hand">${E(typedOf("grateful-" + iso(t)).join(" "))}</div><div class="lab">Today's win</div><div class="pline hand">${E(typedOf("win-" + iso(t)).join(" "))}</div><div class="tiny" style="color:#5B4B9A;margin-top:auto">pause at 11:11 & 08:08 · breathe</div></div></div>`; },
+    detailed: () => { const t = today(), a = dailyAff(t); let last = ""; const sec = { m: "Morning", a: "Afternoon", e: "Evening" }; return `${pHead("My daily rhythm")}<div class="pgrid"><div class="stack" style="gap:2px">${ttFor(t).map((r) => { let h = ""; const s = secOf(r.start); if (s !== last) { h = `<div class="psec">${sec[s]}</div>`; last = s; } return h + `<div class="prow ${r.type === "Study" ? "study" : ""}"><span>${fmtT(r.start)}${r.end ? "–" + fmtT(r.end) : ""}</span>${E(r.text)}</div>`; }).join("")}</div><div class="stack" style="gap:8px"><div class="pquote sm">“${E(a.text)}”</div><div class="lab">Top 3 to-dos</div>${(() => { const G = taskGroups(); return [...G.overdue, ...G.today.filter((x) => !x.done)].sort(tByPri).slice(0, 3); })().map((x) => `<div class="tiny">○ ${E(x.t.split("\n")[0])}</div>`).join("")}<div class="lab">Wellness</div><div class="tiny">Water ○○○○○○○○</div><div class="tiny">Mood 1 2 3 4 5 · Energy 1 2 3 4 5</div><div class="tiny">Slept ____ hrs</div><div class="lab">Grateful for</div><div class="pline hand">${E(typedOf("grateful-" + iso(t)).join(" "))}</div><div class="lab">Today's win</div><div class="pline hand">${E(typedOf("win-" + iso(t)).join(" "))}</div><div class="tiny" style="color:#5B4B9A;margin-top:auto">pause at 11:11 & 08:08 · breathe</div></div></div>`; },
     hourly: () => { const t = today(); let rows = ""; for (let h = 6; h <= 23; h++) { const ev = ttFor(t).filter((r) => Math.floor(tMin(r.start) / 60) === h); rows += `<div class="hrow"><span class="tiny muted b">${h > 12 ? h - 12 : h}${h >= 12 ? "pm" : "am"}</span><div class="hev">${ev.map((r) => `<span class="tiny" style="border-left:3px solid ${TCOL[r.type]};${r.type === "Study" ? "background:var(--soft);font-weight:700" : ""}">${fmtT(r.start)} ${E(r.text)}</span>`).join("")}</div><span class="hnote"></span></div>`; } return `${pHead("Hourly time-blocks")}<div style="flex:1">${rows}</div>`; },
     journal: () => { const t = today(), a = dailyAff(t), typed = typedOf("journal-" + iso(t)), inks = ((MP.S.ink["journal-" + iso(t)] || {}).s || []).length; return `${pHead("Journal spread")}<div class="pgrid eq"><div class="stack" style="gap:3px">${ttFor(t).map((r) => `<div class="tiny jrow ${r.type === "Study" ? "b" : ""}"><span class="muted">${fmtT(r.start)}</span> ${E(r.text)}</div>`).join("")}</div><div class="stack" style="gap:6px"><div class="pquote sm">“${E(a.text)}”</div><div class="lab">Dear diary</div>${typed.map((x) => `<div class="pline hand">${E(x)}</div>`).join("")}${inks ? `<canvas class="printink" data-printink="journal-${iso(t)}" height="300"></canvas>` : ""}${[...Array(Math.max(4, 14 - typed.length - (inks ? 6 : 0)))].map(() => `<div class="pline"></div>`).join("")}</div></div>`; }
   };
@@ -466,7 +560,7 @@
     const match = (s) => !q || (s.title + " " + JSON.stringify(s.body)).toLowerCase().includes(q);
     const shown = H.filter(match);
     return `${head("User guide · version " + E(MP.VERSION), "Help & Guide")}
-      <section class="card row mb"><span class="muted">${ic("search", 18)}</span><input class="f" id="helpq" value="${E(view.hq || "")}" placeholder="Search the guide, e.g. sync, S Pen, matrix" style="flex:1" aria-label="Search the guide"></section>
+      <section class="card row mb"><span class="muted">${ic("search", 18)}</span><input class="f" id="helpq" value="${E(view.hq || "")}" placeholder="Search the guide, e.g. sync, S Pen, post-it" style="flex:1" aria-label="Search the guide"></section>
       <section class="card stack mb"><span class="lab">Contents</span><div class="row">${H.map((s, i) => `<button class="pill out" data-hsec="${s.id}">${i + 1}. ${E(s.title)}</button>`).join("")}</div></section>
       <div class="stack" style="gap:14px">${shown.map((s) => `<section class="card stack" id="help-${s.id}"><div class="between wrap"><h2>${H.indexOf(s) + 1}. ${E(s.title)}</h2>${s.route ? `<button class="btn ghost sm" data-go="${s.route}">Open this screen →</button>` : ""}</div>${s.body.map(blockHTML).join("")}</section>`).join("") || '<p class="small muted">Nothing matches. Try another word.</p>'}</div>
       <p class="tiny muted c mt">Still stuck? Ask the person who set up My Planner for your family.</p>`;
@@ -475,7 +569,11 @@
   /* ---------- settings ---------- */
   V.prefs = () => {
     const sh = P().share, acc = mode === "google" && G.user ? E(G.user.email) : "Demo mode · this device only";
+    const mp = (P().menu || {}).preset || (P().menu ? "custom" : "full");
     return `${head("Make it yours", "Settings")}
+      <section class="card stack mb"><div class="between wrap"><span class="lab">Menu · choose the screens you see</span><span class="row" style="gap:6px"><button class="btn sm ${mp === "simple" ? "" : "ghost"}" data-menup="simple">Simple</button><button class="btn sm ${mp === "full" ? "" : "ghost"}" data-menup="full">Full</button></span></div>
+        <div class="row">${SCREENS.filter((x) => x[0] !== "today" && x[0] !== "prefs").map((x) => `<label class="pill row"><input type="checkbox" data-menus="${x[0]}" ${shownScreen(x[0]) ? "checked" : ""}> ${x[1]}</label>`).join("")}</div>
+        <span class="tiny muted">Hidden screens keep all their data; tick them again any time. Today and Settings always stay.</span></section>
       <section class="stack mb"><span class="lab">Theme</span><div class="grid g3">${THEMES.map((t) => `<button class="themecard ${P().theme === t[0] ? "on" : ""}" data-theme-pick="${t[0]}" data-theme="${t[0]}"><div class="tc"><div class="tcn">${t[1]}</div><div class="row" style="gap:6px">${["--acc", "--acc2", "--soft", "--surf"].map((v) => `<i class="swi" style="background:var(${v})"></i>`).join("")}</div><div class="tch">Up next · Study block</div></div></button>`).join("")}</div></section>
       <div class="grid g2"><section class="card stack"><span class="lab">Profile</span><label class="stack small">Name on Today<input class="f" maxlength="40" value="${E(P().name)}" data-name></label><div class="small">Signed in as <b>${acc}</b></div><div class="row"><button class="btn ghost sm" data-signout>Sign out</button></div></section>
       <section class="card stack"><span class="lab">Study blocks</span><div class="between small"><span>Blocks per day (weekdays)</span><span class="row" style="gap:4px"><button class="pill num" data-blk-n="-1" aria-label="One fewer block">−</button><b style="min-width:24px;text-align:center">${P().timetable.filter((r) => r.type === "Study").length}</b><button class="pill num" data-blk-n="1" aria-label="One more block">+</button></span></div>
@@ -518,7 +616,7 @@
       const blk = (rows) => (Array.isArray(rows) ? rows : []).filter((r) => r.type === "Study").map((r) => ({ id: r.id, start: r.start, end: r.end || null, text: r.text }));
       data.studyPlan = { weekday: blk(S.profile.timetable), weekend: Array.isArray(S.profile.weekend) ? blk(S.profile.weekend) : null };
     }
-    if (cats.tasks) data.tasks = Object.entries(S.tasks).filter(([, v]) => v && !v.del).map(([id, v]) => ({ id, title: v.t, due: v.due || null, urgent: !!v.urg, important: !!v.imp, size: v.b || null, done: !!v.done }));
+    if (cats.tasks) data.tasks = Object.entries(S.tasks).filter(([, v]) => v && !v.del).map(([id, v]) => ({ id, title: v.t, date: tDay(v) || null, due: v.due || null, urgent: !!v.urg, important: !!v.imp, priority: TPRI[tPri(v)][0], size: v.b || null, done: !!v.done, createdAt: v.c ? new Date(v.c).toISOString() : null, completedAt: v.doneAt ? new Date(v.doneAt).toISOString() : null, inbox: !tDay(v), steps: (v.sub || []).length ? { done: v.sub.filter((x) => x.done).length, total: v.sub.length } : null }));
     if (cats.events) {
       const evx = ([id, v]) => ({ id, title: v.t, kind: v.kind || "event", date: v.d, time: v.time || null, end: v.end || null, priority: v.pri || null, reminderMin: v.rem === undefined || v.rem === "" ? null : +v.rem, repeat: v.rep ? { rule: v.rep, days: v.repDays || [], ends: v.repEnd || "never", until: v.repUntil || null, count: v.repCount ? +v.repCount : null, text: repText(v) } : null });
       data.events = Object.entries(S.events).filter(([, v]) => v && !v.del && (v.d >= iso(t) || v.rep)).map(evx);
@@ -542,7 +640,7 @@
      the same item at once end up with one record after sync, not two. Returns a short label. */
   function applyInbox(id, it) {
     const pri = it.priority || "", rid = "bd-" + id.replace(/[^\w-]/g, "").slice(0, 60), by = it.by === "owner" ? "You asked Buddy" : "Suggested by Buddy";
-    if (it.kind === "task") putRec("tasks", rid, { t: it.title, due: it.date, done: false, b: "", urg: pri === "high" || pri === "urgent", imp: pri !== "low" });
+    if (it.kind === "task") putRec("tasks", rid, { t: it.title, d: it.date || iso(today()), due: "", done: false, urg: pri === "high" || pri === "urgent", imp: pri !== "low", c: Date.now() });
     else if (["event", "reminder", "study"].includes(it.kind)) putRec("events", rid, { d: it.date || iso(today()), time: it.time, end: it.time ? it.end || "" : "", t: it.title, kind: it.kind, pri: pri || "med", rem: it.kind === "reminder" || it.time ? (it.kind === "reminder" ? "0" : "10") : "", rep: "", note: it.why ? by + ": " + it.why : by });
     else if (it.kind === "habit") { P().habits.push({ id: rid, name: it.title.slice(0, 60), def: "", active: true }); touchP(); }
     else if (it.kind === "affirmation") { P().mine.push(it.title); touchP(); }
@@ -598,6 +696,7 @@
     const p = P(); p.name = wiz.name.trim(); p.theme = wiz.theme; p.collections = Object.assign({}, wiz.cols);
     if (!p.timetable.length && wiz.routine) p.timetable = D.suggest.routine.map((r) => ({ id: uid(), start: r[0], end: r[1], text: r[2], type: r[3] }));
     wiz.habits.forEach((n) => { if (!p.habits.some((h) => h.name === n)) p.habits.push({ id: uid(), name: n, def: "", active: true }); });
+    if (!p.menu) p.menu = menuSimple(); /* new people start on the Simple menu */
     p.seenVersion = MP.VERSION; p.setupDone = true; touchP(); go("today");
   }
 
@@ -608,10 +707,10 @@
 
   function shell() {
     const inApp = mode !== "signin" && P().setupDone;
-    document.getElementById("side").innerHTML = inApp ? `<div class="brand">My <span>Planner</span></div>${statusPill()}<button class="navbtn navadd" data-sched>${ic("plus")}Add / schedule</button>` + SCREENS.map((s) => `<button class="navbtn ${route === s[0] ? "on" : ""}" data-go="${s[0]}">${ic(s[0])}${s[1]}</button>`).join("") : "";
+    document.getElementById("side").innerHTML = inApp ? `<div class="brand">My <span>Planner</span></div>${statusPill()}<button class="navbtn navadd" data-sched>${ic("plus")}Add / schedule</button>` + SCREENS.filter((s) => shownScreen(s[0])).map((s) => `<button class="navbtn ${route === s[0] ? "on" : ""}" data-go="${s[0]}">${ic(s[0])}${s[1]}</button>`).join("") : "";
     const quick = [["today", "Today"], ["planner", "Planner"], ["habits", "Habits"], ["todo", "To-Do"], ["more", "More"]];
     document.getElementById("bottom").innerHTML = inApp ? quick.map((q) => `<button class="${route === q[0] || (q[0] === "more" && !quick.some((x) => x[0] === route)) ? "on" : ""}" data-go="${q[0]}">${ic(q[0], 22)}${q[1]}</button>`).join("") : "";
-    document.getElementById("sheetin").innerHTML = `<button class="navbtn navadd" data-sched>${ic("plus", 22)}Add / schedule</button>` + SCREENS.map((s) => `<button class="navbtn ${route === s[0] ? "on" : ""}" data-go="${s[0]}">${ic(s[0], 22)}${s[1]}</button>`).join("");
+    document.getElementById("sheetin").innerHTML = `<button class="navbtn navadd" data-sched>${ic("plus", 22)}Add / schedule</button>` + SCREENS.filter((s) => shownScreen(s[0])).map((s) => `<button class="navbtn ${route === s[0] ? "on" : ""}" data-go="${s[0]}">${ic(s[0], 22)}${s[1]}</button>`).join("");
     document.body.classList.toggle("bare", !inApp);
   }
   function statusPill() {
@@ -912,6 +1011,11 @@
     if (rec.rep && rec.repEnd === "until" && (!rec.repUntil || rec.repUntil < d)) { MP.toast("Pick an end date after the start date"); return; }
     if (rec.rep && !repMatch(rec, rec.d)) { for (let i = 1; i < 400; i++) { const dk = iso(addD(parseISO(rec.d), i)); if (repMatch(rec, dk)) { rec.d = dk; break; } } } /* start on the first day that fits */
     if (kind === "habit") { let hid = field("shab"); if (hid === "__new" || (!hid && title)) { hid = uid(); P().habits.push({ id: hid, name: title.slice(0, 60), def: "", active: true }); touchP(); } rec.hab = hid; }
+    if (kind === "task" && !id) {
+      const tid = uid(), tk = { t: title.slice(0, 1000), d, due: "", done: false, urg: pri === "urgent" || pri === "high", imp: pri !== "low", c: Date.now(), sub: [] };
+      if (toCal && mode === "google") { const slot = calSlot(d); tk.cal = { d: time ? d : slot.d, t: time || slot.t }; }
+      putRec("tasks", tid, tk); closeModal(); MP.render(); MP.toast("Added to Today and your To-Do list"); await taskCalSync(tid); return;
+    }
     if (kind === "task") {
       const tid = old.tid && MP.S.tasks[old.tid] && !MP.S.tasks[old.tid].del ? old.tid : uid(), prev = MP.S.tasks[tid] || {};
       putRec("tasks", tid, Object.assign({ b: "", done: false }, prev, { t: title.slice(0, 160), due: d, urg: pri === "urgent" || pri === "high", imp: pri !== "low" }));
@@ -980,7 +1084,15 @@
     if (d.dosignout !== undefined) return doSignOut();
     if (d.wipe !== undefined) return wipeDialog();
     if (d.dowipe !== undefined) return doWipe();
-    if (d.learn !== undefined) return modal(learnHTML());
+    if (d.menup) { P().menu = d.menup === "simple" ? menuSimple() : { preset: "full", hide: {} }; touchP(); MP.render(); MP.toast(d.menup === "simple" ? "Simple menu" : "Full menu: every screen shown"); return; }
+    if (d.tnew !== undefined) return taskDialog(null);
+    if (d.tedit) return taskDialog(d.tedit);
+    if (d.tsave !== undefined) return taskSave(d.tsave);
+    if (d.tpin) { const x = MP.S.tasks[d.tpin]; if (x) { x.pin = !x.pin; if (x.pin) x.pinO = Date.now(); x.u = Date.now(); MP.changed(); MP.render(); MP.toast(x.pin ? "Pinned as a post-it on Today" : "Removed from post-its"); } return; }
+    if (d.tmove !== undefined) { const to = iso(addD(today(), +d.tmove)), G2 = taskGroups(); G2.overdue.forEach((x) => { const r = MP.S.tasks[x.id]; r.d = to; r.inbox = false; r.u = Date.now(); }); MP.changed(); MP.render(); MP.toast(`Moved ${G2.overdue.length} task${G2.overdue.length === 1 ? "" : "s"} to ${+d.tmove ? "tomorrow" : "today"}`); return; }
+    if (d.tundo) return markDone(d.tundo, false);
+    if (d.pnote) return postitPad(d.pnote);
+    if (d.pclose !== undefined) { closeModal(); return MP.render(); }
     if (d.sched !== undefined) { document.getElementById("sheet").classList.remove("on"); return schedDialog(null, d.sched ? { d: d.sched } : null); }
     if (d.sedit) return schedDialog(d.sedit);
     if (d.ssave !== undefined) return schedSave(d.ssave || null);
@@ -989,7 +1101,6 @@
     if (d.calgo) return calSend(d.calgo);
     if (d.calrm) return calRemove(d.calrm);
     if (d.write) { MP.inputMode = d.write; MP.pref.set("input", d.write); return go("three"); }
-    if (d.tdv) { view.tdv = d.tdv; return MP.render(); }
     if (d.fbsend !== undefined) return fbSubmit(true);
     if (d.fbsave !== undefined) return fbSubmit(false);
     if (d.fbone) { const f = MP.S.feedback[d.fbone]; if (f) { f.status = "sent"; f.u = Date.now(); MP.changed(); MP.render(); openEmail([f]); } return; }
@@ -1014,7 +1125,6 @@
     if (d.ym !== undefined) { view.pm = new Date(view.pm.getFullYear(), +d.ym, 1); view.plan = "month"; return MP.render(); }
     if (d.py) { view.pm = new Date(view.pm.getFullYear() + +d.py, view.pm.getMonth(), 1); return MP.render(); }
     if (d.pm !== undefined) { view.pm = d.pm === "0" ? new Date(today().getFullYear(), today().getMonth(), 1) : new Date(view.pm.getFullYear(), view.pm.getMonth() + +d.pm, 1); return MP.render(); }
-    if (d.tv) { view.todo = d.tv; return MP.render(); }
     if (d.ttv) { view.tt = d.ttv; return MP.render(); }
     if (d.weon !== undefined) { P().weekend = P().timetable.map((r) => Object.assign({}, r, { id: uid() })); view.tt = "we"; touchP(); return MP.render(); }
     if (d.weoff !== undefined) { P().weekend = null; view.tt = "wd"; touchP(); return MP.render(); }
@@ -1034,8 +1144,7 @@
     if (d.addev !== undefined) { const v = field("evt"); if (v) { putRec("events", uid(), { d: field("evd") || iso(today()), time: field("evtm"), t: v.slice(0, 120) }); MP.render(); } return; }
     if (d.dayadd) { const v = field("ddt"); if (v) { putRec("events", uid(), { d: d.dayadd, time: field("ddtm"), t: v.slice(0, 120) }); closeModal(); MP.render(); MP.toast("Event added"); } return; }
     if (d.evdel) { delRec("events", d.evdel); return MP.render(); }
-    if (d.addtask !== undefined) { const v = field("nt"); if (!v) return; putRec("tasks", uid(), { t: v.slice(0, 160), due: field("ndue"), done: false, b: "", urg: document.getElementById("nu").checked, imp: document.getElementById("ni").checked }); return MP.render(); }
-    if (d.tdel) { delRec("tasks", d.tdel); return MP.render(); }
+    if (d.tdel) { const sk = MP.S.sent["task-" + d.tdel]; delRec("tasks", d.tdel); closeModal(); MP.render(); MP.toast("Task deleted"); if (sk && !sk.del) calRemove("task-" + d.tdel); return; }
     if (d.fav) { const f = P().fav, i = f.indexOf(d.fav); i >= 0 ? f.splice(i, 1) : f.push(d.fav); touchP(); return MP.render(); }
     if (d.addmine !== undefined) { const v = field("mine"); if (v) { P().mine.push(v.slice(0, 240)); touchP(); MP.render(); } return; }
     if (d.mdel !== undefined) { P().mine.splice(+d.mdel, 1); touchP(); return MP.render(); }
@@ -1063,10 +1172,12 @@
 
   document.addEventListener("change", (e) => {
     const t = e.target, d = t.dataset;
-    if (d.done) { const x = MP.S.tasks[d.done]; if (x) { x.done = t.checked; x.u = Date.now(); MP.changed(); MP.render(); } }
+    if (d.done) return markDone(d.done, t.checked);
+    if (d.sub) { const [tid, sid] = d.sub.split("|"), x = MP.S.tasks[tid]; if (!x) return; const st = (x.sub || []).find((y) => y.id === sid); if (st) st.done = t.checked; x.u = Date.now(); if (x.sub.every((y) => y.done) && !x.done) { MP.toast("All steps done, task ticked"); return markDone(tid, true); } MP.changed(); return MP.render(); }
+    if (d.tfp !== undefined) return tfRefresh();
+    if (d.menus) { const m = P().menu || (P().menu = { hide: {} }); m.hide = m.hide || {}; if (t.checked) delete m.hide[d.menus]; else m.hide[d.menus] = true; m.preset = "custom"; touchP(); MP.render(); return; }
     if (d.blk) { const k = iso(today()), r = dayRec(k); r.study = r.study || {}; r.study[d.blk] = t.checked; touchDay(k); MP.render(); }
     if (d.col) { P().collections[d.col] = t.checked; touchP(); MP.render(); }
-    if (d.size135) { const x = MP.S.tasks[d.size135]; x.b = t.value; x.u = Date.now(); MP.changed(); MP.render(); }
     if (d.sit) { const k = iso(today()), r = dayRec(k); r.sits = r.sits || {}; r.sits[d.sit] = t.checked; touchDay(k); if (r.sits.m && r.sits.a && r.sits.n) MP.toast("Day complete · dot added"); MP.render(); }
     if (d.hist !== undefined) { view.hist = t.value; MP.render(); }
     if (d.alert) { P().alerts = +t.value; touchP(); }
@@ -1087,7 +1198,6 @@
     if (d.tviewsel !== undefined) { P().todayView = t.value; touchP(); MP.render(); }
     if (d.printsel !== undefined) { P().printView = t.value; touchP(); MP.render(); }
     if (d.ttf === "type" || d.ttf === "start" || d.ttf === "end") { setTT(d.id, d.ttf, t.value); MP.render(); }
-    if (d.dest !== undefined) { const u = document.getElementById("nu").checked, i = document.getElementById("ni").checked; document.getElementById("dest").textContent = "→ This task will go to: " + (u && i ? "Do now" : i ? "Schedule" : u ? "Delegate or pass" : "Drop"); }
     if (d.wrt) { wiz.routine = d.wrt === "1"; MP.render(); }
     if (d.wcol) wiz.cols[d.wcol] = t.checked;
     if (d.restore !== undefined && t.files && t.files[0]) {
@@ -1107,6 +1217,7 @@
   function setTT(id, f, v) { ["timetable", "weekend"].forEach((k) => { if (Array.isArray(P()[k])) P()[k].forEach((r) => { if (r.id === id) r[f] = f === "text" ? v.slice(0, 120) : v; }); }); touchP(); }
   document.addEventListener("input", (e) => {
     const t = e.target, d = t.dataset;
+    if (d.tq !== undefined) { const q = t.value.trim().toLowerCase(); document.querySelectorAll("[data-ctrow]").forEach((r) => (r.hidden = !!q && !r.dataset.ctrow.includes(q))); if (q) document.querySelectorAll(".ctab").forEach((x) => x.closest("details").open = true); return; }
     if (d.ttf === "text") setTT(d.id, "text", t.value);
     if (d.name !== undefined) { P().name = t.value.slice(0, 40); touchP(); }
     if (d.sndvol !== undefined) { SND().vol = +t.value / 100; MP.sound && MP.sound.volume(SND().vol); touchP(); }
@@ -1141,14 +1252,17 @@
   }
   function notify(title, body) { MP.toast(title + " · " + body); try { if ("Notification" in window && Notification.permission === "granted") new Notification(title, { body, icon: "icons/icon-192.png" }); } catch (e) {} }
 
-  /* drag tasks between matrix boxes (finger, mouse or S Pen) */
+  /* post-its: drag the ⋮⋮ handle (finger, mouse or S Pen) to reorder */
   let drag = null;
-  document.addEventListener("pointerdown", (e) => { const c = e.target.closest(".task"); if (!c || e.target.closest("input,select,button") || route !== "todo" || view.todo !== "matrix") return; const r = c.getBoundingClientRect(); drag = { id: c.dataset.task, el: c.cloneNode(true), dx: e.clientX - r.left, dy: e.clientY - r.top, sx: e.clientX, sy: e.clientY, moved: false }; drag.el.classList.add("drag"); drag.el.style.width = r.width + "px"; });
-  document.addEventListener("pointermove", (e) => { if (!drag) return; if (!drag.moved && Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) < 6) return; if (!drag.moved) { drag.moved = true; document.body.appendChild(drag.el); } drag.el.style.left = e.clientX - drag.dx + "px"; drag.el.style.top = e.clientY - drag.dy + "px"; document.querySelectorAll(".quad").forEach((q) => q.classList.remove("hot")); const u = document.elementFromPoint(e.clientX, e.clientY), q = u && u.closest(".quad"); if (q) q.classList.add("hot"); });
-  document.addEventListener("pointerup", (e) => { if (!drag) return; if (drag.moved) { drag.el.remove(); const u = document.elementFromPoint(e.clientX, e.clientY), q = u && u.closest("[data-quad]"); if (q) { const x = MP.S.tasks[drag.id], m = { q1: [true, true], q2: [false, true], q3: [true, false], q4: [false, false] }[q.dataset.quad]; x.urg = m[0]; x.imp = m[1]; x.u = Date.now(); MP.changed(); MP.toast("Moved to " + q.querySelector("h3").textContent); } } drag = null; MP.render(); });
+  document.addEventListener("pointerdown", (e) => { const h = e.target.closest(".phandle"); if (!h) return; const c = h.closest(".postit"), r = c.getBoundingClientRect(); e.preventDefault(); drag = { id: c.dataset.pid, el: c.cloneNode(true), dx: e.clientX - r.left, dy: e.clientY - r.top }; drag.el.classList.add("drag"); drag.el.style.width = r.width + "px"; drag.el.style.left = r.left + "px"; drag.el.style.top = r.top + "px"; document.body.appendChild(drag.el); c.style.opacity = ".35"; });
+  document.addEventListener("pointermove", (e) => { if (!drag) return; drag.el.style.left = e.clientX - drag.dx + "px"; drag.el.style.top = e.clientY - drag.dy + "px"; document.querySelectorAll(".postit").forEach((q) => q.classList.remove("hot")); drag.el.hidden = true; const u = document.elementFromPoint(e.clientX, e.clientY); drag.el.hidden = false; const q = u && u.closest(".postits .postit"); if (q && q.dataset.pid !== drag.id) q.classList.add("hot"); });
+  document.addEventListener("pointerup", (e) => { if (!drag) return; drag.el.hidden = true; const u = document.elementFromPoint(e.clientX, e.clientY), q = u && u.closest(".postits .postit"); drag.el.remove();
+    if (q && q.dataset.pid !== drag.id) { const ids = [...document.querySelectorAll(".postits .postit")].map((x) => x.dataset.pid).filter((x) => x !== drag.id); ids.splice(ids.indexOf(q.dataset.pid), 0, drag.id); ids.forEach((pid, i) => { const r = MP.S.tasks[pid]; if (r) { r.pinO = i + 1; r.u = Date.now(); } }); MP.changed(); }
+    drag = null; MP.render(); });
+  document.addEventListener("pointercancel", () => { if (drag) { drag.el.remove(); drag = null; MP.render(); } });
 
   /* ---------- start-up ---------- */
-  MP.VERSION = "1.10";
+  MP.VERSION = "1.11";
   if (MP.sound) MP.sound.onchange = () => { miniPlayer(); if (route === "study") MP.render(); };
   /* Public, read-only helpers for future modules and connectors. */
   MP.api = { today, iso, dayPct, studyHours, streak, tasks, feed: () => MP.buildFeed(MP.S), version: MP.VERSION, schemaVersion: MP.SCHEMA_VERSION };

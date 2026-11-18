@@ -99,7 +99,7 @@ window.MP_HELP = [
 [
 "list",
 [
-"New task also adds it to your To-Do list with the due date (High and Urgent become urgent in the matrix).",
+"New task adds it to your To-Do list for that date (High and Urgent become Urgent + Important, so Do it now).",
 "Habit lets you pick one of your habits, or create a new habit from the title.",
 "Birthday / anniversary saves it in Special dates, repeats every year, and is added to Google Calendar automatically as a yearly event (you can switch this off in Settings).",
 "Habits start as recurring every day and study sessions as every weekday; change it if you like.",
@@ -229,34 +229,40 @@ window.MP_HELP = [
 },
 {
 "id": "todo",
-"title": "To-Do (matrix and 1-3-5)",
+"title": "To-Do",
 "route": "todo",
 "body": [
 [
 "p",
-"Sort tasks with the Eisenhower matrix, then pick a realistic day with 1-3-5."
+"One list of everything you need to do. You tick Urgent and Important; the planner sets the priority for you."
 ],
 [
 "list",
 [
-"Do now: urgent and important.",
-"Schedule: important but not urgent.",
-"Delegate or pass: urgent but not important.",
-"Drop: neither."
+"Do it now: urgent and important.",
+"Plan for later: important but not urgent.",
+"Assign someone: urgent but not important.",
+"Ignore: neither (only if you untick Important, which starts ticked)."
 ]
 ],
 [
 "steps",
 [
-"Type a task, add a due date and tick Urgent and/or Important. The line underneath shows which box it will go to.",
-"Not sure? Tap Learn how for a short guide.",
-"Drag cards between boxes with a finger, mouse or S Pen.",
-"Set each task’s size (1 big, 3 medium, 5 small) to build today’s 1-3-5."
+"Tap New task (or Task on Today). Fill in the Date, write the task in as much detail as you like, tick Urgent and/or Important, and add a Due date if there is a deadline.",
+"Add steps (one per line) to get a small checklist inside the task. Ticking the last step ticks the task.",
+"No date yet? Tick Keep it in the Inbox and give it a date later.",
+"Tick Show as a post-it to pin it on Today. Tap the pen on a post-it to write on it with the S Pen; drag the ⋮⋮ handle to reorder post-its.",
+"Tick Add to Google Calendar to put a 5-minute block in your Calendar, 2 hours from now (you can change the time). When you tick the task done, the Calendar item gets a ✓."
 ]
 ],
 [
-"tip",
-"Tasks with due dates can be sent to Google Calendar from All & reminders."
+"list",
+[
+"A task not done on its day moves to the top as Overdue, marked Overdue 1 day, 2 days and so on. Move all to today or tomorrow in one tap.",
+"A task past its Due date gets a red Past deadline mark.",
+"Today shows your whole list. Tasks you finish today stay there, struck through, until midnight.",
+"Completed tasks, at the bottom of To-Do, lists every finished task with the date it was created and completed. Tasks finished before 18 Nov 2026 show \u201cbefore 18 Nov 2026\u201d."
+]
 ]
 ]
 },

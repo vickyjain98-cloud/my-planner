@@ -300,3 +300,8 @@ tr.grow td{opacity:.85;font-style:italic}
 .dstrip7 button b{font-size:16px}.dstrip7 button.on{background:var(--acc);color:#fff}.dstrip7 button.td b{text-decoration:underline}
 [data-theme=midnight] .blk{color:#1d1d1d}
 @media (max-width:760px){.dgrid{max-height:calc(100vh - 230px)}.tcol .tl{font-size:9.5px;padding-right:3px}}
+
+/* ---------- 1.15: Plan my day, Shut down, Weekly review ---------- */
+.ritbar{gap:8px;margin:0 0 10px;flex-wrap:wrap}.ritbar:empty{display:none}
+.rit-row{padding:4px 0;border-bottom:1px solid var(--line);gap:6px}
+.moodbtn.sm{padding:5px 10px;font-size:12px}

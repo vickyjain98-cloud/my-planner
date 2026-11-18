@@ -45,6 +45,8 @@ Every record carries `u` (updated-at, epoch ms). Sync merges record by record: t
 ```
 Tasks (since 1.11): `{ id, title, date, due, urgent, important, priority: "Do it now"|"Plan for later"|"Assign someone"|"Ignore", done, createdAt, completedAt, inbox, steps: {done,total}|null, size }`. `date` is the day the task is planned for (overdue when past and not done); `due` is an optional deadline; `size` is the old 1-3-5 value, kept for older tasks only.
 
+Meetings (since 1.13, only when Events is shared): `data.meetings = [{ date, minutes }]`, the time in meetings and events for 14 days back and 7 ahead. Counts only: no titles, guests or links. Google Calendar events themselves are never written to the feed.
+
 Activities (since 1.12, inside the `study` category): `activities: [{date, hours: {Study: 1.5, Work: 3}}]` and `activityPlan: {weekday, weekend}` rows `{id, start, end, text, activity}`. `study` and `studyPlan` are unchanged and cover only the Study type. Timetable rows store type `"Study"` for Activity → Study and type `"Activity"` with `act` for every other kind.
 
 The feed is rewritten on each sync while the connection is on, and deleted when it is switched off.

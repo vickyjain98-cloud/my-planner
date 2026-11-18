@@ -622,6 +622,30 @@ window.MP_HELP = [
 ]
 },
 {
+"id": "rituals",
+"title": "Plan my day, Shut down and Weekly review",
+"route": "review",
+"body": [
+[
+"p",
+"Two short daily moments and a weekly look back, so the planner becomes a habit."
+],
+[
+"steps",
+[
+"Plan my day opens by itself the first time you open the planner each morning (or tap ☀ Plan my day on Today): sort anything unfinished (Today, Tomorrow, Later or Drop), glance at today's calendar, pick your top 3 tasks and see today's activities. Skip it any time.",
+"Your top 3 get a ★ on Today and fill the Top 3 box on the Detailed day sheet.",
+"Shut down (from 4 pm, 🌙 on Today, and a reminder at 9:30 pm): tick what you did, move what's left, write one line about the day and set your evening mood.",
+"Weekly review (in the menu, and on Today at the weekend): habits by day, time per activity and meetings, to-dos done and overdue, mood trend, top wins and journal highlights; then set 3 goals for next week."
+]
+],
+[
+"tip",
+"Settings → Plan my day · Shut down changes the time, turns either off, or adds a daily Google Calendar reminder that rings even when the planner is closed. Mood and journal parts of the review stay hidden while the journal lock is on."
+]
+]
+},
+{
 "id": "faq",
 "title": "Help, I’m stuck",
 "route": null,

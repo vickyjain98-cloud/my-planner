@@ -209,19 +209,19 @@ a.pill{text-decoration:none;display:inline-flex;align-items:center}
 .navbtn.navadd svg{stroke:currentColor}
 
 /* ---------- To-Do 1.11 ---------- */
-.trow{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--line)}
+.tkrow{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--line)}
 .ttable{display:flex;flex-direction:column}
 .thead{display:none}
 .deskonly{display:none}
-@media (min-width:760px){.ttable .thead,.ttable .trow{display:grid;grid-template-columns:28px minmax(0,1fr) 150px 104px 84px 56px 34px;gap:10px;align-items:center}.ttable .thead{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;opacity:.6;padding:0 0 6px;border-bottom:1px solid var(--line)}.ttable .trow>.cb{margin-top:0}.ttable .mobonly{display:none}.ttable .deskonly{display:block}.ttable .tcell .pill{display:inline-block;white-space:nowrap}}
-.trow:last-child{border-bottom:0}
-.trow>.cb{margin-top:3px}
+@media (min-width:760px){.ttable .thead,.ttable .tkrow{display:grid;grid-template-columns:28px minmax(0,1fr) 150px 104px 84px 56px 34px;gap:10px;align-items:center}.ttable .thead{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;opacity:.6;padding:0 0 6px;border-bottom:1px solid var(--line)}.ttable .tkrow>.cb{margin-top:0}.ttable .mobonly{display:none}.ttable .deskonly{display:block}.ttable .tcell .pill{display:inline-block;white-space:nowrap}}
+.tkrow:last-child{border-bottom:0}
+.tkrow>.cb{margin-top:3px}
 .tbody{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
 .tpills{display:flex;gap:6px;flex-wrap:wrap}.tpills .pill{flex:none;white-space:nowrap;padding:3px 9px}
 .ttext,.ptext{all:unset;cursor:pointer;font-size:14px;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;white-space:pre-line;word-break:break-word}
 .ttext:focus-visible,.ptext:focus-visible{outline:2px solid var(--acc);border-radius:4px}
-.trow.done .ttext{text-decoration:line-through;opacity:.55}
-.trow.done .pill{opacity:.55}
+.tkrow.done .ttext{text-decoration:line-through;opacity:.55}
+.tkrow.done .pill{opacity:.55}
 .pill.late{background:#F6D5D4;color:#7A1F1C}
 .subs{display:flex;flex-direction:column;gap:2px;padding-left:2px}
 .subs .sdone{text-decoration:line-through;opacity:.6}
@@ -253,3 +253,11 @@ details>summary{cursor:pointer;padding:6px 0}
 #dimv .dims{font-size:13px;color:#444}
 td.nd .hb{opacity:.35}
 .hb b.tiny{display:block;font-weight:700;opacity:.8}
+
+/* ---------- 1.13: Google Calendar, quick add ---------- */
+.c-gcal{background:#E4ECF7;color:#1F3B73}
+[data-theme=midnight] .c-gcal{background:#2a3550;color:#cfdcff}
+.sched.gsched{border-left-color:#4F7BD9}
+tr.grow td{opacity:.85;font-style:italic}
+.qadd{padding:12px 14px;margin:0 0 14px}
+.qadd #qprev:empty{display:none}

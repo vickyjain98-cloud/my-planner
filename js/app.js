@@ -140,7 +140,64 @@
   const CALQ = {};
   const calBtn = (key, label, spec) => { CALQ[key] = { label, spec }; const s = MP.S.sent[key]; return s && !s.del ? `<span class="row" style="gap:6px"><span class="pill tiny">✓ In Calendar</span><button class="link tiny" data-calrm="${E(key)}">Remove</button></span>` : `<button class="link noprint" data-cal="${E(key)}">${ic("cal", 16)} Send to Calendar</button>`; };
   const remind = (mins) => ({ useDefault: false, overrides: [{ method: "popup", minutes: mins }] });
-  const timedEv = (summary, date, start, end, rec) => Object.assign({ summary, start: { dateTime: `${date}T${start}:00`, timeZone: TZ }, end: { dateTime: `${date}T${end}:00`, timeZone: TZ }, reminders: remind(P().alerts || 10), source: { title: "My Planner", url: location.origin + location.pathname } }, rec ? { recurrence: [rec] } : {});
+  /* ---------- Time zones (1.13): a home zone (India by default); meetings can be booked in another zone ---------- */
+  const ZONES = [["Asia/Kolkata", "India"], ["Europe/London", "UK"], ["America/New_York", "US Eastern"], ["America/Chicago", "US Central"], ["America/Los_Angeles", "US Pacific"], ["Asia/Dubai", "Dubai"], ["Asia/Singapore", "Singapore"], ["Australia/Sydney", "Sydney"], ["Europe/Berlin", "Central Europe"], ["Asia/Tokyo", "Tokyo"]];
+  const HOME = () => P().tz || "Asia/Kolkata";
+  const tzParts = (ms, tz) => Object.fromEntries(new Intl.DateTimeFormat("en-US", { timeZone: tz, hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }).formatToParts(new Date(ms)).map((x) => [x.type, x.value]));
+  const tzOff = (tz, ms) => { const q = tzParts(ms, tz); return Date.UTC(+q.year, +q.month - 1, +q.day, +q.hour % 24, +q.minute) - Math.floor(ms / 60000) * 60000; };
+  const wallToMs = (d, t, tz) => { const b = Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10), +t.slice(0, 2), +t.slice(3, 5)); let ms = b - tzOff(tz, b); ms = b - tzOff(tz, ms); return ms; };
+  const msToWall = (ms, tz) => { const q = tzParts(ms, tz); return { d: `${q.year}-${q.month}-${q.day}`, t: `${String(+q.hour % 24).padStart(2, "0")}:${q.minute}` }; };
+  const zoneName = (tz) => { const z = ZONES.find((x) => x[0] === tz); return z ? z[1] : String(tz).split("/").pop().replace(/_/g, " "); };
+  const allZones = () => { try { return Intl.supportedValuesOf("timeZone"); } catch (e) { return ZONES.map((z) => z[0]); } };
+  const zoneOpts = (cur) => { const top = ZONES.map((z) => [z[0], z[1]]); if (cur && !top.some((z) => z[0] === cur)) top.push([cur, zoneName(cur)]); return [...top, ...allZones().filter((z) => !top.some((x) => x[0] === z)).map((z) => [z, z.replace(/_/g, " ")])]; };
+  /* ---------- Google Calendar inside the planner (1.13): read-only, kept on this device, never copied to Drive ---------- */
+  let GC = { items: [], at: 0, busy: false };
+  const gcKey = () => "gcal:" + (G.user ? G.user.sub : "none");
+  const gcOn = () => mode === "google" && (P().gcal || {}).on !== false;
+  const safeLink = (u) => (/^https:\/\//i.test(String(u || "")) ? String(u) : "");
+  const joinUrl = (txt) => { const m = String(txt || "").match(/https:\/\/[^\s<>"]*(?:meet\.google\.com|zoom\.us|teams\.microsoft\.com|teams\.live\.com|webex\.com)[^\s<>"]*/i); return m ? m[0] : ""; };
+  function normG(it, cid, color) {
+    if (!it || it.status === "cancelled" || !it.start) return null;
+    const allDay = !!it.start.date; let d, t = "", d2, t2 = "";
+    if (allDay) { d = it.start.date; d2 = iso(addD(parseISO(it.end.date), -1)); }
+    else { const a = msToWall(Date.parse(it.start.dateTime), HOME()), b = msToWall(Date.parse(it.end.dateTime), HOME()); d = a.d; t = a.t; d2 = b.d; t2 = b.t; }
+    return { id: it.id, cal: cid, color: color || "", title: String(it.summary || "(no title)").slice(0, 200), d, t, d2, t2, allDay, link: safeLink(it.htmlLink), loc: String(it.location || "").slice(0, 300), desc: String(it.description || "").slice(0, 1500), join: safeLink(it.hangoutLink) || joinUrl(it.location) || joinUrl(it.description), att: (it.attendees || []).filter((x) => !x.self).map((x) => ({ e: x.email, s: x.responseStatus })).slice(0, 50) };
+  }
+  async function gcalLoadCache() { try { const c = await MP.idbGet(gcKey()); if (c && Array.isArray(c.items)) GC.items = c.items; } catch (e) {} }
+  async function gcalRefresh(force) {
+    if (!gcOn() || !G.hasCal || !G.valid() || GC.busy) return;
+    if (!force && Date.now() - GC.at < 60e3) return;
+    GC.busy = true;
+    try {
+      const t = today(), tmin = addD(t, -30).toISOString(), tmax = addD(t, 181).toISOString(), cals = Object.entries((P().gcal || {}).cals || { primary: { on: true } }).filter(([, v]) => v && v.on), out = [];
+      for (const [cid, v] of cals) { const items = await G.calList(cid, tmin, tmax); (items || []).forEach((it) => { const g = normG(it, cid, v.color); if (g) out.push(g); }); }
+      GC.items = out; GC.at = Date.now(); await MP.idbSet(gcKey(), { items: out });
+      if (["today", "planner", "timetable", "study"].includes(route) && !document.activeElement.matches("input,textarea,select")) MP.render();
+    } catch (e) { console.warn("calendar", e.message); }
+    GC.busy = false;
+  }
+  setInterval(() => { if (document.visibilityState === "visible") gcalRefresh(); }, 5 * 60e3);
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") gcalRefresh(); });
+  const sentIds = () => new Set(Object.values(MP.S.sent || {}).filter((x) => x && !x.del && x.id).map((x) => x.id));
+  /* Google events on date k, minus anything the planner itself sent (shown once, as the planner item) */
+  const gOn = (k) => { if (!gcOn()) return []; const sid = sentIds(); return GC.items.filter((g) => !sid.has(g.id) && !sid.has(String(g.id).split("_")[0]) && g.d <= k && (g.d2 || g.d) >= k).sort((a, b) => (a.allDay ? "" : a.t).localeCompare(b.allDay ? "" : b.t)); };
+  const gById = (id) => GC.items.find((g) => g.id === id || String(g.id).split("_")[0] === id);
+  const gTime = (g, k) => (g.allDay ? "All day" : `${g.d === k ? fmtT(g.t) : "…"}–${(g.d2 || g.d) === k ? fmtT(g.t2) : "…"}`);
+  /* "Meetings & events" time for a day: Google events + planner events with a start and end */
+  const meetMins = (k) => { let m = 0; gOn(k).filter((g) => !g.allDay).forEach((g) => { const a = g.d === k ? tMin(g.t) : 0, b = (g.d2 || g.d) === k ? tMin(g.t2) : 1440; m += Math.max(0, b - a); }); evOn(k).filter((e) => e.kind === "event" && e.time && e.end).forEach((e) => { m += Math.max(0, tMin(e.end) - tMin(e.time)); }); return m; };
+  const RSVP = { accepted: "✓ accepted", declined: "✕ declined", tentative: "? maybe", needsAction: "· no reply yet" };
+  function gcalDialog(id) {
+    const g = gById(id); if (!g) return;
+    modal(`<div class="between"><h2>${E(g.title)}</h2><button class="tool" data-close aria-label="Close">✕</button></div>
+      <div class="small"><b>${fmt(parseISO(g.d), { weekday: "long", day: "numeric", month: "long" })} · ${E(gTime(g, g.d))}</b></div>
+      ${g.loc ? `<div class="small">📍 ${E(g.loc)}</div>` : ""}${g.desc ? `<div class="small muted" style="white-space:pre-line;max-height:180px;overflow:auto">${E(g.desc.replace(/<[^>]+>/g, " "))}</div>` : ""}
+      ${g.att.length ? `<div class="stack" style="gap:2px"><span class="lab">Guests</span>${g.att.map((a) => `<span class="small">${E(a.e)} <span class="muted">${RSVP[a.s] || ""}</span></span>`).join("")}</div>` : ""}
+      <span class="tiny muted">From your Google Calendar. Change it there; the planner shows it as it is.</span>
+      <div class="row" style="justify-content:flex-end">${g.join ? `<a class="btn" href="${E(g.join)}" target="_blank" rel="noopener noreferrer">Join</a>` : ""}${g.link ? `<a class="btn ghost" href="${E(g.link)}" target="_blank" rel="noopener noreferrer">Open in Google Calendar ↗</a>` : ""}<button class="btn ghost" data-close>Close</button></div>`);
+  }
+  const gRow = (g, k, showDate) => `<div class="between wrap sched gsched" style="${g.color ? "border-left-color:" + E(g.color) : ""}"><button class="link left" data-gev="${E(g.id)}" style="text-align:left"><b>${showDate ? fmt(parseISO(k), { weekday: "short", day: "numeric" }) + " · " : ""}${E(gTime(g, k))}</b> · ${E(g.title)}</button><span class="row" style="gap:6px">${g.join && soonOrNow(k, g.t, g.t2) ? `<a class="btn sm" href="${E(g.join)}" target="_blank" rel="noopener noreferrer">Join</a>` : g.join ? `<a class="link tiny" href="${E(g.join)}" target="_blank" rel="noopener noreferrer">Join link</a>` : ""}<span class="pill tiny">${ic("cal", 12)} Google</span></span></div>`;
+  const soonOrNow = (k, t, t2) => { if (k !== iso(today()) || !t) return false; const n = nowMin(); return n >= tMin(t) - 10 && n <= (t2 ? tMin(t2) : tMin(t) + 60); };
+  const timedEv = (summary, date, start, end, rec) => Object.assign({ summary, start: { dateTime: `${date}T${start}:00`, timeZone: HOME() }, end: { dateTime: `${date}T${end}:00`, timeZone: HOME() }, reminders: remind(P().alerts || 10), source: { title: "My Planner", url: location.origin + location.pathname } }, rec ? { recurrence: [rec] } : {});
   const allDayEv = (summary, date, rec) => Object.assign({ summary, start: { date }, end: { date: iso(addD(parseISO(date), 1)) }, reminders: remind(900) }, rec ? { recurrence: [rec] } : {});
 
   /* ---------- screens ---------- */
@@ -153,7 +210,7 @@
     const p = TPRI[tPri(t)], late = tLate(t), k = iso(today()), subs = t.sub || [], sd = subs.filter((x) => x.done).length, inCal = MP.S.sent["task-" + t.id] && !MP.S.sent["task-" + t.id].del;
     const dTxt = tDay(t) ? (tDay(t) === k ? "Today" : shortD(tDay(t))) : "Inbox", dueTxt = t.due ? fmt(parseISO(t.due), { day: "numeric", month: "short" }) : "", dueOver = !t.done && t.due && t.due < k;
     const meta = [tDay(t) && tDay(t) !== k && !late ? shortD(tDay(t)) : "", t.due ? `<span class="${dueOver ? "over" : ""}">due ${dueTxt}</span>` : "", subs.length ? `${sd} of ${subs.length} steps` : "", inCal && t.cal ? `${ic("cal", 12)} ${fmtT(t.cal.t)}` : ""].filter(Boolean).join(" · ");
-    return `<div class="trow ${t.done ? "done" : ""}"><input type="checkbox" class="cb" data-done="${E(t.id)}" ${t.done ? "checked" : ""} aria-label="Done"><div class="tbody">
+    return `<div class="tkrow ${t.done ? "done" : ""}"><input type="checkbox" class="cb" data-done="${E(t.id)}" ${t.done ? "checked" : ""} aria-label="Done"><div class="tbody">
       ${late || (dueOver && t.due !== tDay(t)) ? `<div class="tpills">${late ? `<span class="pill tiny late">Overdue ${late} day${late > 1 ? "s" : ""}</span>` : ""}${dueOver && t.due !== tDay(t) ? '<span class="pill tiny late">Past deadline</span>' : ""}</div>` : ""}
       <div class="tpills mobonly"><span class="pill tiny ${p[1]}">${p[0]}</span></div>
       <button class="ttext" data-tedit="${E(t.id)}">${E(t.t)}</button>${meta ? `<div class="tiny muted mobonly">${meta}</div>` : ""}${inCal && t.cal ? `<div class="tiny muted deskonly">${ic("cal", 12)} In Calendar at ${fmtT(t.cal.t)}</div>` : ""}
@@ -163,6 +220,29 @@
   }
   const moveAll = () => `<span class="row" style="gap:6px"><button class="btn ghost sm" data-tmove="0">Move all to today</button><button class="btn ghost sm" data-tmove="1">Move all to tomorrow</button></span>`;
   /* Today: the whole list. Overdue first, then today's tasks; anything ticked today stays, struck through, until midnight. */
+  /* Quick add (1.13): type it the way you'd say it; the chips show what was understood (tap to correct). */
+  const quickBox = () => `<section class="card stack qadd"><div class="row" style="flex-wrap:nowrap"><input class="f" id="qadd" data-qin autocomplete="off" maxlength="300" placeholder="Type it as you'd say it, e.g. Call bank tomorrow 6 pm · kal subah 9 baje doctor" style="flex:1" aria-label="Quick add"><button class="btn" data-qsave>${ic("plus", 16)} Add</button></div><div class="row" id="qprev" style="gap:4px"></div></section>`;
+  const KLABEL = { task: "To-Do task", reminder: "Reminder", event: "Meeting / event" };
+  function quickPreview() {
+    const box = document.getElementById("qprev"), v = field("qadd"); if (!box) return;
+    if (!v) { box.innerHTML = ""; return; }
+    const q = MP.quickParse(v), chips = [KLABEL[q.kind], q.d ? (q.d === iso(today()) ? "Today" : shortD(q.d)) : "", q.time ? fmtT(q.time) + (q.end ? "–" + fmtT(q.end) : "") : "", q.rep ? repText({ d: q.d || iso(today()), rep: q.rep, repDays: q.repDays, repEnd: "never" }) : "", q.due ? "due " + shortD(q.due) : "", q.urg || q.imp ? TPRI[tPri(q)][0] : ""].filter(Boolean);
+    box.innerHTML = `<span class="small"><b>${E(q.t)}</b></span>${chips.map((c) => `<button class="pill tiny" data-qfix>${E(c)}</button>`).join("")}<span class="tiny muted">tap a chip to change it</span>`;
+  }
+  async function quickSave(fix) {
+    const v = field("qadd"); if (!v) return; const q = MP.quickParse(v);
+    if (q.kind === "task") {
+      const preset = { t: q.t, d: q.d || iso(today()), due: q.due, urg: q.urg, imp: true }; /* Important starts ticked, as in the form */
+      if (fix) return taskDialog(null, preset);
+      const tid = uid(); putRec("tasks", tid, Object.assign({ done: false, c: Date.now(), sub: [] }, preset)); MP.render(); MP.toast("Added to your list: " + q.t); return;
+    }
+    const pri = q.urg && q.imp ? "urgent" : q.urg ? "high" : "med";
+    const rec = { d: q.d || iso(today()), time: q.time, end: q.time ? q.end : "", t: q.t.slice(0, 120), kind: q.kind, pri, rem: q.time ? (q.kind === "reminder" ? "0" : "10") : "", rep: q.rep, repDays: q.repDays, repEnd: q.rep ? "never" : "", repUntil: "", repCount: "", note: "" };
+    if (fix) return schedDialog(null, rec);
+    if (rec.rep && !repMatch(rec, rec.d)) { for (let i = 1; i < 400; i++) { const dk = iso(addD(parseISO(rec.d), i)); if (repMatch(rec, dk)) { rec.d = dk; break; } } }
+    const eid = uid(); putRec("events", eid, rec); MP.render(); MP.toast(`${KLABEL[q.kind]} added: ${q.t}${q.time ? " · " + fmtT(q.time) : ""}`);
+    if (mode === "google" && G.hasCal) await sendKey("ev-" + eid, { kind: "event", e: MP.S.events[eid] }, true);
+  }
   function todoCard() {
     const G = taskGroups(), n = G.overdue.length + G.today.length, dn = G.today.filter((t) => t.done).length;
     return `<section class="card stack mt"><div class="between wrap"><span class="lab">To-dos · ${dn} of ${n} done</span><span class="row" style="gap:6px"><button class="btn sm" data-tnew>${ic("plus", 16)} Task</button><button class="link" data-go="todo">To-Do →</button></span></div>
@@ -190,9 +270,10 @@
       h += `<div class="trow ${isNow ? "now" : ""} ${isS ? "study" : ""} ${past && !isNow ? "past" : ""}"><span class="ttime">${fmtT(r.start)}${r.end ? " – " + fmtT(r.end) : ""}</span><span style="flex:1">${E(r.text)}${isNow ? ' <span class="tiny">· now</span>' : ""}</span>${isS ? `<input type="checkbox" class="cb" data-blk="${E(r.id)}" ${rec.study && rec.study[r.id] ? "checked" : ""} aria-label="Block done">` : '<span style="width:20px"></span>'}</div>`;
       return h;
     }).join("") || `<p class="small muted">No timetable yet. <button class="link" data-go="timetable">Set it up →</button></p>`;
-    const top = tasks().filter((x) => !x.done && x.b).slice(0, 3);
+    const gToday = gOn(k); const gHtml = gToday.length ? `<div class="sechead">Google Calendar</div>${gToday.map((g) => `<div class="trow"><span class="ttime">${E(gTime(g, k))}</span><span style="flex:1"><button class="link left" data-gev="${E(g.id)}">${E(g.title)}</button></span></div>`).join("")}` : "";
+    const top = (() => { const G = taskGroups(); return [...G.overdue, ...G.today.filter((x) => !x.done)].sort(tByPri).slice(0, 3); })(); /* 1.13 fix: was still the old 1-3-5 */
     const sr = studyRows(t), done = sr.filter((r) => rec.study && rec.study[r.id]).length;
-    return `<div class="grid sheetgrid"><section class="card" style="padding:12px 14px"><div class="between"><span class="lab">${E(P().name || "My")}'s day</span><span class="tiny muted">Now · ${fmtT(minToT(now))}</span></div>${rows}<div class="between small" style="margin-top:10px"><span class="muted">Study blocks done</span><b>${done} of ${sr.length}</b></div></section>
+    return `<div class="grid sheetgrid"><section class="card" style="padding:12px 14px"><div class="between"><span class="lab">${E(P().name || "My")}'s day</span><span class="tiny muted">Now · ${fmtT(minToT(now))}</span></div>${rows}${gHtml}<div class="between small" style="margin-top:10px"><span class="muted">Study blocks done</span><b>${done} of ${sr.length}</b></div></section>
       <div class="stack" style="gap:16px"><section class="card stack soft"><div class="between"><span class="lab">Today's affirmation</span>${writeBtns()}</div><p class="quote" style="font-size:19px">“${E(a.text)}”</p></section>
       <section class="card stack"><span class="lab">Top 3 to-dos</span>${top.map((x) => `<label class="row small" style="gap:8px"><input type="checkbox" class="cb" data-done="${E(x.id)}">${E(x.t)}</label>`).join("") || '<span class="small muted">None picked yet.</span>'}</section>
       <section class="card stack"><span class="lab">Wellness check-in</span>${wellRows(rec, k, 24)}</section>
@@ -236,7 +317,7 @@
     if (tv === "clock") return headr + dayClock();
     if (tv === "journal") return headr + (lockOn() && !unlocked ? `<section class="card stack center"><span class="small">${ic("lock", 16)} Your journal is locked.</span><button class="btn sm" data-go="journal">Unlock</button></section>` : journalSpread());
     const hs = activeHabits().filter((h) => dueOn(h, t) || (h.freq && h.freq.k === "week")), pct = dayPct(t) || 0, tm = moodOf(t);
-    return headr + whatsNewCard() + `<div class="grid g2">
+    return headr + whatsNewCard() + quickBox() + `<div class="grid g2">
       <section class="card stack"><div class="between"><span class="lab">Today's affirmation</span>${writeBtns()}</div><p class="quote">“${E(a.text)}”</p><span class="tiny muted">${E(a.src)}</span></section>
       <section class="card hero stack">${sr.length ? (nb ? `<div class="between"><span class="lab inherit">Up next · ${fmtT(nb.start)}</span><span class="tiny" style="opacity:.85">${rowLen(nb)} min</span></div><h2 class="inherit">${E(nb.text)}</h2><span class="small" style="opacity:.85">${E(actOf(nb))}</span>` : `<h2 class="inherit">All activities done today</h2>`) : `<h2 class="inherit">No activities yet</h2><span class="small">Add Activity rows in your Timetable.</span>`}
       <div class="bar"><i style="width:${sr.length ? (doneB / sr.length) * 100 : 0}%"></i></div><div class="between wrap"><span class="small" style="opacity:.9">${doneB} of ${sr.length} blocks · ${hm(am.done)} of ${hm(am.plan)} done</span><button class="btn inv" data-go="study">Timer</button></div></section></div>
@@ -254,6 +335,7 @@
     const per = {}; rows.filter(isAct).forEach((r) => { per[actOf(r)] = (per[actOf(r)] || 0) + rowLen(r); });
     return `${head("Your routine", "Timetable", tabs)}<section class="card"><div class="tablewrap"><table class="t"><thead><tr><th>Start</th><th>End</th><th>What</th><th>Type</th><th class="noprint"></th></tr></thead><tbody>
       ${rows.map((r) => `<tr class="${isAct(r) ? "srow" : ""}"><td><input class="f sm" type="time" value="${E(r.start)}" data-ttf="start" data-id="${E(r.id)}" aria-label="Start"></td><td><input class="f sm" type="time" value="${E(r.end || "")}" data-ttf="end" data-id="${E(r.id)}" aria-label="End"></td><td><input class="f" value="${E(r.text)}" maxlength="120" data-ttf="text" data-id="${E(r.id)}" aria-label="Activity"></td><td><div class="stack" style="gap:4px">${sel(`data-ttf="type" data-id="${E(r.id)}"`, TYPES, isAct(r) ? "Activity" : r.type, 'aria-label="Type"')}${isAct(r) ? sel(`data-ttact="${E(r.id)}"`, [...actNames().map((n) => [n, n]), ["__new", "+ Add type…"]], actOf(r), 'aria-label="Activity type"') : ""}</div></td><td class="noprint"><span class="row" style="gap:4px;flex-wrap:nowrap">${isAct(r) && r.start && r.end ? calBtn("tt-" + r.id, r.text, { kind: "block", row: r }) : ""}<button class="tool" data-ttdel="${E(r.id)}" aria-label="Delete row">${ic("trash", 16)}</button></span></td></tr>`).join("") || `<tr><td colspan="5" class="small muted">No rows yet.</td></tr>`}
+      ${!we || (today().getDay() % 6 === 0) ? gOn(iso(today())).filter((g) => !g.allDay).map((g) => `<tr class="grow"><td class="small">${fmtT(g.d === iso(today()) ? g.t : "00:00")}</td><td class="small">${fmtT((g.d2 || g.d) === iso(today()) ? g.t2 : "23:59")}</td><td><button class="link left" data-gev="${E(g.id)}">${E(g.title)}</button></td><td class="small">${ic("cal", 12)} Google Calendar · today</td><td></td></tr>`).join("") : ""}
       </tbody></table></div><div class="row mt"><button class="btn" data-ttadd>${ic("plus", 16)} Add a row</button>${!rows.length ? `<button class="btn ghost" data-ttsuggest>Use a suggested routine</button>` : ""}</div>
       <p class="tiny muted">Planned: ${Object.keys(per).map((n) => `${E(n)} ${hm(per[n])}`).join(" · ") || "no activities yet"}. Rows of type <b>Activity</b> are timed on the Activity screen; pick what kind in the box under it. Times save as you type.</p></section>`;
   };
@@ -382,7 +464,7 @@
     return `${head(`${rows.length} block${rows.length === 1 ? "" : "s"} today · edit them in Timetable`, selA ? E(selA) : "Activity")}${chips}
       <div class="grid g2">${timerCard(rows)}
       <section class="card stack"><span class="lab">Today's blocks</span>${rows.map((r) => `<div class="between wrap"><label class="row" style="gap:10px"><input type="checkbox" class="cb" data-blk="${E(r.id)}" ${rec.study && rec.study[r.id] ? "checked" : ""}><span><b>${fmtT(r.start)} – ${fmtT(r.end)}</b><br><span class="small muted">${E(actOf(r))} · ${E(r.text)} · ${rowLen(r)} min</span></span></label><span class="row" style="gap:6px"><button class="btn ghost sm" data-tstart="${E(r.id)}">Start timer</button>${calBtn("tt-" + r.id, r.text, { kind: "block", row: r })}</span></div>`).join("") || `<span class="small muted">No ${selA ? E(selA) + " " : ""}blocks today. <button class="link" data-go="timetable">Add Activity rows →</button></span>`}
-      <div class="stack" style="gap:4px;border-top:1px solid var(--line);padding-top:8px">${names.map((n) => { const m = actMins(t, n); return m.plan || m.done ? `<div class="between small"><span>${E(n)}</span><b>${hm(m.done)} of ${hm(m.plan)}</b></div>` : ""; }).join("") || '<span class="tiny muted">Done against planned shows here.</span>'}</div>
+      <div class="stack" style="gap:4px;border-top:1px solid var(--line);padding-top:8px">${names.map((n) => { const m = actMins(t, n); return m.plan || m.done ? `<div class="between small"><span>${E(n)}</span><b>${hm(m.done)} of ${hm(m.plan)}</b></div>` : ""; }).join("") || '<span class="tiny muted">Done against planned shows here.</span>'}${meetMins(k) ? `<div class="between small"><span>Meetings & events</span><b>${hm(meetMins(k))}</b></div>` : ""}</div>
       <div class="between small"><span>Focus today</span><span class="row" style="gap:4px">${[1, 2, 3, 4, 5].map((n) => `<button class="pill num ${rec.focus === n ? "sel" : ""}" data-focus="${n}">${n}</button>`).join("")}</span></div>
       <div class="between small"><span>Phone away?</span><span class="row" style="gap:4px">${["Yes", "No"].map((x) => `<button class="pill num ${rec.phone === x ? "sel" : ""}" data-phone="${x}">${x}</button>`).join("")}</span></div>
       <label class="stack small">What got in the way?<input class="f" maxlength="200" value="${E(rec.block || "")}" data-dayf="block"></label></section></div>
@@ -403,7 +485,8 @@
         if (mo) ch.push(`<span class="chip ${mo === "P" ? "c-moon" : "c-ama"}">${mo === "P" ? "○" : "●"} ${moonName(mo)}</span>`);
         if (po) ch.push(`<span class="chip c-portal">✦ ${E(po.replace(" Portal", ""))}</span>`);
         DT.forEach((x) => { if (x.md === md) ch.push(`<span class="chip c-bday">${x.type === "Birthday" ? "✿" : "♥"} ${E(x.n)}</span>`); });
-        EV.forEach((x) => { if (occurs(x, iso(d))) ch.push(`<span class="chip c-ev">${x.time ? fmtT(x.time) + " " : ""}${E(x.t)}</span>`); });
+        EV.forEach((x) => { if (occurs(x, iso(d))) { const y = tzOnDay(x, iso(d)); ch.push(`<span class="chip c-ev">${y.time ? fmtT(y.time) + " " : ""}${E(x.t)}</span>`); } });
+        gOn(iso(d)).slice(0, 4).forEach((g) => ch.push(`<span class="chip c-gcal" style="${g.color ? "border-left:3px solid " + E(g.color) : ""}">${!g.allDay && g.d === iso(d) ? fmtT(g.t) + " " : ""}${E(g.title)}</span>`));
         const h = d <= t ? actMins(d).done / 60 : 0; if (h) ch.push(`<span class="c-study">${h.toFixed(1)} h done</span>`);
         cells += `<button class="day ${d.getMonth() !== m.getMonth() ? "out" : ""} ${iso(d) === iso(t) ? "today" : ""}" data-day="${iso(d)}" aria-label="${fmt(d, { weekday: "long", day: "numeric", month: "long" })}"><span class="n">${d.getDate()}</span>${ch.join("")}</button>`;
       }
@@ -422,7 +505,7 @@
     const sec = (title, arr, extra = "") => (arr.length ? `<section class="card stack mb"><div class="between wrap"><span class="lab">${title} · ${arr.length}</span>${extra}</div><div class="ttable">${taskHead()}${arr.map(taskRow).join("")}</div></section>` : "");
     const fmtLong = (k) => (k ? fmt(parseISO(k), { day: "numeric", month: "short", year: "numeric" }) : "—");
     return `${head("One list · priority is set from Urgent + Important", "To-Do", `<button class="btn" data-tnew>${ic("plus", 16)} New task</button>`)}
-      ${sec('<span class="over">Overdue</span>', G.overdue, moveAll())}
+      ${quickBox()}<div class="mb"></div>${sec('<span class="over">Overdue</span>', G.overdue, moveAll())}
       ${sec("Today", G.today) || '<section class="card mb"><span class="small muted">Nothing for today. Tap New task.</span></section>'}
       ${sec("Upcoming", G.upcoming)}${sec("Inbox · no date yet", G.inbox)}
       <section class="card stack"><div class="between wrap"><span class="lab">Completed tasks · ${G.done.length}</span><input class="f" data-tq placeholder="Search completed tasks" style="width:auto;min-width:200px" aria-label="Search completed tasks"></div>
@@ -670,6 +753,13 @@
       <section class="card stack mb"><div class="between wrap"><span class="lab">Menu · choose the screens you see</span><span class="row" style="gap:6px"><button class="btn sm ${mp === "simple" ? "" : "ghost"}" data-menup="simple">Simple</button><button class="btn sm ${mp === "full" ? "" : "ghost"}" data-menup="full">Full</button></span></div>
         <div class="row">${SCREENS.filter((x) => x[0] !== "today" && x[0] !== "prefs").map((x) => `<label class="pill row"><input type="checkbox" data-menus="${x[0]}" ${shownScreen(x[0]) ? "checked" : ""}> ${x[1]}</label>`).join("")}</div>
         <span class="tiny muted">Hidden screens keep all their data; tick them again any time. Today and Settings always stay.</span></section>
+      <section class="card stack mb"><span class="lab">Google Calendar · time zones · meeting links</span>
+        ${mode !== "google" ? '<span class="small muted">Sign in with Google to see your Google Calendar inside the planner.</span>' : G.hasCal ? `<label class="row small"><input type="checkbox" data-gcon ${(P().gcal || {}).on !== false ? "checked" : ""}> Show my Google Calendar inside the planner (Today, Planner, Timetable, day sheets)</label>
+          <div class="row small" style="gap:6px">Calendars: <b>${Object.values((P().gcal || {}).cals || { primary: { on: true, name: "Main calendar" } }).filter((v) => v.on).map((v) => E(v.name || "Main calendar")).join(", ")}</b><button class="btn ghost sm" data-gcpick>Choose calendars</button><button class="btn ghost sm" data-gcnow>Refresh now</button></div>`
+          : `<div class="row"><button class="btn sm" data-gcconnect>Connect Google Calendar</button></div><span class="tiny muted">Shows the events in your Google Calendar inside the planner. Google will ask you to allow it once.</span>`}
+        <span class="tiny muted">Google events are shown on this device only. They are never copied into your My Planner files in Drive, and they never go to Buddy.</span>
+        <div class="grid g2"><label class="stack small">Home time zone${sel("data-tzhome", zoneOpts(HOME()), HOME())}</label><label class="stack small">Second time zone on the day page${sel("data-tz2", [["", "None"], ...zoneOpts(P().tz2 || "")], P().tz2 || "")}</label></div>
+        <div class="grid g2"><label class="stack small">My Zoom link (optional)<input class="f" type="url" maxlength="300" data-mlink="zoom" value="${E((P().mlinks || {}).zoom || "")}" placeholder="https://zoom.us/j/…"></label><label class="stack small">My Teams link (optional)<input class="f" type="url" maxlength="300" data-mlink="teams" value="${E((P().mlinks || {}).teams || "")}" placeholder="https://teams.microsoft.com/…"></label></div></section>
       <section class="card stack mb"><span class="lab">Privacy · journal lock</span>
         ${lockOn() ? `<div class="small">${ic("lock", 14)} On: Journal, Mood, 3-6-9 and History ask for your PIN${bioId() ? " or fingerprint / face" : ""}. They lock again 5 minutes after you leave the app.</div>
         <div class="row">${bioOK() && !bioId() ? `<button class="btn sm" data-bioset>Use fingerprint or face on this device</button>` : ""}${bioId() ? `<button class="btn ghost sm" data-biooff>Stop using fingerprint / face here</button>` : ""}<button class="btn ghost sm" data-pinchange>Change PIN</button><button class="btn ghost sm danger" data-pinoff>Turn the lock off</button></div>`
@@ -731,11 +821,12 @@
       const evx = ([id, v]) => ({ id, title: v.t, kind: v.kind || "event", date: v.d, time: v.time || null, end: v.end || null, priority: v.pri || null, reminderMin: v.rem === undefined || v.rem === "" ? null : +v.rem, repeat: v.rep ? { rule: v.rep, days: v.repDays || [], ends: v.repEnd || "never", until: v.repUntil || null, count: v.repCount ? +v.repCount : null, text: repText(v) } : null });
       data.events = Object.entries(S.events).filter(([, v]) => v && !v.del && (v.d >= iso(t) || v.rep)).map(evx);
       data.upcoming = [...Array(14)].flatMap((_, i) => { const k = iso(addD(t, i)); return Object.entries(S.events).filter(([, v]) => v && !v.del && occurs(v, k)).map(([id, v]) => ({ id, date: k, time: v.time || null, end: v.end || null, title: v.t, kind: v.kind || "event", priority: v.pri || null })); }); data.specialDates = Object.entries(S.dates).filter(([, v]) => v && !v.del).map(([id, v]) => ({ id, name: v.n, relation: v.rel, type: v.type, monthDay: v.md })); }
+    if (cats.events) data.meetings = [...Array(21)].map((_, i) => iso(addD(t, i - 14))).map((k) => ({ date: k, minutes: meetMins(k) })).filter((x) => x.minutes);
     if (cats.mood) data.mood = past.map((d) => { const r = S.days[iso(d)] || {}; return { date: iso(d), am: (r.mood || {}).am || null, pm: (r.mood || {}).pm || null, sleep: r.sleep ?? null }; }).filter((x) => x.am || x.pm || x.sleep);
     if (cats.journal) data.journal = Object.entries(S.typed).filter(([k, v]) => /^(jr-|journal-)/.test(k) && v && v.l && v.l.some(Boolean)).map(([k, v]) => ({ key: k, date: (k.match(/\d{4}-\d{2}-\d{2}/) || [""])[0], text: v.l.filter(Boolean).join("\n") }));
     if ((S.profile.links.buddy || {}).auto !== false) data.autoAddFromBuddy = true;
     data.inboxDecisions = Object.entries(S.inbox).filter(([, v]) => v && v.status !== "pending").map(([id, v]) => ({ id, status: v.status }));
-    return { schema: "my-planner-feed", schemaVersion: MP.SCHEMA_VERSION, appVersion: MP.VERSION, timeZone: TZ, generatedAt: new Date().toISOString(), categories: Object.keys(cats).filter((k) => cats[k]), data };
+    return { schema: "my-planner-feed", schemaVersion: MP.SCHEMA_VERSION, appVersion: MP.VERSION, timeZone: HOME(), generatedAt: new Date().toISOString(), categories: Object.keys(cats).filter((k) => cats[k]), data };
   };
   /* ---------- What's new ---------- */
   const vNum = (v) => String(v || "0").split(".").map((n) => +n || 0);
@@ -881,7 +972,8 @@
   function actNav() {
     if (mode === "signin" || !P().setupDone) return "";
     const t = today(), items = actNames().map((n) => [n, actMins(t, n)]).filter(([, m]) => m.plan || m.done);
-    return items.length ? `<div class="navsub">${items.map(([n, m]) => `<button class="navsubbtn ${route === "study" && view.act === n ? "on" : ""}" data-actgo="${E(n)}"><span>${E(n)}</span><span class="tiny">${hm(m.done)} / ${hm(m.plan)}</span></button>`).join("")}</div>` : "";
+    const mm = meetMins(iso(t));
+    return items.length || mm ? `<div class="navsub">${items.map(([n, m]) => `<button class="navsubbtn ${route === "study" && view.act === n ? "on" : ""}" data-actgo="${E(n)}"><span>${E(n)}</span><span class="tiny">${hm(m.done)} / ${hm(m.plan)}</span></button>`).join("")}${mm ? `<button class="navsubbtn" data-go="planner"><span>Meetings & events</span><span class="tiny">${hm(mm)}</span></button>` : ""}</div>` : "";
   }
   function go(r) {
     if (r === "more") { document.getElementById("sheet").classList.add("on"); return; }
@@ -913,6 +1005,8 @@
       G.status = "ok";
       if (changed && !document.activeElement.matches("input,textarea")) MP.render();
       maybeSummary();
+      if (!GC.at && !GC.items.length) await gcalLoadCache();
+      gcalRefresh();
     } catch (e) { G.status = e.reauth ? "need" : "err"; console.warn("sync", e.message); }
     syncing = false; refreshStatus();
     if (again) { again = false; syncNow(); }
@@ -1070,7 +1164,8 @@
     if (e.repEnd === "count" && +e.repCount > 0) { let c = 0; for (let dt = parseISO(e.d), i = 0; i < 4000; i++, dt = addD(dt, 1)) { const dk = iso(dt); if (dk === e.d || repMatch(e, dk)) c++; if (dk === k) return c <= +e.repCount; } return false; }
     return true;
   };
-  const evOn = (k) => live("events").filter(([, e]) => occurs(e, k)).map(([id, e]) => Object.assign({ id }, e)).sort((a, b) => (a.time || "99").localeCompare(b.time || "99"));
+  const tzOnDay = (e, k) => { if (!e.tz || !e.rep || k === e.d || !e.tzT) return e; try { const shift = Math.round((parseISO(e.d) - parseISO(e.tzD || e.d)) / 864e5), td = iso(addD(parseISO(k), -shift)), a = msToWall(wallToMs(td, e.tzT, e.tz), HOME()); if (a.d !== k) return e; const o = Object.assign({}, e, { time: a.t }); if (e.tzEnd) o.end = msToWall(wallToMs(td, e.tzEnd, e.tz), HOME()).t; return o; } catch (er) { return e; } };
+  const evOn = (k) => live("events").filter(([, e]) => occurs(e, k)).map(([id, e]) => tzOnDay(Object.assign({ id }, e), k)).sort((a, b) => (a.time || "99").localeCompare(b.time || "99"));
   /* the Google Calendar event for one of our events */
   function buildEv(e) {
     const title = (e.kind && e.kind !== "event" ? SLABEL[e.kind] + " · " : "") + e.t;
@@ -1086,10 +1181,20 @@
       ev.reminders = hasRem || e.rem === undefined ? remind(900) : { useDefault: false, overrides: [] }; /* all-day: 9 AM the day before */
     }
     ev.description = desc; if (e.pri) ev.colorId = PRICOL[e.pri];
+    if (e.tz && e.tzT && e.time) { const en = e.tzEnd || minToT(Math.min(tMin(e.tzT) + 30, 1439)); ev.start = { dateTime: `${e.tzD || e.d}T${e.tzT}:00`, timeZone: e.tz }; ev.end = { dateTime: `${e.tzD || e.d}T${en}:00`, timeZone: e.tz }; }
+    if (Array.isArray(e.guests) && e.guests.length) ev.attendees = e.guests.map((email) => ({ email }));
+    if (e.meet && e.meet.k === "meet" && !e.meet.url) ev.conferenceData = { createRequest: { requestId: uid(), conferenceSolutionKey: { type: "hangoutsMeet" } } };
+    else if (e.meet && e.meet.url) { ev.location = e.meet.url; ev.description += "\nJoin: " + e.meet.url; }
     return ev;
   }
+  const evQs = (e, notify) => [`sendUpdates=${e.guests && e.guests.length ? notify || "all" : "none"}`, e.meet && e.meet.k === "meet" ? "conferenceDataVersion=1" : ""].filter(Boolean).join("&");
+  const parseGuests = (txt) => { const ok = [], bad = []; String(txt || "").split(/[\s,;]+/).map((x) => x.trim().toLowerCase()).filter(Boolean).forEach((x) => (/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/.test(x) ? (ok.includes(x) ? 0 : ok.push(x)) : bad.push(x))); return { ok: ok.slice(0, 50), bad }; };
+  const knownGuests = () => { try { return JSON.parse(localStorage.getItem("mp-guests") || "[]"); } catch (e) { return []; } };
+  const rememberGuests = (list) => { try { localStorage.setItem("mp-guests", JSON.stringify([...new Set([...list, ...knownGuests()])].slice(0, 100))); } catch (e) {} };
   function schedDialog(id, preset) {
-    const e = id ? Object.assign({}, MP.S.events[id]) : Object.assign({ kind: "reminder", d: iso(today()), time: "", end: "", pri: "med", rem: "10", rep: "" }, preset || {});
+    const e0 = id ? Object.assign({}, MP.S.events[id]) : null;
+    if (e0 && e0.tz && e0.tzT) { e0.d = e0.tzD || e0.d; e0.time = e0.tzT; e0.end = e0.tzEnd || ""; } /* edit in the meeting's own zone */
+    const e = e0 ? e0 : id ? Object.assign({}, MP.S.events[id]) : Object.assign({ kind: "reminder", d: iso(today()), time: "", end: "", pri: "med", rem: "10", rep: "" }, preset || {});
     const signed = mode === "google", inCal = id && MP.S.sent["ev-" + id] && !MP.S.sent["ev-" + id].del;
     const habOpts = [["", "— choose a habit —"], ...P().habits.filter((h) => h.active !== false).map((h) => [h.id, h.name]), ["__new", "+ New habit (uses the title)"]];
     modal(`<div class="between"><h2>${id ? "Edit" : "Add / schedule"}</h2><button class="tool" data-close aria-label="Close">✕</button></div>
@@ -1099,6 +1204,12 @@
       <div class="sk-habit stack small" ${e.kind === "habit" ? "" : "hidden"}><label class="stack small">Which habit?${sel('id="shab"', habOpts, e.hab || "")}</label></div>
       <div class="sk-date grid g2" ${e.kind === "date" ? "" : "hidden"}><label class="stack small">Type${sel('id="sdtype"', ["Birthday", "Anniversary"], "Birthday")}</label><label class="stack small">Relation<input class="f" id="srel" maxlength="40" placeholder="e.g. Cousin"></label></div>
       <div class="grid g3"><label class="stack small">Date<input class="f" type="date" id="sdate" data-skind value="${E(e.d)}"></label><label class="stack small sk-time">Start time<input class="f" type="time" id="stime" value="${E(e.time || "")}"></label><label class="stack small sk-time">End time (optional)<input class="f" type="time" id="send" value="${E(e.end || "")}"></label></div>
+      <div class="sk-tz small"><button type="button" class="link tiny" data-tzshow ${e.tz ? "hidden" : ""}>Different time zone?</button><label class="stack small sk-tzbox" ${e.tz ? "" : "hidden"}>Time zone of the times above${sel('id="stz" data-skind', zoneOpts(e.tz || HOME()), e.tz || HOME())}</label><span class="tiny muted" id="stzsay"></span></div>
+      <div class="sk-meet stack" style="gap:8px" ${e.kind === "event" ? "" : "hidden"}>
+        <label class="stack small">Invite people (email addresses, separated by commas)<input class="f" id="sguests" list="guestlist" data-skind value="${E((e.guests || []).join(", "))}" placeholder="name@example.com, …" autocomplete="off"></label><datalist id="guestlist">${knownGuests().map((x) => `<option value="${E(x)}">`).join("")}</datalist><div class="row" id="sgchips" style="gap:4px"></div>
+        ${id && (e.guests || []).length && MP.S.sent["ev-" + id] && gById(MP.S.sent["ev-" + id].id) ? `<div class="stack" style="gap:2px"><span class="lab">Replies</span>${gById(MP.S.sent["ev-" + id].id).att.map((a) => `<span class="small">${E(a.e)} <span class="muted">${RSVP[a.s] || ""}</span></span>`).join("")}</div>` : ""}
+        <div class="grid g2"><label class="stack small">Meeting link${sel('id="smeet" data-skind', [["", "None"], ["meet", "Google Meet (created for you)"], ["zoom", "Zoom"], ["teams", "Microsoft Teams"], ["other", "Other link"]], (e.meet || {}).k || "")}</label><label class="stack small sk-murl" ${(e.meet || {}).k && e.meet.k !== "meet" ? "" : "hidden"}>Paste the link<input class="f" id="smurl" type="url" value="${E((e.meet || {}).k !== "meet" ? (e.meet || {}).url || "" : "")}" placeholder="https://"></label></div>
+        ${(e.meet || {}).k === "meet" && e.meet.url ? `<span class="small">Meet link: <a href="${E(safeLink(e.meet.url))}" target="_blank" rel="noopener noreferrer">${E(e.meet.url)}</a></span>` : ""}</div>
       <div class="grid g3"><label class="stack small">Priority${sel('id="spri"', SPRI, e.pri || "med")}</label><label class="stack small">Reminder${sel('id="srem"', SREM, e.rem ?? "")}</label><label class="stack small sk-rep">How often?${sel('id="soften" data-skind', [["once", "One-time"], ["rep", "Recurring"]], e.rep ? "rep" : "once")}</label></div>
       <div class="sk-repbox stack card soft" style="gap:10px;padding:12px" ${e.rep ? "" : "hidden"}>
         <label class="stack small">Repeats${sel('id="srep" data-skind', repOpts(e.d), e.rep || (e.kind === "study" ? "WEEKDAYS" : "DAILY"))}</label>
@@ -1117,7 +1228,12 @@
   function schedKind(src) {
     const k = field("skind"), q = (s) => document.querySelectorAll(s);
     if (src === "skind" && (k === "habit" || k === "study")) { const o = document.getElementById("soften"), r = document.getElementById("srep"); if (o && o.value === "once") { o.value = "rep"; if (r) r.value = k === "habit" ? "DAILY" : "WEEKDAYS"; } }
-    q(".sk-habit").forEach((x) => (x.hidden = k !== "habit")); q(".sk-act").forEach((x) => (x.hidden = k !== "study")); q(".sk-date").forEach((x) => (x.hidden = k !== "date"));
+    q(".sk-habit").forEach((x) => (x.hidden = k !== "habit")); q(".sk-act").forEach((x) => (x.hidden = k !== "study"));
+    q(".sk-meet").forEach((x) => (x.hidden = k !== "event")); q(".sk-tz").forEach((x) => (x.hidden = k === "date" || k === "task"));
+    const mk = field("smeet"); q(".sk-murl").forEach((x) => (x.hidden = !mk || mk === "meet"));
+    if (src === "smeet" && (mk === "zoom" || mk === "teams")) { const u = document.getElementById("smurl"), saved = (P().mlinks || {})[mk]; if (u && !u.value && saved) u.value = saved; }
+    const gc = document.getElementById("sgchips"); if (gc) { const g2 = parseGuests(field("sguests")); gc.innerHTML = g2.ok.map((x) => `<span class="pill tiny">${E(x)}</span>`).join("") + g2.bad.map((x) => `<span class="pill tiny late">${E(x)}?</span>`).join(""); }
+    const ts = document.getElementById("stzsay"), z = field("stz"); if (ts) ts.textContent = z && z !== HOME() && field("stime") && field("sdate") ? (() => { const a = msToWall(wallToMs(field("sdate"), field("stime"), z), HOME()); return `= ${fmtT(a.t)}${a.d !== field("sdate") ? " (" + fmt(parseISO(a.d), { weekday: "short", day: "numeric", month: "short" }) + ")" : ""} ${zoneName(HOME())} time`; })() : ""; q(".sk-date").forEach((x) => (x.hidden = k !== "date"));
     q(".sk-time,.sk-rep").forEach((x) => (x.hidden = k === "date")); q(".sk-yearly").forEach((x) => (x.hidden = k !== "date"));
     const recur = k !== "date" && field("soften") === "rep"; q(".sk-repbox").forEach((x) => (x.hidden = !recur));
     if (src === "sdate" && field("sdate")) { const on = [...document.querySelectorAll("[data-swd]:checked")]; if (on.length <= 1) { const w2 = WD[parseISO(field("sdate")).getDay()]; document.querySelectorAll("[data-swd]").forEach((x) => (x.checked = x.dataset.swd === w2)); } }
@@ -1139,7 +1255,7 @@
   }
   async function schedSave(id) {
     const kind = field("skind"); let title = field("stitle").slice(0, 120); const d = field("sdate") || iso(today());
-    const toCal = (document.getElementById("scal") || {}).checked;
+    let toCal = (document.getElementById("scal") || {}).checked;
     if (kind === "habit" && !title) { const h = P().habits.find((x) => x.id === field("shab")); if (h) title = h.name; }
     if (!title) { MP.toast(kind === "date" ? "Add the person's name" : "Add a title"); return; }
     if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) { MP.toast("Pick a date"); return; }
@@ -1154,6 +1270,23 @@
     const eid = id || uid(), old = MP.S.events[eid] || {};
     const rec = schedRep({ d, time, end: time ? end : "", t: title, kind, pri, rem, note });
     if (kind === "study") rec.act = field("sact") || "Study";
+    /* another time zone: keep the meeting's own time, and store the home-zone time the planner shows */
+    const z = field("stz");
+    if (time && z && z !== HOME() && kind !== "date" && kind !== "task") { const a = msToWall(wallToMs(rec.d, time, z), HOME()); Object.assign(rec, { tz: z, tzD: rec.d, tzT: time, tzEnd: end || "", d: a.d, time: a.t, end: end ? msToWall(wallToMs(rec.d, end, z), HOME()).t : "" }); }
+    /* guests and meeting link (meetings only) */
+    let notify = "all";
+    if (kind === "event") {
+      const g2 = parseGuests(field("sguests")); if (g2.bad.length) { MP.toast("Check these addresses: " + g2.bad.join(", ")); return; }
+      if (g2.ok.length) rec.guests = g2.ok;
+      const mk = field("smeet");
+      if (mk) { const keep = old.meet && old.meet.k === "meet" && mk === "meet" ? old.meet.url || "" : ""; rec.meet = { k: mk, url: mk === "meet" ? keep : field("smurl") }; if (mk !== "meet" && !safeLink(rec.meet.url)) { MP.toast("Paste the meeting link (it starts with https://)"); return; } }
+      if ((rec.guests || rec.meet && rec.meet.k === "meet") && mode !== "google") { MP.toast("Sign in with Google to invite people or create a Meet link"); return; }
+      if (rec.guests || (rec.meet && rec.meet.k === "meet")) toCal = true;
+      const fresh = (rec.guests || []).filter((x) => !(old.guests || []).includes(x));
+      if (fresh.length && !window.confirm(`Send a Google Calendar invite from your Gmail address to:\n\n${fresh.join("\n")}\n\nOK to send?`)) return;
+      if (id && (old.guests || []).length && !fresh.length && (old.time !== rec.time || old.d !== rec.d || old.end !== rec.end || old.t !== rec.t)) notify = window.confirm("Send the update to your guests?") ? "all" : "none";
+      if (rec.guests) rememberGuests(rec.guests);
+    }
     if (rec.rep && rec.repEnd === "until" && (!rec.repUntil || rec.repUntil < d)) { MP.toast("Pick an end date after the start date"); return; }
     if (rec.rep && !repMatch(rec, rec.d)) { for (let i = 1; i < 400; i++) { const dk = iso(addD(parseISO(rec.d), i)); if (repMatch(rec, dk)) { rec.d = dk; break; } } } /* start on the first day that fits */
     if (kind === "habit") { let hid = field("shab"); if (hid === "__new" || (!hid && title)) { hid = uid(); P().habits.push({ id: hid, name: title.slice(0, 60), def: "", active: true }); touchP(); } rec.hab = hid; }
@@ -1173,7 +1306,13 @@
     const key = "ev-" + eid, sent = MP.S.sent[key], wasIn = sent && !sent.del;
     if (mode !== "google") return;
     try {
-      if (wasIn && (!toCal || id)) { try { await G.calDelete(sent.id); } catch (er) {} MP.S.sent[key] = { del: 1, u: Date.now() }; MP.changed(); }
+      const withPeople = (rec.guests && rec.guests.length) || (old.guests && old.guests.length) || rec.meet;
+      if (wasIn && toCal && id && withPeople) { /* invites: update in place, so guests get an update, not a cancel + new invite */
+        const j = await G.calPatch(sent.id, buildEv(MP.S.events[eid]), evQs(Object.assign({}, rec, { guests: rec.guests || old.guests }), notify));
+        if (rec.meet && rec.meet.k === "meet" && j && j.hangoutLink) { MP.S.events[eid].meet = { k: "meet", url: safeLink(j.hangoutLink) }; MP.S.events[eid].u = Date.now(); MP.changed(); }
+        MP.toast(notify === "all" && (rec.guests || []).length ? "Saved; guests were sent the update" : "Saved and updated in Google Calendar"); MP.render(); gcalRefresh(true); return;
+      }
+      if (wasIn && (!toCal || id)) { try { await G.calDelete(sent.id, (old.guests || []).length ? "sendUpdates=all" : ""); } catch (er) {} MP.S.sent[key] = { del: 1, u: Date.now() }; MP.changed(); }
       if (toCal) await sendKey(key, { kind: "event", e: MP.S.events[eid] }, true);
       else if (wasIn) MP.toast("Removed from Google Calendar");
       MP.render();
@@ -1185,21 +1324,24 @@
       let ev;
       if (spec.kind === "event") ev = buildEv(spec.e);
       else { const x = spec.x, [mm, dd] = x.md.split("-").map(Number); let y = today().getFullYear(); if (new Date(y, mm - 1, dd) < today()) y++; ev = allDayEv(`${x.n} · ${x.type}`, `${y}-${String(mm).padStart(2, "0")}-${String(dd).padStart(2, "0")}`, "RRULE:FREQ=YEARLY"); }
-      const cid = await G.calInsert(ev); MP.S.sent[key] = { id: cid, u: Date.now() }; MP.changed(); MP.render();
+      const cid = await G.calInsert(ev, spec.kind === "event" ? evQs(spec.e) : "");
+      MP.S.sent[key] = { id: cid, u: Date.now() };
+      if (spec.kind === "event" && spec.e.meet && spec.e.meet.k === "meet" && G.lastEv && G.lastEv.hangoutLink) { const eid = key.slice(3), r = MP.S.events[eid]; if (r) { r.meet = { k: "meet", url: safeLink(G.lastEv.hangoutLink) }; r.u = Date.now(); } }
+      MP.changed(); MP.render(); gcalRefresh(true);
       MP.toast(quiet ? "Saved and added to Google Calendar" : "Added to your Google Calendar");
     } catch (er) { MP.toast(er.reauth ? "Saved. Tap sync to reconnect, then use Send to Calendar." : "Saved, but Calendar said: " + er.message); }
   }
   /* birthdays & anniversaries go to Google Calendar as yearly events automatically (Settings can turn this off) */
   const autoDate = (did) => { if (mode === "google" && P().autoDates !== false && MP.S.dates[did]) sendKey("date-" + did, { kind: "date", x: MP.S.dates[did] }, true); };
   /* Today card: what's scheduled today, and the next few days */
-  const schedRow = (e, showDate) => `<div class="between wrap sched ${PRICLS[e.pri] || ""}"><button class="link left" data-sedit="${E(e.id)}" style="text-align:left"><b>${showDate ? fmt(parseISO(e.d), { weekday: "short", day: "numeric" }) + " · " : ""}${e.time ? fmtT(e.time) + (e.end ? "–" + fmtT(e.end) : "") : "All day"}</b> · ${E(e.t)}</button><span class="row" style="gap:6px"><span class="pill tiny">${E(SLABEL[e.kind] || "Event")}</span>${e.pri ? `<span class="pill tiny ${PRICLS[e.pri]}">${E((SPRI.find((p) => p[0] === e.pri) || [, ""])[1])}</span>` : ""}${e.rem !== undefined && e.rem !== "" ? '<span title="Reminder on" aria-label="Reminder on">🔔</span>' : ""}${e.rep ? `<span class="tiny muted" title="${E(repText(e))}">↻ ${E(repText(e).split(" · ")[0])}</span>` : ""}${calBtn("ev-" + e.id, e.t, { kind: "event", e })}</span></div>`;
+  const schedRow = (e, showDate) => `<div class="between wrap sched ${PRICLS[e.pri] || ""}"><button class="link left" data-sedit="${E(e.id)}" style="text-align:left"><b>${showDate ? fmt(parseISO(e.d), { weekday: "short", day: "numeric" }) + " · " : ""}${e.time ? fmtT(e.time) + (e.end ? "–" + fmtT(e.end) : "") : "All day"}</b>${e.tz && e.tzT ? ` <span class="tiny muted">(${fmtT(e.tzT)} ${E(zoneName(e.tz))})</span>` : ""} · ${E(e.t)}${e.guests && e.guests.length ? ` <span class="tiny muted">· ${e.guests.length} guest${e.guests.length > 1 ? "s" : ""}</span>` : ""}</button><span class="row" style="gap:6px">${e.meet && safeLink(e.meet.url) ? `<a class="${soonOrNow(e.d, e.time, e.end) ? "btn sm" : "link tiny"}" href="${E(e.meet.url)}" target="_blank" rel="noopener noreferrer">${soonOrNow(e.d, e.time, e.end) ? "Join" : "Join link"}</a>` : ""}<span class="pill tiny">${E(SLABEL[e.kind] || "Event")}</span>${e.pri ? `<span class="pill tiny ${PRICLS[e.pri]}">${E((SPRI.find((p) => p[0] === e.pri) || [, ""])[1])}</span>` : ""}${e.rem !== undefined && e.rem !== "" ? '<span title="Reminder on" aria-label="Reminder on">🔔</span>' : ""}${e.rep ? `<span class="tiny muted" title="${E(repText(e))}">↻ ${E(repText(e).split(" · ")[0])}</span>` : ""}${calBtn("ev-" + e.id, e.t, { kind: "event", e })}</span></div>`;
   function schedCard() {
     const t = today(), k = iso(t), now = minToT(new Date().getHours() * 60 + new Date().getMinutes());
-    const td = evOn(k), up = [];
-    for (let i = 1; i <= 7 && up.length < 4; i++) { const kk = iso(addD(t, i)); evOn(kk).forEach((e) => { if (up.length < 4 && !["DAILY", "WEEKDAYS", "WEEKENDS"].includes(e.rep)) up.push(Object.assign({}, e, { d: kk })); }); }
+    const td = [...evOn(k).map((e) => ({ s: e.time || "", h: () => `<div style="${e.time && (e.end || e.time) < now ? "opacity:.6" : ""}">${schedRow(e)}</div>` })), ...gOn(k).map((g) => ({ s: g.allDay || g.d < k ? "" : g.t, h: () => `<div style="${!g.allDay && (g.d2 || g.d) === k && g.t2 < now ? "opacity:.6" : ""}">${gRow(g, k)}</div>` }))].sort((a, b) => a.s.localeCompare(b.s)), up = [];
+    for (let i = 1; i <= 7 && up.length < 5; i++) { const kk = iso(addD(t, i)), day = []; evOn(kk).forEach((e) => { if (!["DAILY", "WEEKDAYS", "WEEKENDS"].includes(e.rep)) day.push({ s: e.time || "", h: () => schedRow(Object.assign({}, e, { d: kk }), true) }); }); gOn(kk).forEach((g) => { if (g.d === kk) day.push({ s: g.allDay ? "" : g.t, h: () => gRow(g, kk, true) }); }); day.sort((a, b) => a.s.localeCompare(b.s)).forEach((x) => { if (up.length < 5) up.push(x); }); }
     return `<section class="card stack mt"><div class="between"><span class="lab">Today's schedule</span><button class="btn sm" data-sched>${ic("plus", 16)} Add / schedule</button></div>
-      ${td.map((e) => `<div style="${e.time && (e.end || e.time) < now ? "opacity:.6" : ""}">${schedRow(e)}</div>`).join("") || '<span class="small muted">Nothing scheduled today. Tap Add / schedule for a reminder, task, habit, study session or event.</span>'}
-      ${up.length ? `<span class="lab mt">Coming up</span>${up.map((e) => schedRow(e, true)).join("")}` : ""}</section>`;
+      ${td.map((x) => x.h()).join("") || '<span class="small muted">Nothing scheduled today. Tap Add / schedule for a reminder, task, habit, activity or event.</span>'}
+      ${up.length ? `<span class="lab mt">Coming up</span>${up.map((x) => x.h()).join("")}` : ""}</section>`;
   }
   /* in-app reminders while the app is open (Calendar handles them when it is closed) */
   const firedKey = "mp-fired";
@@ -1231,6 +1373,15 @@
     if (d.wipe !== undefined) return wipeDialog();
     if (d.dowipe !== undefined) return doWipe();
     if (d.menup) { P().menu = d.menup === "simple" ? menuSimple() : { preset: "full", hide: {} }; touchP(); MP.render(); MP.toast(d.menup === "simple" ? "Simple menu" : "Full menu: every screen shown"); return; }
+    if (d.qsave !== undefined) return quickSave(false);
+    if (d.qfix !== undefined) return quickSave(true);
+    if (d.gev) return gcalDialog(d.gev);
+    if (d.tzshow !== undefined) { document.querySelectorAll(".sk-tzbox").forEach((x) => (x.hidden = false)); t.hidden = true; return; }
+    if (d.gcconnect !== undefined) { G.authorize(true).then(() => { P().gcal = Object.assign({ on: true }, P().gcal || {}); touchP(); MP.render(); gcalRefresh(true); MP.toast(G.hasCal ? "Google Calendar connected" : "Calendar permission wasn't given"); }).catch((er) => MP.toast(er.message)); return; }
+    if (d.gcnow !== undefined) { gcalRefresh(true).then(() => MP.toast("Calendar refreshed")); return; }
+    if (d.gcpick !== undefined) { (G.hasList ? Promise.resolve() : G.authorize(true, true)).then(() => G.calCalendars()).then((list) => { if (!list) { MP.toast("Google didn't allow listing your calendars"); return; } const cur = (P().gcal || {}).cals || { primary: { on: true } };
+        modal(`<h2>Calendars to show</h2>${list.map((c) => { const key = c.primary ? "primary" : c.id; return `<label class="row small"><input type="checkbox" data-gcsel="${E(key)}" data-gcname="${E(c.summary || "")}" data-gccol="${E(c.backgroundColor || "")}" ${(cur[key] || {}).on ? "checked" : ""}> <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${E(c.backgroundColor || "#999")}"></span> ${E(c.summary || key)}${c.primary ? " (main)" : ""}</label>`; }).join("")}<div class="row" style="justify-content:flex-end"><button class="btn" data-gcdone>Done</button></div>`); }).catch((er) => MP.toast(er.message)); return; }
+    if (d.gcdone !== undefined) { const cals = {}; document.querySelectorAll("[data-gcsel]").forEach((x) => { cals[x.dataset.gcsel] = { on: x.checked, name: x.dataset.gcname, color: x.dataset.gccol }; }); P().gcal = Object.assign({ on: true }, P().gcal || {}, { cals }); touchP(); closeModal(); MP.render(); gcalRefresh(true); return; }
     if (d.unpin !== undefined) return tryPin();
     if (d.unbio !== undefined) return tryBio();
     if (d.pinforgot !== undefined) return pinForgot();
@@ -1251,7 +1402,7 @@
     if (d.sched !== undefined) { document.getElementById("sheet").classList.remove("on"); return schedDialog(null, d.sched ? { d: d.sched } : null); }
     if (d.sedit) return schedDialog(d.sedit);
     if (d.ssave !== undefined) return schedSave(d.ssave || null);
-    if (d.sdel) { const ev = MP.S.events[d.sdel], key = "ev-" + d.sdel, s2 = MP.S.sent[key]; if (s2 && !s2.del && mode === "google") G.calDelete(s2.id).catch(() => {}); if (s2 && !s2.del) MP.S.sent[key] = { del: 1, u: Date.now() }; delRec("events", d.sdel); closeModal(); MP.render(); MP.toast(ev && ev.tid ? "Deleted (the To-Do task stays)" : "Deleted"); return; }
+    if (d.sdel) { const ev = MP.S.events[d.sdel], key = "ev-" + d.sdel, s2 = MP.S.sent[key]; if (s2 && !s2.del && mode === "google") { const tell = ev && (ev.guests || []).length ? window.confirm("Tell your guests the meeting is cancelled?") : false; G.calDelete(s2.id, tell ? "sendUpdates=all" : "sendUpdates=none").catch(() => {}); } if (s2 && !s2.del) MP.S.sent[key] = { del: 1, u: Date.now() }; delRec("events", d.sdel); closeModal(); MP.render(); MP.toast(ev && ev.tid ? "Deleted (the To-Do task stays)" : "Deleted"); return; }
     if (d.cal) return calDialog(d.cal);
     if (d.calgo) return calSend(d.calgo);
     if (d.calrm) return calRemove(d.calrm);
@@ -1343,6 +1494,10 @@
     if (d.menus) { const m = P().menu || (P().menu = { hide: {} }); m.hide = m.hide || {}; if (t.checked) delete m.hide[d.menus]; else m.hide[d.menus] = true; m.preset = "custom"; touchP(); MP.render(); return; }
     if (d.blk) { blockDone(iso(today()), d.blk, t.checked); MP.render(); }
     if (d.tbrk !== undefined) { TMR().breaks = t.checked; touchP(); return; }
+    if (d.gcon !== undefined) { P().gcal = Object.assign({}, P().gcal || {}, { on: t.checked }); touchP(); if (!t.checked) { GC.items = []; MP.idbSet(gcKey(), { items: [] }); } else gcalRefresh(true); return MP.render(); }
+    if (d.tzhome !== undefined) { P().tz = t.value; touchP(); GC.at = 0; gcalRefresh(true); MP.toast("Home time zone: " + zoneName(t.value)); return MP.render(); }
+    if (d.tz2 !== undefined) { P().tz2 = t.value; touchP(); return; }
+    if (d.mlink) { const u = t.value.trim(); if (u && !safeLink(u)) { MP.toast("Links must start with https://"); return; } P().mlinks = Object.assign({}, P().mlinks || {}, { [d.mlink]: u }); touchP(); return; }
     if (d.tkeep !== undefined) { TMR().keep = t.checked; touchP(); return; }
     if (d.tcal !== undefined) { TMR().cal = t.checked; touchP(); return; }
     if (d.tevery !== undefined) { TMR().every = Math.max(10, Math.min(120, +t.value || 50)); touchP(); return; }
@@ -1390,6 +1545,8 @@
   function setTT(id, f, v) { ["timetable", "weekend"].forEach((k) => { if (Array.isArray(P()[k])) P()[k].forEach((r) => { if (r.id === id) r[f] = f === "text" ? v.slice(0, 120) : v; }); }); touchP(); }
   document.addEventListener("input", (e) => {
     const t = e.target, d = t.dataset;
+    if (d.qin !== undefined) return quickPreview();
+    if (t.id === "sguests" || t.id === "stime" || t.id === "sdate") { if (document.getElementById("skind")) schedKind(t.id); }
     if (d.tq !== undefined) { const q = t.value.trim().toLowerCase(); document.querySelectorAll("[data-ctrow]").forEach((r) => (r.hidden = !!q && !r.dataset.ctrow.includes(q))); if (q) document.querySelectorAll(".ctab").forEach((x) => x.closest("details").open = true); return; }
     if (d.ttf === "text") setTT(d.id, "text", t.value);
     if (d.name !== undefined) { P().name = t.value.slice(0, 40); touchP(); }
@@ -1408,7 +1565,7 @@
     if (t.id === "helpq") { clearTimeout(window._hq); window._hq = setTimeout(() => { view.hq = t.value; MP.render(); const f = document.getElementById("helpq"); if (f) { f.focus(); f.setSelectionRange(f.value.length, f.value.length); } }, 300); }
   });
   document.addEventListener("click", (e) => { if (e.target.closest(".ytl")) stopSound(); });
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape") { closeModal(); document.getElementById("sheet").classList.remove("on"); } if (e.key === "Enter" && e.target.id === "pinin") tryPin(); if (e.key === "Enter" && e.target.id === "hq") { view.q = e.target.value; MP.render(); } if (e.key === "Enter" && e.target.id === "helpq") { view.hq = e.target.value; MP.render(); const f = document.getElementById("helpq"); if (f) { f.focus(); f.setSelectionRange(f.value.length, f.value.length); } } });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") { closeModal(); document.getElementById("sheet").classList.remove("on"); } if (e.key === "Enter" && e.target.id === "pinin") tryPin(); if (e.key === "Enter" && e.target.id === "qadd") quickSave(false); if (e.key === "Enter" && e.target.id === "hq") { view.q = e.target.value; MP.render(); } if (e.key === "Enter" && e.target.id === "helpq") { view.hq = e.target.value; MP.render(); const f = document.getElementById("helpq"); if (f) { f.focus(); f.setSelectionRange(f.value.length, f.value.length); } } });
   document.getElementById("sheet").addEventListener("click", (e) => { if (e.target.id === "sheet") e.currentTarget.classList.remove("on"); });
   document.getElementById("modal").addEventListener("click", (e) => { if (e.target.id === "modal") closeModal(); });
 
@@ -1424,7 +1581,7 @@
   document.addEventListener("pointercancel", () => { if (drag) { drag.el.remove(); drag = null; MP.render(); } });
 
   /* ---------- start-up ---------- */
-  MP.VERSION = "1.12";
+  MP.VERSION = "1.13";
   if (MP.sound) MP.sound.onchange = () => { miniPlayer(); if (route === "study") MP.render(); };
   /* Public, read-only helpers for future modules and connectors. */
   MP.api = { today, iso, dayPct, studyHours, streak, tasks, feed: () => MP.buildFeed(MP.S), version: MP.VERSION, schemaVersion: MP.SCHEMA_VERSION };

@@ -82,6 +82,18 @@ window.MP_HELP = [
 "body": [
 [
 "p",
+"Quick add: on Today and To-Do, type it the way you would say it and press Add, e.g. “Call bank tomorrow 6 pm”, “Gym every Mon Wed Fri 7 am”, “Meeting with Rahul Friday 3-4 pm”, “Submit form by 25 Nov urgent”, “kal subah 9 baje doctor”. The chips show what the planner understood; tap one to open the full form and change anything."
+],
+[
+"list",
+[
+"Meetings / events: add guests' email addresses to send a real Google Calendar invite from your Gmail (you see their replies), and pick a meeting link: Google Meet (created for you), Zoom, Teams or any link. A Join button appears from 10 minutes before.",
+"Save your own Zoom and Teams links once in Settings and they fill in for you.",
+"Times are India time unless you tap Different time zone? and pick the zone the meeting was set in; the planner shows both times."
+]
+],
+[
+"p",
 "The Add / schedule button at the top of Today (also in Today's schedule, and in any day you tap on the Planner) opens one form for everything you want to plan."
 ],
 [
@@ -464,11 +476,20 @@ window.MP_HELP = [
 "body": [
 [
 "p",
-"Nothing goes to your Calendar unless you tap Send to Calendar on that item (study blocks, events, to-dos, special dates). The first time, Google asks you to allow it."
+"Two directions: items you choose go from the planner to Google Calendar, and (if you turn it on) your Google Calendar shows inside the planner."
+],
+[
+"steps",
+[
+"To see your Google Calendar here: Settings → Google Calendar → Connect Google Calendar, then tick Show my Google Calendar inside the planner.",
+"Choose calendars lets you add others (family, work, holidays). Your main calendar is on by default.",
+"Google events appear on Today, the Planner month, the Timetable and the Detailed day sheet, marked Google. Tap one for details, a Join button if it has a meeting link, and Open in Google Calendar to change it.",
+"Items the planner sent to Google show once, as the planner item, never twice."
+]
 ],
 [
 "tip",
-"Sent items show ✓ In Calendar with a Remove option. Set the alert time in Settings."
+"Google events are kept on this device only. They are never copied into your planner files in Drive and never go to Buddy. Meetings & events time shows next to your activities."
 ]
 ]
 },

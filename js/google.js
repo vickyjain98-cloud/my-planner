@@ -8,7 +8,9 @@
   const CFG = window.MP_CONFIG || {};
   const BASE = "openid email profile https://www.googleapis.com/auth/drive.file";
   const CAL = "https://www.googleapis.com/auth/calendar.events";
-  const G = (MP.G = { user: null, token: null, exp: 0, hasCal: false, folderId: null, files: {}, status: "off" });
+  /* 1.13: only asked for when the person taps "Choose calendars", to list their other calendars (family, work, holidays) */
+  const CALLIST = "https://www.googleapis.com/auth/calendar.calendarlist.readonly";
+  const G = (MP.G = { user: null, token: null, exp: 0, hasCal: false, hasList: false, folderId: null, files: {}, status: "off" });
 
   let client = null;
   const ready = () => new Promise((res, rej) => {
@@ -20,11 +22,11 @@
   });
 
   /* Must be called from a tap/click (browsers block pop-ups otherwise). */
-  G.authorize = async (extraCal) => {
+  G.authorize = async (extraCal, wantList) => {
     if (!CFG.clientId) throw new Error("This copy of My Planner has no Google client ID yet (see the setup guide).");
     await ready();
     return new Promise((res, rej) => {
-      const scope = extraCal || G.hasCal ? BASE + " " + CAL : BASE;
+      const scope = (extraCal || G.hasCal ? BASE + " " + CAL : BASE) + (wantList || G.hasList ? " " + CALLIST : "");
       client = google.accounts.oauth2.initTokenClient({
         client_id: CFG.clientId, scope, include_granted_scopes: true,
         callback: (r) => {
@@ -32,6 +34,7 @@
           G.token = r.access_token;
           G.exp = Date.now() + (Number(r.expires_in || 3600) - 120) * 1000;
           G.hasCal = google.accounts.oauth2.hasGrantedAllScopes(r, CAL);
+          G.hasList = google.accounts.oauth2.hasGrantedAllScopes(r, CALLIST);
           res(G.token);
         },
         error_callback: (e) => rej(new Error(e && e.type === "popup_closed" ? "Sign-in window was closed." : "Sign-in was blocked or cancelled."))
@@ -179,13 +182,26 @@
 
   /* ---------- Calendar (only items the person chooses) ---------- */
   G.ensureCal = async () => { if (!G.hasCal || !G.valid()) await G.authorize(true); if (!G.hasCal) throw new Error("Calendar permission was not given."); };
-  G.calInsert = async (ev) => {
+  /* Calendar writes. q = extra query, e.g. "sendUpdates=all&conferenceDataVersion=1" for invites and Meet links. */
+  const EVURL = "https://www.googleapis.com/calendar/v3/calendars/primary/events";
+  G.calInsert = async (ev, qs) => {
     await G.ensureCal();
-    const r = await api("https://www.googleapis.com/calendar/v3/calendars/primary/events", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(ev) });
-    return (await r.json()).id;
+    const r = await api(EVURL + (qs ? "?" + qs : ""), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(ev) });
+    const j = await r.json(); G.lastEv = j; return j.id;
   };
-  G.calPatch = async (id, ev) => { await G.ensureCal(); await api("https://www.googleapis.com/calendar/v3/calendars/primary/events/" + encodeURIComponent(id), { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(ev) }); };
-  G.calDelete = async (id) => { await G.ensureCal(); try { await api("https://www.googleapis.com/calendar/v3/calendars/primary/events/" + encodeURIComponent(id), { method: "DELETE" }); } catch (e) { if (!/ 410| 404/.test(e.message)) throw e; } };
+  G.calPatch = async (id, ev, qs) => { await G.ensureCal(); const r = await api(EVURL + "/" + encodeURIComponent(id) + (qs ? "?" + qs : ""), { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(ev) }); const j = await r.json(); G.lastEv = j; return j; };
+  G.calDelete = async (id, qs) => { await G.ensureCal(); try { await api(EVURL + "/" + encodeURIComponent(id) + (qs ? "?" + qs : ""), { method: "DELETE" }); } catch (e) { if (!/ 410| 404/.test(e.message)) throw e; } };
+  /* Calendar reads (1.13): events shown inside the planner. Read-only, never copied to Drive. Never prompts. */
+  G.calList = async (calId, timeMin, timeMax) => {
+    if (!G.hasCal || !G.valid()) return null;
+    const out = []; let page = "";
+    for (let n = 0; n < 5; n++) {
+      const u = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calId)}/events?singleEvents=true&orderBy=startTime&maxResults=2500&timeMin=${encodeURIComponent(timeMin)}&timeMax=${encodeURIComponent(timeMax)}&fields=nextPageToken,items(id,status,summary,start,end,htmlLink,location,description,attendees(email,responseStatus,self),hangoutLink,recurringEventId,organizer(self))` + (page ? "&pageToken=" + encodeURIComponent(page) : "");
+      const j = await (await api(u)).json(); out.push(...(j.items || [])); if (!j.nextPageToken) break; page = j.nextPageToken;
+    }
+    return out;
+  };
+  G.calCalendars = async () => { if (!G.hasList || !G.valid()) return null; const j = await (await api("https://www.googleapis.com/calendar/v3/users/me/calendarList?fields=items(id,summary,primary,backgroundColor)&minAccessRole=reader")).json(); return j.items || []; };
 
   /* ---------- Opt-in family progress summary (a view-only Google Doc, no entries or mood) ---------- */
   G.writeSummaryDoc = async (html, docId, title) => {

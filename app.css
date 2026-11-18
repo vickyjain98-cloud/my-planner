@@ -210,6 +210,10 @@ a.pill{text-decoration:none;display:inline-flex;align-items:center}
 
 /* ---------- To-Do 1.11 ---------- */
 .trow{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--line)}
+.ttable{display:flex;flex-direction:column}
+.thead{display:none}
+.deskonly{display:none}
+@media (min-width:760px){.ttable .thead,.ttable .trow{display:grid;grid-template-columns:28px minmax(0,1fr) 150px 104px 84px 56px 34px;gap:10px;align-items:center}.ttable .thead{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;opacity:.6;padding:0 0 6px;border-bottom:1px solid var(--line)}.ttable .trow>.cb{margin-top:0}.ttable .mobonly{display:none}.ttable .deskonly{display:block}.ttable .tcell .pill{display:inline-block;white-space:nowrap}}
 .trow:last-child{border-bottom:0}
 .trow>.cb{margin-top:3px}
 .tbody{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
@@ -238,3 +242,14 @@ a.pill{text-decoration:none;display:inline-flex;align-items:center}
 .ctab .cr>div:first-child{word-break:break-word}
 details>summary{cursor:pointer;padding:6px 0}
 @media (max-width:640px){.ctab{grid-template-columns:minmax(0,1fr) auto auto;font-size:12px}.ctab .ch:nth-child(2),.ctab .ch:nth-child(5),.ctab .cr>div:nth-child(2),.ctab .cr>div:nth-child(5){display:none}}
+
+/* ---------- 1.12: activities, timer, habits, lock ---------- */
+.navsub{display:flex;flex-direction:column;gap:2px;margin:-2px 0 4px 34px}
+.navsubbtn{all:unset;cursor:pointer;display:flex;justify-content:space-between;gap:8px;font-size:12.5px;padding:4px 10px;border-radius:8px;color:var(--ink);opacity:.85}
+.navsubbtn:hover,.navsubbtn.on{background:var(--soft);opacity:1}
+.navsubbtn .tiny{opacity:.7}
+#dimv{position:fixed;inset:0;z-index:200;background:#000;color:#5a5a5a;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;cursor:pointer}
+#dimv .dimt{font-size:64px;font-variant-numeric:tabular-nums;font-weight:300}
+#dimv .dims{font-size:13px;color:#444}
+td.nd .hb{opacity:.35}
+.hb b.tiny{display:block;font-weight:700;opacity:.8}

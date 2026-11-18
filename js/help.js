@@ -153,6 +153,13 @@ window.MP_HELP = [
 "Write what counts as 100% so you score yourself fairly.",
 "Pause a habit to stop counting it without losing its history."
 ]
+],
+[
+"list",
+[
+"How often: in Manage habits choose Every day, Chosen days (e.g. Mon–Fri), Times a week (e.g. 3), or A count each day (e.g. 8 glasses; tap the habit on Today to add one).",
+"Days a habit isn't due don't break your winning streak. Weekly habits show how many times you've done them this week."
+]
 ]
 ]
 },
@@ -178,25 +185,34 @@ window.MP_HELP = [
 },
 {
 "id": "study",
-"title": "Study",
+"title": "Activity (and the timer)",
 "route": "study",
 "body": [
 [
 "p",
-"Your study blocks for today, a focus timer and study music."
+"Everything you spend time on: study, work, meditation, reading, exercise and your own types. Each has a timer and shows time done against time planned."
 ],
 [
 "steps",
 [
-"Tap Start for a 25-minute focus round; a 5-minute break follows.",
-"When a focus round ends, the next study block is ticked for you.",
-"Rate your focus (1–5), note if your phone was away and what got in the way.",
-"Open a study-music link (YouTube) or your own playlist."
+"In Timetable, set a row's Type to Activity, then pick the kind underneath (or + Add type).",
+"On the Activity screen, tap a kind at the top to see only those blocks; the side menu lists each kind with time done / planned today.",
+"Tap Start timer on a block: it counts down that block's own length and ticks the block when it ends. Or pick 5–90 minutes, type your own, or use 25 + 5.",
+"For sessions of 60 minutes or more, tick Add breaks (10 minutes after every 50 by default; change it in Settings → Activities).",
+"Rate your focus, note whether your phone was away and what got in the way."
+]
+],
+[
+"list",
+[
+"While a timer runs the screen stays on and turns black and dim after 30 seconds to save battery; tap to come back.",
+"If you allowed Google Calendar, a backup alert is added for the end time, so your phone rings even if the planner is closed. It is removed when the timer stops.",
+"Finishing a block ticks the habit with the same name (or the one you link in Settings → Activities)."
 ]
 ],
 [
 "tip",
-"Change how many blocks you have and their length in Settings → Study blocks, or edit Study rows in Timetable."
+"Your old Study blocks are now Activity → Study. Study hours in the family summary and for Buddy count only Study."
 ]
 ]
 },
@@ -468,6 +484,13 @@ window.MP_HELP = [
 "Profile name, study blocks, study music playlist and Calendar alert time.",
 "Family progress summary (opt-in) and Connections (Buddy OS).",
 "Your data: backup, restore, export CSV, delete all data. Version history."
+]
+],
+[
+"list",
+[
+"Menu: hide screens you don't use, or choose Simple or Full. Hidden screens keep their data.",
+"Privacy: set a 4–6 digit PIN to lock Journal, Mood, 3-6-9 and History; add fingerprint or face on phones that support it. It locks again 5 minutes after you leave. Forgot it? Sign in with Google again to reset."
 ]
 ]
 ]

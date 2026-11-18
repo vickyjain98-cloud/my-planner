@@ -31,13 +31,13 @@
   MP.ic = (k, s = 20) => `<svg aria-hidden="true" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${ICON[k] || ""}</svg>`;
   const ic = MP.ic;
 
-  const SCREENS = [["today", "Today"], ["timetable", "Timetable"], ["habits", "Habits"], ["dash", "Habit Dashboard"], ["study", "Study"], ["planner", "Planner"], ["todo", "To-Do"], ["affirm", "Affirmations"], ["journal", "Journal"], ["three", "3-6-9"], ["mood", "Mood & Wellness"], ["dates", "Special Dates"], ["history", "History & Search"], ["print", "Print"], ["prefs", "Settings"], ["ideas", "Suggestions"], ["help", "Help & Guide"]];
+  const SCREENS = [["today", "Today"], ["timetable", "Timetable"], ["habits", "Habits"], ["dash", "Habit Dashboard"], ["study", "Activity"], ["planner", "Planner"], ["todo", "To-Do"], ["affirm", "Affirmations"], ["journal", "Journal"], ["three", "3-6-9"], ["mood", "Mood & Wellness"], ["dates", "Special Dates"], ["history", "History & Search"], ["print", "Print"], ["prefs", "Settings"], ["ideas", "Suggestions"], ["help", "Help & Guide"]];
   const THEMES = [["sage", "Sage Botanical"], ["lavender", "Lavender Dream"], ["beige", "Beige Minimal"], ["blush", "Blush Floral"], ["midnight", "Midnight Moon"], ["ocean", "Ocean Calm"]];
   /* Choose your menu (1.11): hidden screens keep all their data. People who set up before 1.11 keep the full menu. */
   const MENU_SIMPLE = ["today", "planner", "todo", "study", "habits", "journal", "prefs", "help"];
   const shownScreen = (r) => { const m = P().menu; return r === "today" || r === "prefs" || !m || !m.hide || !m.hide[r]; };
   const menuSimple = () => ({ preset: "simple", hide: Object.fromEntries(SCREENS.filter((x) => !MENU_SIMPLE.includes(x[0])).map((x) => [x[0], true])) });
-  const TYPES = ["Study", "Fixed", "Break", "Rest", "Planning", "Morning", "Free"];
+  const TYPES = ["Activity", "Fixed", "Break", "Rest", "Planning", "Morning", "Free"]; /* stored type "Study" = Activity → Study (kept so older data and devices still work) */
   const TCOL = { Study: "var(--acc)", Fixed: "var(--acc2)", Break: "#CFE0D3", Rest: "#D3E3EA", Planning: "#F1DFAE", Morning: "#F4D3BB", Free: "#E1D7EF" };
   const MOODCOL = { calm: "#8FB6A3", happy: "#F2C66D", focused: "#7C9CC9", grateful: "#C99BC7", anxious: "#E59B7E", tired: "#B8B2A7", low: "#7E7FA8", irritable: "#D9776F" };
   const MOODVAL = { happy: 1, grateful: 0.9, calm: 0.85, focused: 0.8, tired: 0.45, irritable: 0.35, anxious: 0.3, low: 0.2 };
@@ -58,11 +58,33 @@
 
   const ttFor = (d) => { const we = d.getDay() === 0 || d.getDay() === 6; const rows = we && Array.isArray(P().weekend) ? P().weekend : P().timetable; return rows.slice().sort((a, b) => (a.start || "").localeCompare(b.start || "")); };
   const studyRows = (d) => ttFor(d).filter((r) => r.type === "Study");
+  /* ---------- Activities (1.12) ---------- */
+  const isAct = (r) => r.type === "Study" || r.type === "Activity";
+  const actOf = (r) => (r.type === "Study" ? "Study" : r.act || "Other");
+  const DEF_ACTS = ["Study", "Work", "Meditation", "Reading", "Exercise"];
+  const acts = () => (Array.isArray(P().acts) ? P().acts : DEF_ACTS.map((n) => ({ name: n })));
+  const ensureActs = () => { if (!Array.isArray(P().acts)) P().acts = DEF_ACTS.map((n) => ({ name: n })); return P().acts; };
+  const actNames = () => { const out = acts().map((a) => a.name); [...P().timetable, ...(Array.isArray(P().weekend) ? P().weekend : [])].forEach((r) => { if (isAct(r) && !out.includes(actOf(r))) out.push(actOf(r)); }); return out; };
+  const actRows = (d, name) => ttFor(d).filter((r) => isAct(r) && (!name || actOf(r) === name));
+  const actMins = (d, name) => { const rec = MP.S.days[iso(d)], rows = actRows(d, name); return { plan: rows.reduce((s, r) => s + rowLen(r), 0), done: rec && rec.study ? rows.reduce((s, r) => s + (rec.study[r.id] ? rowLen(r) : 0), 0) : 0 }; };
+  const hm = (m) => (m >= 60 ? `${Math.floor(m / 60)} h${m % 60 ? " " + (m % 60) : ""}` : `${m} min`);
+  const actHabit = (name) => { const a = acts().find((x) => x.name === name), hs = P().habits.filter((h) => h.active !== false); if (a && a.hab) return hs.find((h) => h.id === a.hab); return hs.find((h) => h.name.trim().toLowerCase() === name.toLowerCase()); };
+  /* Marking a block done also ticks the habit linked to that activity (Settings → Activities). */
+  function blockDone(k, rowId, on) {
+    const r = dayRec(k); r.study = r.study || {}; r.study[rowId] = on;
+    if (on) { const row = ttFor(parseISO(k)).find((x) => x.id === rowId), h = row && actHabit(actOf(row)); if (h) { r.h = r.h || {}; if (r.h[h.id] !== "d") { r.h[h.id] = "d"; MP.toast(h.name + " ticked in Habits"); } } }
+    touchDay(k);
+  }
   const rowLen = (r) => { const a = tMin(r.start), b = tMin(r.end); return a == null || b == null ? 0 : (b - a + 1440) % 1440; };
   const studyHours = (d) => { const rec = MP.S.days[iso(d)]; if (!rec || !rec.study) return 0; return studyRows(d).reduce((s, r) => s + (rec.study[r.id] ? rowLen(r) : 0), 0) / 60; };
   const activeHabits = () => P().habits.filter((h) => h.active !== false);
-  const dayPct = (d) => { const rec = MP.S.days[iso(d)], hs = activeHabits(); if (!rec || !rec.h || !hs.length) return null; const vals = hs.map((h) => rec.h[h.id]).filter(Boolean); if (!vals.length) return null; return hs.reduce((s, h) => s + (rec.h[h.id] === "d" ? 1 : rec.h[h.id] === "p" ? 0.5 : 0), 0) / hs.length; };
-  const streak = () => { let n = 0; const t = today(); for (let i = 0; i < 800; i++) { const p = dayPct(addD(t, -i)); if (i === 0 && (p === null || p < 0.7)) continue; if (p !== null && p >= 0.7) n++; else break; } return n; };
+  /* Flexible habits (1.12): h.freq = undefined/{k:"daily"} | {k:"days",days:[0-6]} | {k:"week",n} | {k:"count",n,unit}.
+     Habits without freq stay "every day", exactly as before. Weekly habits are tracked by the week, not in the daily score. */
+  const dueOn = (h, d) => { const f = h.freq; if (!f || f.k === "daily" || f.k === "count") return true; if (f.k === "days") return (f.days || []).includes(d.getDay()); return false; };
+  const weekDone = (h, d) => { const m = monday(d); let n = 0; for (let i = 0; i < 7; i++) { const v = ((MP.S.days[iso(addD(m, i))] || {}).h || {})[h.id]; n += v === "d" ? 1 : v === "p" ? 0.5 : 0; } return n; };
+  const freqText = (h) => { const f = h.freq; if (!f || f.k === "daily") return "Every day"; if (f.k === "days") return (f.days || []).map((x) => WDN[x]).join(" "); if (f.k === "week") return f.n + "× a week"; return f.n + (f.unit ? " " + f.unit : "") + " a day"; };
+  const dayPct = (d) => { const rec = MP.S.days[iso(d)], hs = activeHabits().filter((h) => dueOn(h, d)); if (!rec || !rec.h || !hs.length) return null; const vals = hs.map((h) => rec.h[h.id]).filter(Boolean); if (!vals.length) return null; return hs.reduce((s, h) => s + (rec.h[h.id] === "d" ? 1 : rec.h[h.id] === "p" ? 0.5 : 0), 0) / hs.length; };
+  const streak = () => { let n = 0; const t = today(); for (let i = 0; i < 800; i++) { const dd = addD(t, -i); if (activeHabits().length && !activeHabits().some((h) => dueOn(h, dd))) continue; /* rest day: nothing due, streak carries on */ const p = dayPct(dd); if (i === 0 && (p === null || p < 0.7)) continue; if (p !== null && p >= 0.7) n++; else break; } return n; };
   const bestStreak = () => { const keys = Object.keys(MP.S.days).sort(); let best = 0, cur = 0, prev = null; keys.forEach((k) => { const d = parseISO(k); const p = dayPct(d); const cont = prev && (d - prev) / 864e5 === 1; if (p !== null && p >= 0.7) { cur = cont ? cur + 1 : 1; best = Math.max(best, cur); } else cur = 0; prev = d; }); return best; };
   const moonOf = (d) => D.moons[iso(d)] || "";
   const moonName = (k) => (k === "P" ? "Purnima" : k === "A" ? "Amavasya" : "");
@@ -125,13 +147,18 @@
   const V = {};
 
   const shortD = (k) => fmt(parseISO(k), { weekday: "short", day: "numeric", month: "short" });
+  /* Tasks show as a table on wider screens (Task · Priority · Date · Due · Steps) and as a stacked list on phones. */
+  const taskHead = () => `<div class="thead"><span></span><span>Task</span><span>Priority</span><span>Date</span><span>Due</span><span>Steps</span><span></span></div>`;
   function taskRow(t) {
     const p = TPRI[tPri(t)], late = tLate(t), k = iso(today()), subs = t.sub || [], sd = subs.filter((x) => x.done).length, inCal = MP.S.sent["task-" + t.id] && !MP.S.sent["task-" + t.id].del;
-    const meta = [tDay(t) && tDay(t) !== k && !late ? shortD(tDay(t)) : "", t.due ? `<span class="${!t.done && t.due < k ? "over" : ""}">due ${fmt(parseISO(t.due), { day: "numeric", month: "short" })}</span>` : "", subs.length ? `${sd} of ${subs.length} steps` : "", inCal && t.cal ? `${ic("cal", 12)} ${fmtT(t.cal.t)}` : ""].filter(Boolean).join(" · ");
+    const dTxt = tDay(t) ? (tDay(t) === k ? "Today" : shortD(tDay(t))) : "Inbox", dueTxt = t.due ? fmt(parseISO(t.due), { day: "numeric", month: "short" }) : "", dueOver = !t.done && t.due && t.due < k;
+    const meta = [tDay(t) && tDay(t) !== k && !late ? shortD(tDay(t)) : "", t.due ? `<span class="${dueOver ? "over" : ""}">due ${dueTxt}</span>` : "", subs.length ? `${sd} of ${subs.length} steps` : "", inCal && t.cal ? `${ic("cal", 12)} ${fmtT(t.cal.t)}` : ""].filter(Boolean).join(" · ");
     return `<div class="trow ${t.done ? "done" : ""}"><input type="checkbox" class="cb" data-done="${E(t.id)}" ${t.done ? "checked" : ""} aria-label="Done"><div class="tbody">
-      <div class="tpills">${late ? `<span class="pill tiny late">Overdue ${late} day${late > 1 ? "s" : ""}</span>` : ""}<span class="pill tiny ${p[1]}">${p[0]}</span>${!t.done && t.due && t.due < k && t.due !== tDay(t) ? '<span class="pill tiny late">Past deadline</span>' : ""}</div>
-      <button class="ttext" data-tedit="${E(t.id)}">${E(t.t)}</button>${meta ? `<div class="tiny muted">${meta}</div>` : ""}
+      ${late || (dueOver && t.due !== tDay(t)) ? `<div class="tpills">${late ? `<span class="pill tiny late">Overdue ${late} day${late > 1 ? "s" : ""}</span>` : ""}${dueOver && t.due !== tDay(t) ? '<span class="pill tiny late">Past deadline</span>' : ""}</div>` : ""}
+      <div class="tpills mobonly"><span class="pill tiny ${p[1]}">${p[0]}</span></div>
+      <button class="ttext" data-tedit="${E(t.id)}">${E(t.t)}</button>${meta ? `<div class="tiny muted mobonly">${meta}</div>` : ""}${inCal && t.cal ? `<div class="tiny muted deskonly">${ic("cal", 12)} In Calendar at ${fmtT(t.cal.t)}</div>` : ""}
       ${subs.length && !t.done ? `<div class="subs">${subs.map((x) => `<label class="row tiny ${x.done ? "sdone" : ""}"><input type="checkbox" class="cb sm" data-sub="${E(t.id)}|${E(x.id)}" ${x.done ? "checked" : ""}> ${E(x.t)}</label>`).join("")}</div>` : ""}</div>
+      <span class="tcell deskonly"><span class="pill tiny ${p[1]}">${p[0]}</span></span><span class="tcell deskonly small ${late ? "over" : ""}">${dTxt}</span><span class="tcell deskonly small ${dueOver ? "over" : ""}">${dueTxt || "—"}</span><span class="tcell deskonly small">${subs.length ? `${sd}/${subs.length}` : "—"}</span>
       <span class="row tacts"><button class="tool ${t.pin ? "on" : ""}" data-tpin="${E(t.id)}" title="${t.pin ? "Remove from post-its" : "Show as a post-it"}" aria-label="Post-it">📌</button></span></div>`;
   }
   const moveAll = () => `<span class="row" style="gap:6px"><button class="btn ghost sm" data-tmove="0">Move all to today</button><button class="btn ghost sm" data-tmove="1">Move all to tomorrow</button></span>`;
@@ -139,8 +166,8 @@
   function todoCard() {
     const G = taskGroups(), n = G.overdue.length + G.today.length, dn = G.today.filter((t) => t.done).length;
     return `<section class="card stack mt"><div class="between wrap"><span class="lab">To-dos · ${dn} of ${n} done</span><span class="row" style="gap:6px"><button class="btn sm" data-tnew>${ic("plus", 16)} Task</button><button class="link" data-go="todo">To-Do →</button></span></div>
-      ${G.overdue.length ? `<div class="between wrap"><span class="lab over">Overdue · ${G.overdue.length}</span>${moveAll()}</div>${G.overdue.map(taskRow).join("")}<span class="lab">Today</span>` : ""}
-      ${G.today.map(taskRow).join("") || '<span class="small muted">Nothing for today. Tap Task to add one.</span>'}</section>`;
+      ${G.overdue.length ? `<div class="between wrap"><span class="lab over">Overdue · ${G.overdue.length}</span>${moveAll()}</div><div class="ttable">${taskHead()}${G.overdue.map(taskRow).join("")}</div><span class="lab">Today</span>` : ""}
+      ${G.today.length ? `<div class="ttable">${taskHead()}${G.today.map(taskRow).join("")}</div>` : ""}${G.today.length ? "" : '<span class="small muted">Nothing for today. Tap Task to add one.</span>'}</section>`;
   }
   /* Post-its: pinned tasks only, coloured by priority; write on them with the S Pen; drag the handle to reorder. */
   function postitStrip() {
@@ -159,7 +186,7 @@
     const rows = rowsArr.map((r, i) => {
       let h = ""; const s = secOf(r.start); if (s !== last) { h += `<div class="sechead">${sec[s]}</div>`; last = s; }
       const st = tMin(r.start), en = r.end ? tMin(r.end) : (rowsArr[i + 1] ? tMin(rowsArr[i + 1].start) : 1440);
-      const isNow = now >= st && now < (en > st ? en : 1440), past = en > st && en <= now, isS = r.type === "Study";
+      const isNow = now >= st && now < (en > st ? en : 1440), past = en > st && en <= now, isS = isAct(r);
       h += `<div class="trow ${isNow ? "now" : ""} ${isS ? "study" : ""} ${past && !isNow ? "past" : ""}"><span class="ttime">${fmtT(r.start)}${r.end ? " – " + fmtT(r.end) : ""}</span><span style="flex:1">${E(r.text)}${isNow ? ' <span class="tiny">· now</span>' : ""}</span>${isS ? `<input type="checkbox" class="cb" data-blk="${E(r.id)}" ${rec.study && rec.study[r.id] ? "checked" : ""} aria-label="Block done">` : '<span style="width:20px"></span>'}</div>`;
       return h;
     }).join("") || `<p class="small muted">No timetable yet. <button class="link" data-go="timetable">Set it up →</button></p>`;
@@ -193,13 +220,13 @@
   function journalSpread() {
     const t = today(), k = iso(t), a = dailyAff(t);
     return `<div class="card spread sheetgrid"><div class="stack page"><div style="font-family:var(--disp);font-size:24px">${fmt(t, { weekday: "long" })}<span class="muted" style="font-size:16px"> · ${fmt(t, { day: "numeric", month: "long" })}</span></div>
-      ${ttFor(t).map((r) => `<div class="row small jrow ${r.type === "Study" ? "b" : ""}"><span style="width:62px" class="muted">${fmtT(r.start)}</span><span style="flex:1">${E(r.text)}</span></div>`).join("") || '<span class="small muted">No timetable yet.</span>'}</div>
+      ${ttFor(t).map((r) => `<div class="row small jrow ${isAct(r) ? "b" : ""}"><span style="width:62px" class="muted">${fmtT(r.start)}</span><span style="flex:1">${E(r.text)}</span></div>`).join("") || '<span class="small muted">No timetable yet.</span>'}</div>
       <div class="stack page"><p class="quote" style="font-size:18px;text-align:center">“${E(a.text)}”</p><span class="lab">Dear diary</span>${MP.padHTML("journal-" + k, 9, 40)}<span class="lab">Grateful for</span>${MP.padHTML("grateful-" + k, 2, 40)}</div></div>`;
   }
 
   V.today = () => {
     const t = today(), k = iso(t), rec = dayRec(k), a = dailyAff(t), nm = nextMoon(), p = portalOf(t), tv = P().todayView || "overview";
-    const sr = studyRows(t), doneB = sr.filter((r) => rec.study && rec.study[r.id]).length, nb = sr.find((r) => !(rec.study && rec.study[r.id]));
+    const sr = actRows(t), doneB = sr.filter((r) => rec.study && rec.study[r.id]).length, nb = sr.find((r) => !(rec.study && rec.study[r.id])), am = actMins(t);
     const pr = P().practice, pday = pr.start ? Math.floor((t - parseISO(pr.start)) / 864e5) + 1 : 0;
     const hour = new Date().getHours(), greet = hour < 4 ? "Still up" : hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : hour < 22 ? "Good evening" : "Good night";
     const headr = `<div class="between hdr" style="align-items:flex-start"><div><div class="lab">${fmt(t, { weekday: "long", day: "numeric", month: "long" })}</div><h1 class="title">${greet},<br><em>${E(P().name || "friend")}</em></h1></div>
@@ -207,14 +234,14 @@
       <div class="row">${nm ? `<span class="pill ${nm.m === "Purnima" ? "c-moon" : "c-ama"}">${nm.m === "Purnima" ? "○" : "●"} ${nm.m} ${nm.i === 0 ? "today" : "in " + nm.i + " day" + (nm.i > 1 ? "s" : "")} · ${fmt(nm.d, { weekday: "short", day: "numeric", month: "short" })}</span>` : ""}${p ? `<span class="pill c-portal">✦ ${E(p)}</span>` : ""}${pr.text && pday >= 1 && pday <= pr.len ? `<span class="pill out">3-6-9 · Day ${pday} of ${pr.len}</span>` : ""}</div></div></div>`;
     if (tv === "sheet") return headr + whatsNewCard() + schedCard() + daySheet();
     if (tv === "clock") return headr + dayClock();
-    if (tv === "journal") return headr + journalSpread();
-    const hs = activeHabits(), pct = dayPct(t) || 0, tm = moodOf(t);
+    if (tv === "journal") return headr + (lockOn() && !unlocked ? `<section class="card stack center"><span class="small">${ic("lock", 16)} Your journal is locked.</span><button class="btn sm" data-go="journal">Unlock</button></section>` : journalSpread());
+    const hs = activeHabits().filter((h) => dueOn(h, t) || (h.freq && h.freq.k === "week")), pct = dayPct(t) || 0, tm = moodOf(t);
     return headr + whatsNewCard() + `<div class="grid g2">
       <section class="card stack"><div class="between"><span class="lab">Today's affirmation</span>${writeBtns()}</div><p class="quote">“${E(a.text)}”</p><span class="tiny muted">${E(a.src)}</span></section>
-      <section class="card hero stack">${sr.length ? (nb ? `<div class="between"><span class="lab inherit">Up next · ${fmtT(nb.start)}</span><span class="tiny" style="opacity:.85">${rowLen(nb)} min</span></div><h2 class="inherit">${E(nb.text)}</h2>` : `<h2 class="inherit">All study blocks done today</h2>`) : `<h2 class="inherit">No study blocks yet</h2><span class="small">Add Study rows in your timetable.</span>`}
-      <div class="bar"><i style="width:${sr.length ? (doneB / sr.length) * 100 : 0}%"></i></div><div class="between wrap"><span class="small" style="opacity:.9">${doneB} of ${sr.length} blocks · ${studyHours(t).toFixed(1)} h studied</span><button class="btn inv" data-go="study">Focus timer</button></div></section></div>
+      <section class="card hero stack">${sr.length ? (nb ? `<div class="between"><span class="lab inherit">Up next · ${fmtT(nb.start)}</span><span class="tiny" style="opacity:.85">${rowLen(nb)} min</span></div><h2 class="inherit">${E(nb.text)}</h2><span class="small" style="opacity:.85">${E(actOf(nb))}</span>` : `<h2 class="inherit">All activities done today</h2>`) : `<h2 class="inherit">No activities yet</h2><span class="small">Add Activity rows in your Timetable.</span>`}
+      <div class="bar"><i style="width:${sr.length ? (doneB / sr.length) * 100 : 0}%"></i></div><div class="between wrap"><span class="small" style="opacity:.9">${doneB} of ${sr.length} blocks · ${hm(am.done)} of ${hm(am.plan)} done</span><button class="btn inv" data-go="study">Timer</button></div></section></div>
       <section class="card stack mt"><div class="between"><span class="lab">Habits today</span><span class="small accb">${hs.filter((h) => (rec.h || {})[h.id] === "d").length} of ${hs.length} · ${Math.round(pct * 100)}%</span></div>
-      ${hs.length ? `<div class="row habrow">${hs.map((h) => `<button class="hb" data-h="${E(h.id)}" aria-label="${E(h.name)}: tap to change">${dots((rec.h || {})[h.id] || "e", (rec.h || {})[h.id])}<span>${E(h.name.split(" ")[0])}</span></button>`).join("")}</div><span class="tiny muted">Tap a circle: empty → Done (100%) → Partial (50%) → Missed</span>` : `<span class="small muted">No habits yet. <button class="link" data-go="habits">Add habits →</button></span>`}</section>
+      ${hs.length ? `<div class="row habrow">${hs.map((h) => { const f = h.freq || {}, cnt = f.k === "count" ? `<b class="tiny">${((rec.hn || {})[h.id] || 0)}/${f.n}</b>` : f.k === "week" ? `<b class="tiny">${weekDone(h, t)}/${f.n} wk</b>` : ""; return `<button class="hb" data-h="${E(h.id)}" aria-label="${E(h.name)}: tap to change">${dots((rec.h || {})[h.id] || "e", (rec.h || {})[h.id])}<span>${E(h.name.split(" ")[0])}</span>${cnt}</button>`; }).join("")}</div><span class="tiny muted">Tap a circle: empty → Done (100%) → Partial (50%) → Missed</span>` : `<span class="small muted">No habits yet. <button class="link" data-go="habits">Add habits →</button></span>`}</section>
       ${schedCard()}${inboxCard()}${postitStrip()}${todoCard()}<div class="grid g2 mt">
       <section class="card stack"><div class="between"><span class="lab">Mood check-in</span><button class="link" data-go="mood">Open →</button></div>
       <div class="row">${Object.keys(MOODCOL).map((w) => `<button class="moodbtn" data-moodq="${w}" style="${tm === w ? `background:${MOODCOL[w]};color:#1d1d1d` : ""}">${w}</button>`).join("")}</div>
@@ -224,27 +251,31 @@
   V.timetable = () => {
     const we = view.tt === "we" && Array.isArray(P().weekend), rows = (we ? P().weekend : P().timetable).slice().sort((a, b) => (a.start || "").localeCompare(b.start || ""));
     const tabs = `<div class="row"><div class="tabs"><button class="${!we ? "on" : ""}" data-ttv="wd">${Array.isArray(P().weekend) ? "Weekdays" : "Every day"}</button>${Array.isArray(P().weekend) ? `<button class="${we ? "on" : ""}" data-ttv="we">Weekend</button>` : ""}</div>${Array.isArray(P().weekend) ? `<button class="btn ghost sm" data-weoff>Use one timetable</button>` : `<button class="btn ghost sm" data-weon>Different weekend timetable</button>`}</div>`;
-    const mins = rows.filter((r) => r.type === "Study").reduce((s, r) => s + rowLen(r), 0);
-    return `${head("Your routine", "Timetable", tabs)}<section class="card"><div class="tablewrap"><table class="t"><thead><tr><th>Start</th><th>End</th><th>Activity</th><th>Type</th><th class="noprint"></th></tr></thead><tbody>
-      ${rows.map((r) => `<tr class="${r.type === "Study" ? "srow" : ""}"><td><input class="f sm" type="time" value="${E(r.start)}" data-ttf="start" data-id="${E(r.id)}" aria-label="Start"></td><td><input class="f sm" type="time" value="${E(r.end || "")}" data-ttf="end" data-id="${E(r.id)}" aria-label="End"></td><td><input class="f" value="${E(r.text)}" maxlength="120" data-ttf="text" data-id="${E(r.id)}" aria-label="Activity"></td><td>${sel(`data-ttf="type" data-id="${E(r.id)}"`, TYPES, r.type, 'aria-label="Type"')}</td><td class="noprint"><span class="row" style="gap:4px;flex-wrap:nowrap">${r.type === "Study" && r.start && r.end ? calBtn("tt-" + r.id, r.text, { kind: "block", row: r }) : ""}<button class="tool" data-ttdel="${E(r.id)}" aria-label="Delete row">${ic("trash", 16)}</button></span></td></tr>`).join("") || `<tr><td colspan="5" class="small muted">No rows yet.</td></tr>`}
+    const per = {}; rows.filter(isAct).forEach((r) => { per[actOf(r)] = (per[actOf(r)] || 0) + rowLen(r); });
+    return `${head("Your routine", "Timetable", tabs)}<section class="card"><div class="tablewrap"><table class="t"><thead><tr><th>Start</th><th>End</th><th>What</th><th>Type</th><th class="noprint"></th></tr></thead><tbody>
+      ${rows.map((r) => `<tr class="${isAct(r) ? "srow" : ""}"><td><input class="f sm" type="time" value="${E(r.start)}" data-ttf="start" data-id="${E(r.id)}" aria-label="Start"></td><td><input class="f sm" type="time" value="${E(r.end || "")}" data-ttf="end" data-id="${E(r.id)}" aria-label="End"></td><td><input class="f" value="${E(r.text)}" maxlength="120" data-ttf="text" data-id="${E(r.id)}" aria-label="Activity"></td><td><div class="stack" style="gap:4px">${sel(`data-ttf="type" data-id="${E(r.id)}"`, TYPES, isAct(r) ? "Activity" : r.type, 'aria-label="Type"')}${isAct(r) ? sel(`data-ttact="${E(r.id)}"`, [...actNames().map((n) => [n, n]), ["__new", "+ Add type…"]], actOf(r), 'aria-label="Activity type"') : ""}</div></td><td class="noprint"><span class="row" style="gap:4px;flex-wrap:nowrap">${isAct(r) && r.start && r.end ? calBtn("tt-" + r.id, r.text, { kind: "block", row: r }) : ""}<button class="tool" data-ttdel="${E(r.id)}" aria-label="Delete row">${ic("trash", 16)}</button></span></td></tr>`).join("") || `<tr><td colspan="5" class="small muted">No rows yet.</td></tr>`}
       </tbody></table></div><div class="row mt"><button class="btn" data-ttadd>${ic("plus", 16)} Add a row</button>${!rows.length ? `<button class="btn ghost" data-ttsuggest>Use a suggested routine</button>` : ""}</div>
-      <p class="tiny muted">Planned study: ${(mins / 60).toFixed(1)} h across ${rows.filter((r) => r.type === "Study").length} blocks. Rows of type <b>Study</b> are your study blocks. Times save as you type.</p></section>`;
+      <p class="tiny muted">Planned: ${Object.keys(per).map((n) => `${E(n)} ${hm(per[n])}`).join(" · ") || "no activities yet"}. Rows of type <b>Activity</b> are timed on the Activity screen; pick what kind in the box under it. Times save as you type.</p></section>`;
   };
 
   V.habits = () => {
     const t = today(), days = [...Array(7)].map((_, i) => addD(t, i - 6)), hs = P().habits;
     return `${head("Done 100% · Partial 50% · Missed", "Habits", `<button class="btn ghost" data-go="dash">${ic("dash", 16)} Dashboard</button>`)}
       <section class="card tablewrap"><table class="t"><thead><tr><th>Habit</th>${days.map((d) => `<th class="c">${fmt(d, { weekday: "short" })}<br>${d.getDate()}</th>`).join("")}</tr></thead><tbody>
-      ${activeHabits().map((h) => `<tr><td><b>${E(h.name)}</b>${h.def ? `<div class="tiny muted">100% = ${E(h.def)}</div>` : ""}</td>${days.map((d) => { const v = ((MP.S.days[iso(d)] || {}).h || {})[h.id] || "e"; return `<td class="c"><button class="hb inline" data-hd="${iso(d)}" data-hi="${E(h.id)}" aria-label="${E(h.name)} on ${fmt(d, { weekday: "long" })}">${dots(v + " smd", v)}</button></td>`; }).join("")}</tr>`).join("") || `<tr><td colspan="8" class="small muted">Add your first habit below.</td></tr>`}</tbody></table></section>
-      <section class="card stack mt"><span class="lab">Manage habits</span>${hs.map((h) => `<div class="row" style="gap:8px"><input class="f" style="flex:2;min-width:140px" value="${E(h.name)}" maxlength="60" data-hname="${E(h.id)}" aria-label="Habit name"><input class="f" style="flex:2;min-width:140px" value="${E(h.def || "")}" maxlength="80" placeholder="What counts as 100%?" data-hdef="${E(h.id)}" aria-label="What counts as 100%"><button class="btn ghost sm" data-hact="${E(h.id)}">${h.active === false ? "Resume" : "Pause"}</button></div>`).join("")}
+      ${activeHabits().map((h) => `<tr><td><b>${E(h.name)}</b><div class="tiny muted">${E(freqText(h))}${h.freq && h.freq.k === "week" ? ` · ${weekDone(h, t)} of ${h.freq.n} this week` : ""}</div>${h.def ? `<div class="tiny muted">100% = ${E(h.def)}</div>` : ""}</td>${days.map((d) => { const v = ((MP.S.days[iso(d)] || {}).h || {})[h.id] || "e"; return `<td class="c ${dueOn(h, d) || (h.freq && h.freq.k === "week") ? "" : "nd"}"><button class="hb inline" data-hd="${iso(d)}" data-hi="${E(h.id)}" aria-label="${E(h.name)} on ${fmt(d, { weekday: "long" })}">${dots(v + " smd", v)}</button></td>`; }).join("")}</tr>`).join("") || `<tr><td colspan="8" class="small muted">Add your first habit below.</td></tr>`}</tbody></table></section>
+      <section class="card stack mt"><span class="lab">Manage habits</span>${hs.map((h) => `<div class="row" style="gap:8px"><input class="f" style="flex:2;min-width:140px" value="${E(h.name)}" maxlength="60" data-hname="${E(h.id)}" aria-label="Habit name"><input class="f" style="flex:2;min-width:140px" value="${E(h.def || "")}" maxlength="80" placeholder="What counts as 100%?" data-hdef="${E(h.id)}" aria-label="What counts as 100%"><button class="btn ghost sm" data-hact="${E(h.id)}">${h.active === false ? "Resume" : "Pause"}</button></div>
+        <div class="row small" style="gap:6px;margin:-2px 0 8px">${sel(`data-hfreq="${E(h.id)}"`, [["daily", "Every day"], ["days", "Chosen days"], ["week", "Times a week"], ["count", "A count each day"]], (h.freq || {}).k || "daily", 'style="width:auto" aria-label="How often"')}
+        ${(h.freq || {}).k === "days" ? [1, 2, 3, 4, 5, 6, 0].map((x) => `<label class="pill row"><input type="checkbox" data-hday="${E(h.id)}|${x}" ${(h.freq.days || []).includes(x) ? "checked" : ""}> ${WDN[x]}</label>`).join("") : ""}
+        ${(h.freq || {}).k === "week" ? `<input class="f" type="number" min="1" max="7" value="${h.freq.n}" data-hn="${E(h.id)}" style="width:64px" aria-label="Times a week"> times a week` : ""}
+        ${(h.freq || {}).k === "count" ? `<input class="f" type="number" min="1" max="99" value="${h.freq.n}" data-hn="${E(h.id)}" style="width:64px" aria-label="Count"><input class="f" maxlength="20" value="${E(h.freq.unit || "")}" placeholder="e.g. glasses" data-hunit="${E(h.id)}" style="width:110px" aria-label="Unit"> a day (tap on Today to add one)` : ""}</div>`).join("")}
       <div class="row"><input class="f" id="newh" placeholder="New habit, e.g. Drink 8 glasses of water" maxlength="60" style="flex:1"><button class="btn" data-hadd>${ic("plus", 16)} Add</button></div>
-      <div class="row">${D.suggest.habits.filter((x) => !hs.some((h) => h.name === x)).slice(0, 8).map((x) => `<button class="pill out" data-hsug="${E(x)}">+ ${E(x)}</button>`).join("")}</div><span class="tiny muted">Paused habits keep their history and don't count towards your score.</span></section>`;
+      <div class="row">${D.suggest.habits.filter((x) => !hs.some((h) => h.name === x)).slice(0, 8).map((x) => `<button class="pill out" data-hsug="${E(x)}">+ ${E(x)}</button>`).join("")}</div><span class="tiny muted">Paused habits keep their history and don't count towards your score. Days a habit isn't due (rest days) don't break your streak; weekly habits are counted by the week.</span></section>`;
   };
 
   V.dash = () => {
     const w = view.dash === "week", t = today(), span = w ? 7 : 30, days = [...Array(span)].map((_, i) => addD(t, i - span + 1));
     const hs = activeHabits();
-    const per = hs.map((h) => { let s = 0, f = 0; days.forEach((d) => { const v = ((MP.S.days[iso(d)] || {}).h || {})[h.id]; if (v === "d") { s += 1; f++; } else if (v === "p") { s += 0.5; f++; } }); return { h: h.name, c: s / span, f }; });
+    const per = hs.map((h) => { let s = 0, f = 0; const due = h.freq && h.freq.k === "week" ? (h.freq.n * span) / 7 : days.filter((d) => dueOn(h, d)).length || 1; days.forEach((d) => { const v = ((MP.S.days[iso(d)] || {}).h || {})[h.id]; if (v === "d") { s += 1; f++; } else if (v === "p") { s += 0.5; f++; } }); return { h: h.name, c: Math.min(1, s / due), f }; });
     const eff = per.length ? per.reduce((a, b) => a + b.c, 0) / per.length : 0;
     const prevDays = days.map((d) => addD(d, -span)); const prevEff = (() => { if (!hs.length) return 0; let tot = 0; hs.forEach((h) => { prevDays.forEach((d) => { const v = ((MP.S.days[iso(d)] || {}).h || {})[h.id]; tot += v === "d" ? 1 : v === "p" ? 0.5 : 0; }); }); return tot / (hs.length * span); })();
     const delta = Math.round((eff - prevEff) * 100);
@@ -252,7 +283,7 @@
     const wk = iso(monday(t)), wrec = MP.S.weeks[wk] || {};
     const heat = w ? "" : `<section class="card stack mt tablewrap"><span class="lab">Last 30 days · heatmap</span><div class="heat" style="grid-template-columns:130px repeat(30,minmax(14px,1fr))">${hs.map((h) => `<span class="tiny b">${E(h.name)}</span>` + days.map((d) => { const v = ((MP.S.days[iso(d)] || {}).h || {})[h.id]; return `<i class="hc ${v || ""}" title="${iso(d)}"></i>`; }).join("")).join("")}</div><span class="tiny muted">Green = done · gold = partial · rose = missed</span></section>`;
     return `${head(w ? "This week" : "Last 30 days", "Habit Dashboard", `<div class="tabs"><button class="${w ? "on" : ""}" data-dv="week">Week</button><button class="${!w ? "on" : ""}" data-dv="month">Month</button></div>`)}
-      <div class="grid g3"><section class="card row" style="gap:16px;flex-wrap:nowrap">${ring(eff, 120, 12, "EFFICIENCY")}<div class="small muted">Everything you did ÷ ${span} days, across all habits (Partial counts 50%).</div></section>
+      <div class="grid g3"><section class="card row" style="gap:16px;flex-wrap:nowrap">${ring(eff, 120, 12, "EFFICIENCY")}<div class="small muted">Everything you did ÷ the days each habit was due, across all habits (Partial counts 50%).</div></section>
       <section class="card stack"><span class="lab">Winning streak</span><div class="big xl">${streak()} days</div><span class="small muted">Days in a row with 70%+ of habits done · best ${bestStreak()}</span></section>
       <section class="card stack"><span class="lab">${w ? "This week" : "Last 30 days"}</span><div class="between"><span>Winning days</span><b>${win} / ${span}</b></div><div class="between"><span>100% days</span><b>${full}</b></div><div class="between"><span>vs previous ${w ? "week" : "30 days"}</span><b class="accb">${delta >= 0 ? "+" : ""}${delta}%</b></div></section></div>
       <div class="grid g2 mt"><section class="card stack"><span class="lab">Daily completion</span>${w ? bars(daily, days.map((d) => fmt(d, { weekday: "short" }))) : lineChart([daily], days.map((d) => d.getDate()))}</section>
@@ -260,7 +291,71 @@
       <section class="card stack mt"><span class="lab">This week's reflection · saved to this week only</span><div class="grid g2"><label class="stack small">What worked<textarea class="f" rows="2" maxlength="500" data-wkf="worked" data-wk="${wk}">${E(wrec.worked || "")}</textarea></label><label class="stack small">One thing to change<textarea class="f" rows="2" maxlength="500" data-wkf="change" data-wk="${wk}">${E(wrec.change || "")}</textarea></label></div></section>`;
   };
 
-  let timer = { left: 1500, run: false, h: null, phase: "focus" };
+  /* ---------- Timer (1.12): any length, optional breaks; remembers its end time across reloads ---------- */
+  const TMR = () => P().timer || (P().timer = { breaks: false, every: 50, blen: 10, keep: true, cal: true });
+  let tm = (() => { try { const x = JSON.parse(localStorage.getItem("mp-timer2") || "null"); return x && Array.isArray(x.segs) ? x : null; } catch (e) { return null; } })() || { segs: [], i: 0, run: false, endAt: 0, left: 0, row: "", label: "" };
+  const tmSave = () => { try { localStorage.setItem("mp-timer2", JSON.stringify(tm)); } catch (e) {} };
+  const tmLeft = () => Math.max(0, Math.round(((tm.run ? tm.endAt - Date.now() : tm.left)) / 1000));
+  const tmFmt = (sec) => `${sec >= 3600 ? Math.floor(sec / 3600) + ":" : ""}${String(Math.floor((sec % 3600) / 60)).padStart(2, "0")}:${String(sec % 60).padStart(2, "0")}`;
+  function tmPlan(min, brk) { const T = TMR(); if (!brk || min < 60) return [{ k: "f", m: min }]; const sg = []; let left = min; while (left > 0) { const f = Math.min(T.every || 50, left); sg.push({ k: "f", m: f }); left -= f; if (left > (T.blen || 10)) { sg.push({ k: "b", m: T.blen || 10 }); left -= T.blen || 10; } } return sg; }
+  function timerCard(rows) {
+    const k = iso(today()), rec = dayRec(k), nb = rows.find((r) => !(rec.study && rec.study[r.id])), T = TMR(), on = tm.segs.length > 0, seg = on ? tm.segs[tm.i] : null;
+    const picks = [5, 10, 15, 25, 30, 45, 60, 90].map((n) => `<button class="pill num" data-tquick="${n}">${n}</button>`).join("");
+    return `<section class="card hero stack center"><span class="lab inherit">${on ? `${seg.k === "b" ? "Break" : "Focus"}${tm.segs.length > 1 ? ` · part ${tm.i + 1} of ${tm.segs.length}` : ""}` : "Timer"}</span>${on && tm.label ? `<span class="small" style="opacity:.9">${E(tm.label)}</span>` : ""}
+      <div class="timer" id="timerv">${tmFmt(on ? tmLeft() : (nb ? rowLen(nb) : 25) * 60)}</div>
+      ${on ? `<div class="row"><button class="btn inv" data-tpause>${tm.run ? "Pause" : "Resume"}</button><button class="btn outline" data-tstop>Stop</button></div>`
+        : `<div class="row">${nb ? `<button class="btn inv" data-tstart="${E(nb.id)}">Start ${E(actOf(nb))} · ${rowLen(nb)} min</button>` : ""}<button class="btn outline" data-tpomo>25 + 5</button></div>
+      <div class="stack" style="gap:6px;align-items:center"><span class="small" style="opacity:.9">Or set your own (minutes)</span><div class="row" style="justify-content:center">${picks}</div><div class="row"><input class="f" type="number" min="1" max="600" id="tcmin" placeholder="e.g. 40" style="width:100px" aria-label="Minutes"><button class="btn outline sm" data-tcustom>Start</button></div></div>`}
+      <label class="row small" style="opacity:.95"><input type="checkbox" data-tbrk ${T.breaks ? "checked" : ""}> Add breaks to sessions of 60 min or more (${T.blen || 10} min after every ${T.every || 50})</label>
+      <span class="small" style="opacity:.85">When a block's timer ends, the block is ticked for you.</span></section>`;
+  }
+  let wl = null, lastTouch = Date.now();
+  async function wakeOn() { if (TMR().keep === false || !tm.run) return; try { if ("wakeLock" in navigator && !wl) { wl = await navigator.wakeLock.request("screen"); wl.addEventListener("release", () => (wl = null)); } } catch (e) {} }
+  const wakeOff = () => { try { if (wl) wl.release(); } catch (e) {} wl = null; dimOff(); };
+  function dimOff() { const d = document.getElementById("dimv"); if (d) d.remove(); lastTouch = Date.now(); }
+  function dimOn() { if (document.getElementById("dimv")) return; const d = document.createElement("div"); d.id = "dimv"; d.innerHTML = `<div class="dimt" id="dimt">${tmFmt(tmLeft())}</div><div class="dims">${E(tm.label || "")} · tap to return</div>`; document.body.appendChild(d); }
+  async function calBackup(on) {
+    if (mode !== "google" || !G.hasCal || TMR().cal === false) return;
+    try {
+      if (tm.cal) { const id = tm.cal; tm.cal = ""; tmSave(); await G.calDelete(id); }
+      if (!on || !tm.run) return;
+      let end = tm.endAt; for (let j = tm.i + 1; j < tm.segs.length; j++) end += tm.segs[j].m * 60e3;
+      const e = new Date(end), st = `${String(e.getHours()).padStart(2, "0")}:${String(e.getMinutes()).padStart(2, "0")}`;
+      const ev = timedEv("⏰ " + (tm.label || "Timer") + " ends", iso(e), st, minToT(Math.min(1439, tMin(st) + 1))); ev.reminders = remind(0);
+      tm.cal = await G.calInsert(ev); tmSave();
+    } catch (er) {}
+  }
+  function tmStart(min, o = {}) {
+    if (tm.segs.length) tmStop(true);
+    tm = { segs: o.pomo ? [{ k: "f", m: 25 }, { k: "b", m: 5 }] : tmPlan(min, TMR().breaks), i: 0, run: true, endAt: 0, left: 0, row: o.row || "", label: o.label || (o.pomo ? "Focus 25 + 5" : min + "-minute timer"), cal: "" };
+    tm.endAt = Date.now() + tm.segs[0].m * 60e3; tmSave();
+    if ("Notification" in window && Notification.permission === "default") { try { Notification.requestPermission(); } catch (er) {} }
+    if (SND().auto) startSound(); wakeOn(); calBackup(true); MP.render();
+  }
+  function tmStop(silent) { const had = tm.cal; tm = { segs: [], i: 0, run: false, endAt: 0, left: 0, row: "", label: "", cal: had }; calBackup(false).then(() => { tm.cal = ""; tmSave(); }); tmSave(); stopSound(); wakeOff(); if (!silent) MP.render(); }
+  function tmTick() {
+    if (!tm.run || !tm.segs.length) return;
+    let changed = false;
+    while (tm.run && Date.now() >= tm.endAt) {
+      const cur = tm.segs[tm.i]; tm.i++; changed = true;
+      if (tm.i >= tm.segs.length) {
+        if (tm.row) { const k = iso(today()), row = ttFor(today()).find((x) => x.id === tm.row); blockDone(k, tm.row, true); notify("Time's up", row ? `"${row.text}" ticked.` : tm.label); }
+        else notify("Time's up", tm.label || "Timer finished");
+        const c = tm.cal; tm = { segs: [], i: 0, run: false, endAt: 0, left: 0, row: "", label: "", cal: c }; calBackup(false); stopSound(); wakeOff(); tmSave(); MP.render(); return;
+      }
+      const nx = tm.segs[tm.i]; tm.endAt += nx.m * 60e3;
+      notify(cur.k === "f" ? "Break time" : "Back to focus", cur.k === "f" ? `Take ${nx.m} minutes.` : `${nx.m} minutes of focus.`);
+      if (nx.k === "b" && SND().breakStop) stopSound(); if (nx.k === "f" && SND().auto) startSound();
+    }
+    if (changed) { tmSave(); if (route === "study") MP.render(); }
+    const el = document.getElementById("timerv"); if (el) el.textContent = tmFmt(tmLeft());
+    const dt = document.getElementById("dimt"); if (dt) dt.textContent = tmFmt(tmLeft());
+    if (TMR().keep !== false && Date.now() - lastTouch > 30000) dimOn();
+  }
+  setInterval(tmTick, 1000);
+  ["pointerdown", "keydown"].forEach((ev) => document.addEventListener(ev, () => { lastTouch = Date.now(); if (document.getElementById("dimv")) dimOff(); }, true));
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && tm.run) { tmTick(); wakeOn(); } });
+  if (tm.run) setTimeout(() => { tmTick(); wakeOn(); }, 500);
   const SND = () => P().sound || (P().sound = { auto: true, type: "brown", vol: 0.5, breakStop: true, playlist: "" });
   const safeUrl = (u) => /^https:\/\/[^\s"'<>]+$/i.test(u || "") ? u : "";
   function soundCard() {
@@ -281,17 +376,18 @@
     el.classList.toggle("on", !!on);
   }
   V.study = () => {
-    const t = today(), k = iso(t), rec = dayRec(k), sr = studyRows(t);
-    const mm = String(Math.floor(timer.left / 60)).padStart(2, "0"), ss = String(timer.left % 60).padStart(2, "0");
-    const days = [...Array(7)].map((_, i) => addD(t, i - 6)), hrs = days.map(studyHours), mx = Math.max(4, ...hrs);
-    return `${head(`${sr.length} block${sr.length === 1 ? "" : "s"} today · edit them in Timetable`, "Study")}
-      <div class="grid g2"><section class="card hero stack center"><span class="lab inherit">${timer.phase === "focus" ? "Focus" : "Break"} · 25 + 5</span><div class="timer" id="timerv">${mm}:${ss}</div><div class="row"><button class="btn inv" data-timer="toggle">${timer.run ? "Pause" : "Start"}</button><button class="btn outline" data-timer="reset">Reset</button></div><span class="small" style="opacity:.85">When a focus round ends, the next block is ticked for you.</span></section>
-      <section class="card stack"><span class="lab">Today's blocks</span>${sr.map((r) => `<div class="between wrap"><label class="row" style="gap:10px"><input type="checkbox" class="cb" data-blk="${E(r.id)}" ${rec.study && rec.study[r.id] ? "checked" : ""}><span><b>${fmtT(r.start)} – ${fmtT(r.end)}</b><br><span class="small muted">${E(r.text)} · ${rowLen(r)} min</span></span></label>${calBtn("tt-" + r.id, r.text, { kind: "block", row: r })}</div>`).join("") || `<span class="small muted">No study blocks. <button class="link" data-go="timetable">Add Study rows →</button></span>`}
+    const t = today(), k = iso(t), rec = dayRec(k), selA = view.act || "", names = actNames(), rows = actRows(t, selA || null);
+    const days = [...Array(7)].map((_, i) => addD(t, i - 6)), hrs = days.map((d) => actMins(d, selA || null).done / 60), mx = Math.max(4, ...hrs);
+    const chips = `<div class="row mb">${[["", "All activities"], ...names.map((n) => [n, n])].map(([v, l]) => `<button class="pill ${selA === v ? "sel" : "out"}" data-actsel="${E(v)}">${E(l)}</button>`).join("")}</div>`;
+    return `${head(`${rows.length} block${rows.length === 1 ? "" : "s"} today · edit them in Timetable`, selA ? E(selA) : "Activity")}${chips}
+      <div class="grid g2">${timerCard(rows)}
+      <section class="card stack"><span class="lab">Today's blocks</span>${rows.map((r) => `<div class="between wrap"><label class="row" style="gap:10px"><input type="checkbox" class="cb" data-blk="${E(r.id)}" ${rec.study && rec.study[r.id] ? "checked" : ""}><span><b>${fmtT(r.start)} – ${fmtT(r.end)}</b><br><span class="small muted">${E(actOf(r))} · ${E(r.text)} · ${rowLen(r)} min</span></span></label><span class="row" style="gap:6px"><button class="btn ghost sm" data-tstart="${E(r.id)}">Start timer</button>${calBtn("tt-" + r.id, r.text, { kind: "block", row: r })}</span></div>`).join("") || `<span class="small muted">No ${selA ? E(selA) + " " : ""}blocks today. <button class="link" data-go="timetable">Add Activity rows →</button></span>`}
+      <div class="stack" style="gap:4px;border-top:1px solid var(--line);padding-top:8px">${names.map((n) => { const m = actMins(t, n); return m.plan || m.done ? `<div class="between small"><span>${E(n)}</span><b>${hm(m.done)} of ${hm(m.plan)}</b></div>` : ""; }).join("") || '<span class="tiny muted">Done against planned shows here.</span>'}</div>
       <div class="between small"><span>Focus today</span><span class="row" style="gap:4px">${[1, 2, 3, 4, 5].map((n) => `<button class="pill num ${rec.focus === n ? "sel" : ""}" data-focus="${n}">${n}</button>`).join("")}</span></div>
       <div class="between small"><span>Phone away?</span><span class="row" style="gap:4px">${["Yes", "No"].map((x) => `<button class="pill num ${rec.phone === x ? "sel" : ""}" data-phone="${x}">${x}</button>`).join("")}</span></div>
       <label class="stack small">What got in the way?<input class="f" maxlength="200" value="${E(rec.block || "")}" data-dayf="block"></label></section></div>
       ${soundCard()}
-      <section class="card stack mt"><span class="lab">Hours studied · last 7 days</span>${bars(hrs.map((h) => h / mx), days.map((d) => fmt(d, { weekday: "short" })), 140, (v) => (v * mx).toFixed(1) + "h")}</section>`;
+      <section class="card stack mt"><span class="lab">Hours ${selA ? "of " + E(selA) : "of all activities"} · last 7 days</span>${bars(hrs.map((h) => h / mx), days.map((d) => fmt(d, { weekday: "short" })), 140, (v) => (v * mx).toFixed(1) + "h")}</section>`;
   };
 
   V.planner = () => {
@@ -308,7 +404,7 @@
         if (po) ch.push(`<span class="chip c-portal">✦ ${E(po.replace(" Portal", ""))}</span>`);
         DT.forEach((x) => { if (x.md === md) ch.push(`<span class="chip c-bday">${x.type === "Birthday" ? "✿" : "♥"} ${E(x.n)}</span>`); });
         EV.forEach((x) => { if (occurs(x, iso(d))) ch.push(`<span class="chip c-ev">${x.time ? fmtT(x.time) + " " : ""}${E(x.t)}</span>`); });
-        const h = d <= t ? studyHours(d) : 0; if (h) ch.push(`<span class="c-study">${h.toFixed(1)} h study</span>`);
+        const h = d <= t ? actMins(d).done / 60 : 0; if (h) ch.push(`<span class="c-study">${h.toFixed(1)} h done</span>`);
         cells += `<button class="day ${d.getMonth() !== m.getMonth() ? "out" : ""} ${iso(d) === iso(t) ? "today" : ""}" data-day="${iso(d)}" aria-label="${fmt(d, { weekday: "long", day: "numeric", month: "long" })}"><span class="n">${d.getDate()}</span>${ch.join("")}</button>`;
       }
     }
@@ -323,7 +419,7 @@
   V.todo = () => {
     const G = taskGroups(), months = {};
     G.done.forEach((t) => { const m = t.doneAt ? fmt(new Date(t.doneAt), { month: "long", year: "numeric" }) : "Before 18 Nov 2026"; (months[m] = months[m] || []).push(t); });
-    const sec = (title, arr, extra = "") => (arr.length ? `<section class="card stack mb"><div class="between wrap"><span class="lab">${title} · ${arr.length}</span>${extra}</div>${arr.map(taskRow).join("")}</section>` : "");
+    const sec = (title, arr, extra = "") => (arr.length ? `<section class="card stack mb"><div class="between wrap"><span class="lab">${title} · ${arr.length}</span>${extra}</div><div class="ttable">${taskHead()}${arr.map(taskRow).join("")}</div></section>` : "");
     const fmtLong = (k) => (k ? fmt(parseISO(k), { day: "numeric", month: "short", year: "numeric" }) : "—");
     return `${head("One list · priority is set from Urgent + Important", "To-Do", `<button class="btn" data-tnew>${ic("plus", 16)} New task</button>`)}
       ${sec('<span class="over">Overdue</span>', G.overdue, moveAll())}
@@ -497,7 +593,7 @@
     return `${head("Nothing is ever overwritten", "History & Search", `<input class="f" type="date" value="${k}" max="${iso(today())}" data-hist style="width:auto" aria-label="Pick a date">`)}
       <section class="card row mb"><span style="color:var(--muted)">${ic("search", 18)}</span><input class="f" id="hq" value="${E(view.q)}" placeholder="Search to-dos, events, writing, notes, week goals…" style="flex:1" aria-label="Search"><button class="btn sm" data-hsearch>Search</button></section>${results}
       <div class="grid g3"><section class="card stack center"><span class="lab">${fmt(d, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</span>${ring(dayPct(d) || 0, 110, 11, "HABITS")}</section>
-      <section class="card stack"><span class="lab">Study</span>${studyRows(d).map((r) => `<div class="between small"><span>${fmtT(r.start)} · ${E(r.text)}</span><b>${rec.study && rec.study[r.id] ? "✓" : "–"}</b></div>`).join("") || '<span class="small muted">No blocks</span>'}${rec.focus ? `<div class="between small"><span>Focus</span><b>${rec.focus}/5</b></div>` : ""}</section>
+      <section class="card stack"><span class="lab">Activities</span>${actRows(d).map((r) => `<div class="between small"><span>${fmtT(r.start)} · ${E(actOf(r))} · ${E(r.text)}</span><b>${rec.study && rec.study[r.id] ? "✓" : "–"}</b></div>`).join("") || '<span class="small muted">No blocks</span>'}${rec.focus ? `<div class="between small"><span>Focus</span><b>${rec.focus}/5</b></div>` : ""}</section>
       <section class="card stack"><span class="lab">Mood</span>${["am", "pm"].map((x) => (m[x] && m[x].w ? `<div class="between small"><span>${x === "am" ? "Morning" : "Evening"}</span><span class="pill" style="background:${MOODCOL[m[x].w]};color:#1d1d1d">${m[x].w}${m[x].s ? " · " + m[x].s : ""}</span></div>` : "")).join("") || '<span class="small muted">No entries</span>'}${rec.sleep ? `<div class="between small"><span>Slept</span><b>${rec.sleep} h</b></div>` : ""}</section></div>
       <section class="card stack mt"><span class="lab">Habits that day</span><div class="row">${P().habits.map((h) => { const v = (rec.h || {})[h.id] || "e"; return `<span class="row small" style="gap:6px">${dots(v + " smd", v)}${E(h.name)}</span>`; }).join("") || '<span class="small muted">No habits</span>'}</div></section>`;
   };
@@ -507,9 +603,9 @@
   const typedOf = (key) => ((MP.S.typed[key] && MP.S.typed[key].l) || []).filter(Boolean);
   const PV = {
     summary: () => { const t = today(), a = dailyAff(t); return `${pHead("Summary")}<div class="pquote">“${E(a.text)}”</div><div class="grid g2"><div class="stack" style="gap:6px"><div class="lab">Study blocks</div>${studyRows(t).map((r) => `<div class="small">○ <b>${fmtT(r.start)}</b> ${E(r.text)}</div>`).join("")}</div><div class="stack" style="gap:6px"><div class="lab">Top 3</div>${tasks().filter((x) => !x.done && x.b).slice(0, 3).map((x) => `<div class="small">○ ${E(x.t)}</div>`).join("")}<div class="lab" style="margin-top:6px">Habits</div><div class="small">${activeHabits().map((h) => "○ " + E(h.name.split(" ")[0])).join("  ")}</div></div></div><div class="tiny muted c cut">✂ half page · two days fit on one A4 sheet</div>`; },
-    detailed: () => { const t = today(), a = dailyAff(t); let last = ""; const sec = { m: "Morning", a: "Afternoon", e: "Evening" }; return `${pHead("My daily rhythm")}<div class="pgrid"><div class="stack" style="gap:2px">${ttFor(t).map((r) => { let h = ""; const s = secOf(r.start); if (s !== last) { h = `<div class="psec">${sec[s]}</div>`; last = s; } return h + `<div class="prow ${r.type === "Study" ? "study" : ""}"><span>${fmtT(r.start)}${r.end ? "–" + fmtT(r.end) : ""}</span>${E(r.text)}</div>`; }).join("")}</div><div class="stack" style="gap:8px"><div class="pquote sm">“${E(a.text)}”</div><div class="lab">Top 3 to-dos</div>${(() => { const G = taskGroups(); return [...G.overdue, ...G.today.filter((x) => !x.done)].sort(tByPri).slice(0, 3); })().map((x) => `<div class="tiny">○ ${E(x.t.split("\n")[0])}</div>`).join("")}<div class="lab">Wellness</div><div class="tiny">Water ○○○○○○○○</div><div class="tiny">Mood 1 2 3 4 5 · Energy 1 2 3 4 5</div><div class="tiny">Slept ____ hrs</div><div class="lab">Grateful for</div><div class="pline hand">${E(typedOf("grateful-" + iso(t)).join(" "))}</div><div class="lab">Today's win</div><div class="pline hand">${E(typedOf("win-" + iso(t)).join(" "))}</div><div class="tiny" style="color:#5B4B9A;margin-top:auto">pause at 11:11 & 08:08 · breathe</div></div></div>`; },
-    hourly: () => { const t = today(); let rows = ""; for (let h = 6; h <= 23; h++) { const ev = ttFor(t).filter((r) => Math.floor(tMin(r.start) / 60) === h); rows += `<div class="hrow"><span class="tiny muted b">${h > 12 ? h - 12 : h}${h >= 12 ? "pm" : "am"}</span><div class="hev">${ev.map((r) => `<span class="tiny" style="border-left:3px solid ${TCOL[r.type]};${r.type === "Study" ? "background:var(--soft);font-weight:700" : ""}">${fmtT(r.start)} ${E(r.text)}</span>`).join("")}</div><span class="hnote"></span></div>`; } return `${pHead("Hourly time-blocks")}<div style="flex:1">${rows}</div>`; },
-    journal: () => { const t = today(), a = dailyAff(t), typed = typedOf("journal-" + iso(t)), inks = ((MP.S.ink["journal-" + iso(t)] || {}).s || []).length; return `${pHead("Journal spread")}<div class="pgrid eq"><div class="stack" style="gap:3px">${ttFor(t).map((r) => `<div class="tiny jrow ${r.type === "Study" ? "b" : ""}"><span class="muted">${fmtT(r.start)}</span> ${E(r.text)}</div>`).join("")}</div><div class="stack" style="gap:6px"><div class="pquote sm">“${E(a.text)}”</div><div class="lab">Dear diary</div>${typed.map((x) => `<div class="pline hand">${E(x)}</div>`).join("")}${inks ? `<canvas class="printink" data-printink="journal-${iso(t)}" height="300"></canvas>` : ""}${[...Array(Math.max(4, 14 - typed.length - (inks ? 6 : 0)))].map(() => `<div class="pline"></div>`).join("")}</div></div>`; }
+    detailed: () => { const t = today(), a = dailyAff(t); let last = ""; const sec = { m: "Morning", a: "Afternoon", e: "Evening" }; return `${pHead("My daily rhythm")}<div class="pgrid"><div class="stack" style="gap:2px">${ttFor(t).map((r) => { let h = ""; const s = secOf(r.start); if (s !== last) { h = `<div class="psec">${sec[s]}</div>`; last = s; } return h + `<div class="prow ${isAct(r) ? "study" : ""}"><span>${fmtT(r.start)}${r.end ? "–" + fmtT(r.end) : ""}</span>${E(r.text)}</div>`; }).join("")}</div><div class="stack" style="gap:8px"><div class="pquote sm">“${E(a.text)}”</div><div class="lab">Top 3 to-dos</div>${(() => { const G = taskGroups(); return [...G.overdue, ...G.today.filter((x) => !x.done)].sort(tByPri).slice(0, 3); })().map((x) => `<div class="tiny">○ ${E(x.t.split("\n")[0])}</div>`).join("")}<div class="lab">Wellness</div><div class="tiny">Water ○○○○○○○○</div><div class="tiny">Mood 1 2 3 4 5 · Energy 1 2 3 4 5</div><div class="tiny">Slept ____ hrs</div><div class="lab">Grateful for</div><div class="pline hand">${E(typedOf("grateful-" + iso(t)).join(" "))}</div><div class="lab">Today's win</div><div class="pline hand">${E(typedOf("win-" + iso(t)).join(" "))}</div><div class="tiny" style="color:#5B4B9A;margin-top:auto">pause at 11:11 & 08:08 · breathe</div></div></div>`; },
+    hourly: () => { const t = today(); let rows = ""; for (let h = 6; h <= 23; h++) { const ev = ttFor(t).filter((r) => Math.floor(tMin(r.start) / 60) === h); rows += `<div class="hrow"><span class="tiny muted b">${h > 12 ? h - 12 : h}${h >= 12 ? "pm" : "am"}</span><div class="hev">${ev.map((r) => `<span class="tiny" style="border-left:3px solid ${TCOL[r.type]};${isAct(r) ? "background:var(--soft);font-weight:700" : ""}">${fmtT(r.start)} ${E(r.text)}</span>`).join("")}</div><span class="hnote"></span></div>`; } return `${pHead("Hourly time-blocks")}<div style="flex:1">${rows}</div>`; },
+    journal: () => { if (lockOn() && !unlocked) return `${pHead("Journal spread")}<p class="small">${ic("lock", 14)} Your journal is locked. Open Journal, unlock it, then come back to print.</p>`; const t = today(), a = dailyAff(t), typed = typedOf("journal-" + iso(t)), inks = ((MP.S.ink["journal-" + iso(t)] || {}).s || []).length; return `${pHead("Journal spread")}<div class="pgrid eq"><div class="stack" style="gap:3px">${ttFor(t).map((r) => `<div class="tiny jrow ${isAct(r) ? "b" : ""}"><span class="muted">${fmtT(r.start)}</span> ${E(r.text)}</div>`).join("")}</div><div class="stack" style="gap:6px"><div class="pquote sm">“${E(a.text)}”</div><div class="lab">Dear diary</div>${typed.map((x) => `<div class="pline hand">${E(x)}</div>`).join("")}${inks ? `<canvas class="printink" data-printink="journal-${iso(t)}" height="300"></canvas>` : ""}${[...Array(Math.max(4, 14 - typed.length - (inks ? 6 : 0)))].map(() => `<div class="pline"></div>`).join("")}</div></div>`; }
   };
   V.print = () => { const pv = P().printView || "detailed"; return `${head("Preview before printing", "Print", `<button class="btn" data-print>${ic("print", 16)} Print / save as PDF</button>`)}<div class="row noprint mb"><label class="row small" style="gap:8px"><span class="lab">Layout</span>${sel("data-printsel", [["summary", "Summary one-pager"], ["detailed", "Detailed Daily Rhythm"], ["hourly", "Hourly time-block sheet"], ["journal", "Journal spread"]], pv, 'style="width:auto;font-weight:700" aria-label="Print layout"')}</label><span class="tiny muted">A4 portrait · uses your theme · typed and handwritten entries print too</span></div><section class="card a4" id="printarea">${PV[pv]()}</section>`; };
 
@@ -574,10 +670,18 @@
       <section class="card stack mb"><div class="between wrap"><span class="lab">Menu · choose the screens you see</span><span class="row" style="gap:6px"><button class="btn sm ${mp === "simple" ? "" : "ghost"}" data-menup="simple">Simple</button><button class="btn sm ${mp === "full" ? "" : "ghost"}" data-menup="full">Full</button></span></div>
         <div class="row">${SCREENS.filter((x) => x[0] !== "today" && x[0] !== "prefs").map((x) => `<label class="pill row"><input type="checkbox" data-menus="${x[0]}" ${shownScreen(x[0]) ? "checked" : ""}> ${x[1]}</label>`).join("")}</div>
         <span class="tiny muted">Hidden screens keep all their data; tick them again any time. Today and Settings always stay.</span></section>
+      <section class="card stack mb"><span class="lab">Privacy · journal lock</span>
+        ${lockOn() ? `<div class="small">${ic("lock", 14)} On: Journal, Mood, 3-6-9 and History ask for your PIN${bioId() ? " or fingerprint / face" : ""}. They lock again 5 minutes after you leave the app.</div>
+        <div class="row">${bioOK() && !bioId() ? `<button class="btn sm" data-bioset>Use fingerprint or face on this device</button>` : ""}${bioId() ? `<button class="btn ghost sm" data-biooff>Stop using fingerprint / face here</button>` : ""}<button class="btn ghost sm" data-pinchange>Change PIN</button><button class="btn ghost sm danger" data-pinoff>Turn the lock off</button></div>`
+        : `<span class="small">Lock Journal, Mood, 3-6-9 and History with a PIN (and fingerprint or face where your phone supports it), so anyone holding the phone can't read them.</span><button class="btn sm" data-pinchange style="align-self:flex-start">Set a PIN</button>`}
+        <span class="tiny muted">The PIN is stored only as a scrambled code. Your entries are already protected by your Google account in your own Drive; the lock stops someone holding the phone from reading them in the app. Forgot it? Sign in with Google again to reset.</span></section>
       <section class="stack mb"><span class="lab">Theme</span><div class="grid g3">${THEMES.map((t) => `<button class="themecard ${P().theme === t[0] ? "on" : ""}" data-theme-pick="${t[0]}" data-theme="${t[0]}"><div class="tc"><div class="tcn">${t[1]}</div><div class="row" style="gap:6px">${["--acc", "--acc2", "--soft", "--surf"].map((v) => `<i class="swi" style="background:var(${v})"></i>`).join("")}</div><div class="tch">Up next · Study block</div></div></button>`).join("")}</div></section>
       <div class="grid g2"><section class="card stack"><span class="lab">Profile</span><label class="stack small">Name on Today<input class="f" maxlength="40" value="${E(P().name)}" data-name></label><div class="small">Signed in as <b>${acc}</b></div><div class="row"><button class="btn ghost sm" data-signout>Sign out</button></div></section>
-      <section class="card stack"><span class="lab">Study blocks</span><div class="between small"><span>Blocks per day (weekdays)</span><span class="row" style="gap:4px"><button class="pill num" data-blk-n="-1" aria-label="One fewer block">−</button><b style="min-width:24px;text-align:center">${P().timetable.filter((r) => r.type === "Study").length}</b><button class="pill num" data-blk-n="1" aria-label="One more block">+</button></span></div>
-      ${P().timetable.filter((r) => r.type === "Study").sort((a, b) => a.start.localeCompare(b.start)).map((r) => `<div class="row small" style="gap:8px"><b style="width:70px">${fmtT(r.start)}</b><span style="flex:1">${E(r.text)}</span>${sel(`data-blen="${E(r.id)}"`, [25, 30, 40, 45, 50, 60, 90].map((n) => [n, n + " min"]), rowLen(r), 'style="width:auto" aria-label="Length"')}</div>`).join("")}<span class="tiny muted">Rename or move blocks in Timetable.</span></section>
+      <section class="card stack"><span class="lab">Activities</span>${acts().map((a, ix) => `<div class="row" style="gap:6px;flex-wrap:nowrap">${a.name === "Study" ? `<b class="small" style="flex:1">Study</b>` : `<input class="f" style="flex:1;min-width:90px" value="${E(a.name)}" maxlength="30" data-actname="${ix}" aria-label="Activity name">`}${sel(`data-acthab="${ix}"`, [["", "Habit: same name"], ...P().habits.filter((h) => h.active !== false).map((h) => [h.id, "Habit: " + h.name])], a.hab || "", 'style="width:auto;max-width:170px" aria-label="Linked habit"')}${a.name === "Study" ? "" : `<button class="tool" data-actdel="${ix}" aria-label="Remove ${E(a.name)}">${ic("trash", 16)}</button>`}</div>`).join("")}
+        <div class="row"><input class="f" id="newact" placeholder="New type, e.g. Music practice" maxlength="30" style="flex:1"><button class="btn sm" data-actadd>${ic("plus", 14)} Add</button></div><span class="tiny muted">Finishing an activity block ticks its linked habit for that day.</span>
+        <span class="lab mt">Timer</span><label class="row small"><input type="checkbox" data-tkeep ${TMR().keep !== false ? "checked" : ""}> Keep the screen on while a timer runs (goes black and dim after 30 seconds to save battery)</label>
+        <label class="row small"><input type="checkbox" data-tcal ${TMR().cal !== false ? "checked" : ""}> Backup alert through Google Calendar, so it rings even if the app is closed</label>
+        <div class="row small">Breaks: <input class="f" type="number" min="10" max="120" value="${TMR().every || 50}" data-tevery style="width:70px" aria-label="Minutes of focus"> min focus, then <input class="f" type="number" min="2" max="60" value="${TMR().blen || 10}" data-tblen style="width:64px" aria-label="Break minutes"> min break</div></section>
       <section class="card stack"><span class="lab">Study music</span>
       <label class="stack small">My study playlist link (optional, e.g. Spotify or YouTube)<input class="f" type="url" maxlength="300" placeholder="https://…" value="${E(SND().playlist)}" data-playlist></label><span class="tiny muted">It appears as a button on the Study screen, next to the YouTube suggestions.</span></section>
       <section class="card stack"><span class="lab">Google Calendar</span><label class="between small">Alert for timed items${sel("data-alert", [5, 10, 15, 30, 60].map((n) => [n, n + " min before"]), P().alerts, 'style="width:auto"')}</label><label class="between small">Add birthdays & anniversaries automatically (every year)<input type="checkbox" class="cb" data-autodates ${P().autoDates !== false ? "checked" : ""}></label><span class="tiny muted">Other items go to your Calendar only when you choose (the tick box in Add / schedule, or Send to Calendar). Calendar permission is asked for only the first time.</span></section>
@@ -600,21 +704,27 @@
   const weekSummary = () => {
     const t = today(), m = monday(t), days = [...Array(7)].map((_, i) => addD(m, i)).filter((d) => d <= t);
     const pcts = days.map(dayPct).filter((x) => x !== null), hrs = days.reduce((s, d) => s + studyHours(d), 0), studied = days.filter((d) => studyHours(d) > 0).length;
-    return { name: P().name || "", from: m, to: addD(m, 6), habits: pcts.length ? pcts.reduce((a, b) => a + b, 0) / pcts.length : 0, hrs, studied, n: days.length, streak: streak() };
+    const byAct = actNames().map((n) => ({ n, h: days.reduce((s2, d) => s2 + actMins(d, n).done, 0) / 60 })).filter((x) => x.h > 0 && x.n !== "Study");
+    return { byAct, name: P().name || "", from: m, to: addD(m, 6), habits: pcts.length ? pcts.reduce((a, b) => a + b, 0) / pcts.length : 0, hrs, studied, n: days.length, streak: streak() };
   };
   V.family = () => { const s = weekSummary(); return `${head("Exactly what a parent sees", "Family summary preview", `<button class="btn ghost" data-go="prefs">Back</button>`)}
     <div class="grid g3"><section class="card stack center">${ring(s.habits, 120, 12, "HABITS")}<b>${E(s.name)}</b></section><section class="card stack"><span class="lab">Study this week</span><div class="big xl">${s.hrs.toFixed(1)} h</div><span class="small muted">${s.studied} of ${s.n} days</span></section><section class="card stack"><span class="lab">Winning streak</span><div class="big xl">${s.streak} days</div></section></div>
+    ${s.byAct.length ? `<section class="card stack mt"><span class="lab">Other activities this week</span>${s.byAct.map((x) => `<div class="between small"><span>${E(x.n)}</span><b>${x.h.toFixed(1)} h</b></div>`).join("")}</section>` : ""}
     <p class="small muted mt">${ic("lock", 14)} Not shared: entries, journal, notes, to-dos, affirmations, handwriting, mood and Year in Pixels.</p>`; };
-  const summaryHTML = () => { const s = weekSummary(); return `<html><body style="font-family:Arial"><h1>${E(s.name)} · My Planner progress</h1><p>Week of ${fmt(s.from, { day: "numeric", month: "long" })} – ${fmt(s.to, { day: "numeric", month: "long", year: "numeric" })} · updated ${fmt(today(), { day: "numeric", month: "short" })}</p><table border="1" cellpadding="6" style="border-collapse:collapse"><tr><td>Habits completed</td><td><b>${Math.round(s.habits * 100)}%</b></td></tr><tr><td>Study this week</td><td><b>${s.hrs.toFixed(1)} hours</b> on ${s.studied} of ${s.n} days</td></tr><tr><td>Winning streak</td><td><b>${s.streak} days</b></td></tr></table><p style="color:#777">Shared by ${E(s.name)} from My Planner. Entries, notes and mood are private and never included.</p></body></html>`; };
+  const summaryHTML = () => { const s = weekSummary(); return `<html><body style="font-family:Arial"><h1>${E(s.name)} · My Planner progress</h1><p>Week of ${fmt(s.from, { day: "numeric", month: "long" })} – ${fmt(s.to, { day: "numeric", month: "long", year: "numeric" })} · updated ${fmt(today(), { day: "numeric", month: "short" })}</p><table border="1" cellpadding="6" style="border-collapse:collapse"><tr><td>Habits completed</td><td><b>${Math.round(s.habits * 100)}%</b></td></tr><tr><td>Study this week</td><td><b>${s.hrs.toFixed(1)} hours</b> on ${s.studied} of ${s.n} days</td></tr><tr><td>Winning streak</td><td><b>${s.streak} days</b></td></tr>${s.byAct.map((x) => `<tr><td>${E(x.n)}</td><td><b>${x.h.toFixed(1)} hours</b></td></tr>`).join("")}</table><p style="color:#777">Shared by ${E(s.name)} from My Planner. Entries, notes and mood are private and never included.</p></body></html>`; };
 
   /* ---------- Buddy OS feed: only the categories the person allows ---------- */
   MP.buildFeed = (S) => {
     const cats = (S.profile.links.buddy || {}).cats || {}, t = today(), past = [...Array(30)].map((_, i) => addD(t, -i)), data = { name: S.profile.name || "" };
     if (cats.habits) data.habits = { list: S.profile.habits.filter((h) => h.active !== false).map((h) => ({ id: h.id, name: h.name })), days: past.map((d) => ({ date: iso(d), pct: dayPct(d), marks: ((S.days[iso(d)] || {}).h) || {} })).filter((x) => x.pct !== null), streak: streak() };
     if (cats.study) {
-      data.study = past.map((d) => ({ date: iso(d), hours: +studyHours(d).toFixed(2), focus: (S.days[iso(d)] || {}).focus || null, blocksDone: Object.values((S.days[iso(d)] || {}).study || {}).filter(Boolean).length })).filter((x) => x.hours || x.focus);
+      data.study = past.map((d) => ({ date: iso(d), hours: +studyHours(d).toFixed(2), focus: (S.days[iso(d)] || {}).focus || null, blocksDone: studyRows(d).filter((r) => ((S.days[iso(d)] || {}).study || {})[r.id]).length })).filter((x) => x.hours || x.focus);
       const blk = (rows) => (Array.isArray(rows) ? rows : []).filter((r) => r.type === "Study").map((r) => ({ id: r.id, start: r.start, end: r.end || null, text: r.text }));
       data.studyPlan = { weekday: blk(S.profile.timetable), weekend: Array.isArray(S.profile.weekend) ? blk(S.profile.weekend) : null };
+      /* 1.12: every activity type (Study stays above, unchanged) */
+      const ab = (rows) => (Array.isArray(rows) ? rows : []).filter(isAct).map((r) => ({ id: r.id, start: r.start, end: r.end || null, text: r.text, activity: actOf(r) }));
+      data.activityPlan = { weekday: ab(S.profile.timetable), weekend: Array.isArray(S.profile.weekend) ? ab(S.profile.weekend) : null };
+      data.activities = past.map((d) => { const o = {}; actNames().forEach((n) => { const m = actMins(d, n); if (m.done) o[n] = +(m.done / 60).toFixed(2); }); return { date: iso(d), hours: o }; }).filter((x) => Object.keys(x.hours).length);
     }
     if (cats.tasks) data.tasks = Object.entries(S.tasks).filter(([, v]) => v && !v.del).map(([id, v]) => ({ id, title: v.t, date: tDay(v) || null, due: v.due || null, urgent: !!v.urg, important: !!v.imp, priority: TPRI[tPri(v)][0], size: v.b || null, done: !!v.done, createdAt: v.c ? new Date(v.c).toISOString() : null, completedAt: v.doneAt ? new Date(v.doneAt).toISOString() : null, inbox: !tDay(v), steps: (v.sub || []).length ? { done: v.sub.filter((x) => x.done).length, total: v.sub.length } : null }));
     if (cats.events) {
@@ -707,10 +817,10 @@
 
   function shell() {
     const inApp = mode !== "signin" && P().setupDone;
-    document.getElementById("side").innerHTML = inApp ? `<div class="brand">My <span>Planner</span></div>${statusPill()}<button class="navbtn navadd" data-sched>${ic("plus")}Add / schedule</button>` + SCREENS.filter((s) => shownScreen(s[0])).map((s) => `<button class="navbtn ${route === s[0] ? "on" : ""}" data-go="${s[0]}">${ic(s[0])}${s[1]}</button>`).join("") : "";
+    document.getElementById("side").innerHTML = inApp ? `<div class="brand">My <span>Planner</span></div>${statusPill()}<button class="navbtn navadd" data-sched>${ic("plus")}Add / schedule</button>` + SCREENS.filter((s) => shownScreen(s[0])).map((s) => `<button class="navbtn ${route === s[0] ? "on" : ""}" data-go="${s[0]}">${ic(s[0])}${s[1]}</button>${s[0] === "study" ? actNav() : ""}`).join("") : "";
     const quick = [["today", "Today"], ["planner", "Planner"], ["habits", "Habits"], ["todo", "To-Do"], ["more", "More"]];
     document.getElementById("bottom").innerHTML = inApp ? quick.map((q) => `<button class="${route === q[0] || (q[0] === "more" && !quick.some((x) => x[0] === route)) ? "on" : ""}" data-go="${q[0]}">${ic(q[0], 22)}${q[1]}</button>`).join("") : "";
-    document.getElementById("sheetin").innerHTML = `<button class="navbtn navadd" data-sched>${ic("plus", 22)}Add / schedule</button>` + SCREENS.filter((s) => shownScreen(s[0])).map((s) => `<button class="navbtn ${route === s[0] ? "on" : ""}" data-go="${s[0]}">${ic(s[0], 22)}${s[1]}</button>`).join("");
+    document.getElementById("sheetin").innerHTML = `<button class="navbtn navadd" data-sched>${ic("plus", 22)}Add / schedule</button>` + SCREENS.filter((s) => shownScreen(s[0])).map((s) => `<button class="navbtn ${route === s[0] ? "on" : ""}" data-go="${s[0]}">${ic(s[0], 22)}${s[1]}</button>${s[0] === "study" ? actNav() : ""}`).join("");
     document.body.classList.toggle("bare", !inApp);
   }
   function statusPill() {
@@ -721,6 +831,34 @@
     if (G.status === "err") return `<button class="status warn" data-resync>Sync problem · tap to retry</button>`;
     return `<button class="status warn" data-resync>○ Tap to sync with Drive</button>`;
   }
+  /* ---------- Journal lock (1.12): PIN (stored only as a salted hash) or this device's fingerprint / face ---------- */
+  const LOCKED = ["journal", "mood", "three", "history"];
+  let unlocked = false, hiddenAt = 0;
+  const lockOn = () => !!(P().lock && P().lock.h);
+  const isLocked = (r) => lockOn() && !unlocked && LOCKED.includes(r);
+  const hex = (buf) => [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+  const pinHash = async (pin, salt) => hex(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(salt + ":" + pin)));
+  const b64 = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf))), unb64 = (x) => Uint8Array.from(atob(x), (c) => c.charCodeAt(0));
+  const bioId = () => { try { return localStorage.getItem("mp-bio") || ""; } catch (e) { return ""; } };
+  const bioOK = () => !!(window.PublicKeyCredential && navigator.credentials);
+  function lockHTML() {
+    return `${head("Private", "Locked", "")}<section class="card stack" style="max-width:420px;margin:0 auto;align-items:center;text-align:center">${ic("lock", 28)}
+      <p class="small">Journal, Mood, 3-6-9 and History are locked.</p>
+      ${bioId() && bioOK() ? `<button class="btn" data-unbio>Unlock with fingerprint or face</button>` : ""}
+      <div class="row" style="justify-content:center"><input class="f" type="password" inputmode="numeric" maxlength="6" id="pinin" placeholder="PIN" style="width:130px;text-align:center;letter-spacing:.3em" aria-label="PIN"><button class="btn ${bioId() ? "ghost" : ""}" data-unpin>Unlock</button></div>
+      <button class="link tiny" data-pinforgot>Forgot your PIN?</button></section>`;
+  }
+  async function tryPin() { const v = field("pinin"), L = P().lock; if (!L) return; if ((await pinHash(v, L.s)) === L.h) { unlocked = true; MP.render(); } else { MP.toast("That PIN isn't right"); const f = document.getElementById("pinin"); if (f) { f.value = ""; f.focus(); } } }
+  async function tryBio() { try { await navigator.credentials.get({ publicKey: { challenge: crypto.getRandomValues(new Uint8Array(32)), allowCredentials: [{ type: "public-key", id: unb64(bioId()) }], userVerification: "required", timeout: 60000 } }); unlocked = true; MP.render(); } catch (e) { MP.toast("Fingerprint / face didn't unlock it. Use your PIN."); } }
+  async function setBio() { try { const c = await navigator.credentials.create({ publicKey: { challenge: crypto.getRandomValues(new Uint8Array(32)), rp: { name: "My Planner" }, user: { id: crypto.getRandomValues(new Uint8Array(16)), name: "my-planner-lock", displayName: "My Planner lock" }, pubKeyCredParams: [{ type: "public-key", alg: -7 }, { type: "public-key", alg: -257 }], authenticatorSelection: { authenticatorAttachment: "platform", userVerification: "required", residentKey: "discouraged" }, timeout: 60000 } }); localStorage.setItem("mp-bio", b64(c.rawId)); MP.toast("Fingerprint / face unlock is on for this device"); MP.render(); } catch (e) { MP.toast("This device or browser couldn't set up fingerprint / face. Your PIN still works."); } }
+  async function setPin() { const a = field("pin1"), b = field("pin2"); if (!/^\d{4,6}$/.test(a)) { MP.toast("Use 4 to 6 digits"); return; } if (a !== b) { MP.toast("The two PINs don't match"); return; } const salt = hex(crypto.getRandomValues(new Uint8Array(16))); P().lock = { s: salt, h: await pinHash(a, salt) }; touchP(); unlocked = true; closeModal(); MP.render(); MP.toast("Journal lock is on"); }
+  function pinForgot() {
+    if (mode !== "google") { modal(`<h2>Forgot your PIN?</h2><p class="small">In demo mode the PIN can't be reset. Your entries are safe on this device.</p><div class="row" style="justify-content:flex-end"><button class="btn" data-close>OK</button></div>`); return; }
+    modal(`<h2>Reset your PIN</h2><p class="small">Sign in with your Google account again to prove it's you. The lock is then removed, and you can set a new PIN in Settings → Privacy.</p><div class="row" style="justify-content:flex-end"><button class="btn ghost" data-close>Cancel</button><button class="btn" data-pinreset>Sign in with Google</button></div>`);
+  }
+  async function pinReset() { try { await G.authorize(true); delete P().lock; try { localStorage.removeItem("mp-bio"); } catch (e) {} touchP(); unlocked = true; closeModal(); MP.render(); MP.toast("Lock removed. Set a new PIN in Settings → Privacy."); } catch (e) { MP.toast("Google sign-in didn't finish, so the PIN wasn't reset."); } }
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") hiddenAt = Date.now(); else if (hiddenAt && Date.now() - hiddenAt > 5 * 60e3 && unlocked) { unlocked = false; if (LOCKED.includes(route)) MP.render(); } });
+
   MP.render = () => {
     document.body.dataset.theme = P().theme || MP.pref.get("theme") || "sage";
     MP.pref.set("theme", document.body.dataset.theme);
@@ -729,7 +867,7 @@
     if (mode === "signin") { main.innerHTML = signinHTML(MP._msg); return; }
     if (!P().setupDone) { main.innerHTML = V.setup(); return; }
     const top = mode === "google" ? `<div class="mobstatus">${statusPill()}</div>` : `<div class="mobstatus">${statusPill()}</div>`;
-    main.innerHTML = top + (V[route] || V.today)();
+    main.innerHTML = top + (isLocked(route) ? lockHTML() : (V[route] || V.today)());
     MP.setupPads();
     document.querySelectorAll("[data-printink]").forEach(drawPrintInk);
     miniPlayer();
@@ -738,6 +876,12 @@
     const strokes = ((MP.S.ink[cv.dataset.printink] || {}).s || []), w = cv.clientWidth || 300, ctx = cv.getContext("2d");
     cv.width = w; const maxY = Math.max(40, ...strokes.flatMap((s) => s.p.map((q) => q[1]))); const sc = Math.min(1, 300 / maxY); cv.height = maxY * sc + 10;
     strokes.forEach((s) => { ctx.strokeStyle = s.c; ctx.lineWidth = Math.max(1, s.z * sc); ctx.lineCap = "round"; ctx.beginPath(); s.p.forEach((q, i) => (i ? ctx.lineTo(q[0] * w, q[1] * sc) : ctx.moveTo(q[0] * w, q[1] * sc))); ctx.stroke(); });
+  }
+  /* Sidebar: each activity type with time done against planned today */
+  function actNav() {
+    if (mode === "signin" || !P().setupDone) return "";
+    const t = today(), items = actNames().map((n) => [n, actMins(t, n)]).filter(([, m]) => m.plan || m.done);
+    return items.length ? `<div class="navsub">${items.map(([n, m]) => `<button class="navsubbtn ${route === "study" && view.act === n ? "on" : ""}" data-actgo="${E(n)}"><span>${E(n)}</span><span class="tiny">${hm(m.done)} / ${hm(m.plan)}</span></button>`).join("")}</div>` : "";
   }
   function go(r) {
     if (r === "more") { document.getElementById("sheet").classList.add("on"); return; }
@@ -823,8 +967,8 @@
   }
   const download = (name, text, type) => { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500); };
   function csvLog() {
-    const hs = P().habits, rows = [["date", "habits_pct", ...hs.map((h) => h.name), "study_hours", "focus", "mood_am", "mood_pm", "sleep", "water", "energy"]];
-    Object.keys(MP.S.days).sort().forEach((k) => { const r = MP.S.days[k], d = parseISO(k), p = dayPct(d); rows.push([k, p == null ? "" : Math.round(p * 100), ...hs.map((h) => ({ d: "Done", p: "Partial", m: "Missed" }[(r.h || {})[h.id]] || "")), studyHours(d).toFixed(1), r.focus || "", ((r.mood || {}).am || {}).w || "", ((r.mood || {}).pm || {}).w || "", r.sleep ?? "", r.water ?? "", r.energy ?? ""]); });
+    const hs = P().habits, rows = [["date", "habits_pct", ...hs.map((h) => h.name), "study_hours", "activity_hours", "focus", "mood_am", "mood_pm", "sleep", "water", "energy"]];
+    Object.keys(MP.S.days).sort().forEach((k) => { const r = MP.S.days[k], d = parseISO(k), p = dayPct(d); rows.push([k, p == null ? "" : Math.round(p * 100), ...hs.map((h) => ({ d: "Done", p: "Partial", m: "Missed" }[(r.h || {})[h.id]] || "")), studyHours(d).toFixed(1), (actMins(d).done / 60).toFixed(1), r.focus || "", ((r.mood || {}).am || {}).w || "", ((r.mood || {}).pm || {}).w || "", r.sleep ?? "", r.water ?? "", r.energy ?? ""]); });
     return rows.map((r) => r.map((c) => { let s = String(c); if (/^[=+\-@]/.test(s)) s = "'" + s; return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }).join(",")).join("\n");
   }
 
@@ -845,7 +989,7 @@
     if (mode !== "google") { MP.toast("Sign in with Google to use Calendar."); return; }
     try {
       let ev;
-      if (s.kind === "block") ev = timedEv("Study · " + s.row.text, iso(today()), s.row.start, s.row.end, choice === "daily" ? "RRULE:FREQ=DAILY" : null);
+      if (s.kind === "block") ev = timedEv(actOf(s.row) + " · " + s.row.text, iso(today()), s.row.start, s.row.end, choice === "daily" ? "RRULE:FREQ=DAILY" : null);
       else if (s.kind === "task") ev = timedEv("To-do · " + s.t.t, s.t.due, "09:00", "09:30");
       else if (s.kind === "event") ev = buildEv(MP.S.events[s.e.id] || s.e);
       else if (s.kind === "date") { const [mm, dd] = s.x.md.split("-").map(Number); let y = today().getFullYear(); if (new Date(y, mm - 1, dd) < today()) y++; ev = allDayEv(`${s.x.n} · ${s.x.type}`, `${y}-${String(mm).padStart(2, "0")}-${String(dd).padStart(2, "0")}`, "RRULE:FREQ=YEARLY"); }
@@ -865,14 +1009,14 @@
       ${mo ? `<div class="small">${mo === "P" ? "○" : "●"} ${moonName(mo)}</div>` : ""}${po ? `<div class="small">✦ ${E(po)}</div>` : ""}
       ${DT.map(([, x]) => `<div class="small">${x.type === "Birthday" ? "✿" : "♥"} ${E(x.n)} · ${E(x.type)}</div>`).join("")}
       ${EV.map(([, e]) => `<div class="small">• ${e.time ? fmtT(e.time) + " · " : ""}${E(e.t)}</div>`).join("") || (!mo && !po && !DT.length ? '<div class="small muted">Nothing planned.</div>' : "")}
-      ${studyHours(d) ? `<div class="small accb">${studyHours(d).toFixed(1)} h studied</div>` : ""}
+      ${actMins(d).done ? `<div class="small accb">${hm(actMins(d).done)} of activities done</div>` : ""}
       <div class="row"><input class="f" type="time" id="ddtm" style="width:auto" aria-label="Time"><input class="f" id="ddt" maxlength="120" placeholder="Add an event on this day" style="flex:1"><button class="btn sm" data-dayadd="${k}">Add</button></div>
       <div class="between wrap"><button class="link" data-hgo="${k}">Open this day in History →</button><button class="btn sm" data-sched="${k}">${ic("plus", 16)} Add / schedule</button></div>`);
   }
 
   /* ---------- Add / schedule (one form for reminders, tasks, habits, study, events, dates) ---------- */
-  const SKINDS = [["reminder", "⏰ Reminder"], ["task", "✓ New task (To-Do)"], ["habit", "◎ Habit"], ["study", "📖 Study session"], ["event", "📅 Event / appointment"], ["wellbeing", "❀ Journal · affirmation · mood"], ["date", "✿ Birthday / anniversary"]];
-  const SLABEL = { reminder: "Reminder", task: "Task", habit: "Habit", study: "Study", event: "Event", wellbeing: "Wellbeing", date: "Special date" };
+  const SKINDS = [["reminder", "⏰ Reminder"], ["task", "✓ New task (To-Do)"], ["habit", "◎ Habit"], ["study", "⏱ Activity session"], ["event", "📅 Event / appointment"], ["wellbeing", "❀ Journal · affirmation · mood"], ["date", "✿ Birthday / anniversary"]];
+  const SLABEL = { reminder: "Reminder", task: "Task", habit: "Habit", study: "Activity", event: "Event", wellbeing: "Wellbeing", date: "Special date" };
   const SPRI = [["low", "Low"], ["med", "Medium"], ["high", "High"], ["urgent", "Urgent"]];
   const PRICOL = { low: "2", med: "5", high: "6", urgent: "11" };
   const PRICLS = { low: "pri-low", med: "pri-med", high: "pri-high", urgent: "pri-urg" };
@@ -951,6 +1095,7 @@
     modal(`<div class="between"><h2>${id ? "Edit" : "Add / schedule"}</h2><button class="tool" data-close aria-label="Close">✕</button></div>
       <label class="stack small">What is it?${sel('id="skind" data-skind', SKINDS, e.kind)}</label>
       <label class="stack small"><span id="stlab">${e.kind === "date" ? "Name" : "Title"}</span><input class="f" id="stitle" maxlength="120" value="${E(e.t || "")}" placeholder="e.g. Call Dr. Mehta · Revise Unit 3 · Drink water"></label>
+      <div class="sk-act stack small" ${e.kind === "study" ? "" : "hidden"}><label class="stack small">Activity type${sel('id="sact"', actNames(), e.act || "Study")}</label></div>
       <div class="sk-habit stack small" ${e.kind === "habit" ? "" : "hidden"}><label class="stack small">Which habit?${sel('id="shab"', habOpts, e.hab || "")}</label></div>
       <div class="sk-date grid g2" ${e.kind === "date" ? "" : "hidden"}><label class="stack small">Type${sel('id="sdtype"', ["Birthday", "Anniversary"], "Birthday")}</label><label class="stack small">Relation<input class="f" id="srel" maxlength="40" placeholder="e.g. Cousin"></label></div>
       <div class="grid g3"><label class="stack small">Date<input class="f" type="date" id="sdate" data-skind value="${E(e.d)}"></label><label class="stack small sk-time">Start time<input class="f" type="time" id="stime" value="${E(e.time || "")}"></label><label class="stack small sk-time">End time (optional)<input class="f" type="time" id="send" value="${E(e.end || "")}"></label></div>
@@ -972,7 +1117,7 @@
   function schedKind(src) {
     const k = field("skind"), q = (s) => document.querySelectorAll(s);
     if (src === "skind" && (k === "habit" || k === "study")) { const o = document.getElementById("soften"), r = document.getElementById("srep"); if (o && o.value === "once") { o.value = "rep"; if (r) r.value = k === "habit" ? "DAILY" : "WEEKDAYS"; } }
-    q(".sk-habit").forEach((x) => (x.hidden = k !== "habit")); q(".sk-date").forEach((x) => (x.hidden = k !== "date"));
+    q(".sk-habit").forEach((x) => (x.hidden = k !== "habit")); q(".sk-act").forEach((x) => (x.hidden = k !== "study")); q(".sk-date").forEach((x) => (x.hidden = k !== "date"));
     q(".sk-time,.sk-rep").forEach((x) => (x.hidden = k === "date")); q(".sk-yearly").forEach((x) => (x.hidden = k !== "date"));
     const recur = k !== "date" && field("soften") === "rep"; q(".sk-repbox").forEach((x) => (x.hidden = !recur));
     if (src === "sdate" && field("sdate")) { const on = [...document.querySelectorAll("[data-swd]:checked")]; if (on.length <= 1) { const w2 = WD[parseISO(field("sdate")).getDay()]; document.querySelectorAll("[data-swd]").forEach((x) => (x.checked = x.dataset.swd === w2)); } }
@@ -1008,6 +1153,7 @@
     if (end && time && end <= time) { MP.toast("End time should be after the start time"); return; }
     const eid = id || uid(), old = MP.S.events[eid] || {};
     const rec = schedRep({ d, time, end: time ? end : "", t: title, kind, pri, rem, note });
+    if (kind === "study") rec.act = field("sact") || "Study";
     if (rec.rep && rec.repEnd === "until" && (!rec.repUntil || rec.repUntil < d)) { MP.toast("Pick an end date after the start date"); return; }
     if (rec.rep && !repMatch(rec, rec.d)) { for (let i = 1; i < 400; i++) { const dk = iso(addD(parseISO(rec.d), i)); if (repMatch(rec, dk)) { rec.d = dk; break; } } } /* start on the first day that fits */
     if (kind === "habit") { let hid = field("shab"); if (hid === "__new" || (!hid && title)) { hid = uid(); P().habits.push({ id: hid, name: title.slice(0, 60), def: "", active: true }); touchP(); } rec.hab = hid; }
@@ -1085,6 +1231,15 @@
     if (d.wipe !== undefined) return wipeDialog();
     if (d.dowipe !== undefined) return doWipe();
     if (d.menup) { P().menu = d.menup === "simple" ? menuSimple() : { preset: "full", hide: {} }; touchP(); MP.render(); MP.toast(d.menup === "simple" ? "Simple menu" : "Full menu: every screen shown"); return; }
+    if (d.unpin !== undefined) return tryPin();
+    if (d.unbio !== undefined) return tryBio();
+    if (d.pinforgot !== undefined) return pinForgot();
+    if (d.pinreset !== undefined) return pinReset();
+    if (d.bioset !== undefined) return setBio();
+    if (d.biooff !== undefined) { try { localStorage.removeItem("mp-bio"); } catch (er) {} MP.render(); return; }
+    if (d.pinchange !== undefined) { if (lockOn() && !unlocked) return go("journal"); modal(`<h2>${lockOn() ? "Change" : "Set"} your PIN</h2><label class="stack small">New PIN (4 to 6 digits)<input class="f" type="password" inputmode="numeric" maxlength="6" id="pin1"></label><label class="stack small">Type it again<input class="f" type="password" inputmode="numeric" maxlength="6" id="pin2"></label><div class="row" style="justify-content:flex-end"><button class="btn ghost" data-close>Cancel</button><button class="btn" data-pinsave>Save PIN</button></div>`); return; }
+    if (d.pinsave !== undefined) return setPin();
+    if (d.pinoff !== undefined) { if (!unlocked) return go("journal"); delete P().lock; try { localStorage.removeItem("mp-bio"); } catch (er) {} touchP(); MP.render(); MP.toast("Journal lock is off"); return; }
     if (d.tnew !== undefined) return taskDialog(null);
     if (d.tedit) return taskDialog(d.tedit);
     if (d.tsave !== undefined) return taskSave(d.tsave);
@@ -1118,7 +1273,10 @@
     if (d.inno) { const it = MP.S.inbox[d.inno]; if (it) { it.status = "dismissed"; it.u = Date.now(); MP.changed(); MP.render(); } return; }
     if (d.jshuf !== undefined) { view.jshuf = (view.jshuf || 0) + 1; return MP.render(); }
     if (d.jgo) { view.jd = d.jgo; return MP.render(); }
-    if (d.h) { const k = iso(today()), r = dayRec(k); r.h = r.h || {}; r.h[d.h] = CYC[r.h[d.h] || "e"]; touchDay(k); return MP.render(); }
+    if (d.h) { const k = iso(today()), r = dayRec(k), hb = P().habits.find((x) => x.id === d.h); r.h = r.h || {};
+      if (hb && hb.freq && hb.freq.k === "count") { r.hn = r.hn || {}; let n = (r.hn[d.h] || 0) + 1; if (n > hb.freq.n) n = 0; r.hn[d.h] = n; r.h[d.h] = n >= hb.freq.n ? "d" : n > 0 ? "p" : ""; if (!r.h[d.h]) delete r.h[d.h]; }
+      else r.h[d.h] = CYC[r.h[d.h] || "e"];
+      touchDay(k); return MP.render(); }
     if (d.hd) { const r = dayRec(d.hd); r.h = r.h || {}; r.h[d.hi] = CYC[r.h[d.hi] || "e"]; touchDay(d.hd); return MP.render(); }
     if (d.dv) { view.dash = d.dv; return MP.render(); }
     if (d.pv) { view.plan = d.pv; return MP.render(); }
@@ -1131,14 +1289,19 @@
     if (d.ttadd !== undefined) { const arr = view.tt === "we" && Array.isArray(P().weekend) ? P().weekend : P().timetable; const lastEnd = arr.reduce((m2, r) => Math.max(m2, tMin(r.end || r.start) || 0), 7 * 60); arr.push({ id: uid(), start: minToT(lastEnd), end: minToT(lastEnd + 30), text: "New activity", type: "Free" }); touchP(); return MP.render(); }
     if (d.ttsuggest !== undefined) { P().timetable = D.suggest.routine.map((r) => ({ id: uid(), start: r[0], end: r[1], text: r[2], type: r[3] })); touchP(); return MP.render(); }
     if (d.ttdel) { ["timetable", "weekend"].forEach((k) => { if (Array.isArray(P()[k])) P()[k] = P()[k].filter((r) => r.id !== d.ttdel); }); touchP(); return MP.render(); }
-    if (d.blkN) { const tt = P().timetable, st = tt.filter((r) => r.type === "Study").sort((a, b) => a.start.localeCompare(b.start)); if (+d.blkN > 0) { const lastEnd = st.length ? tMin(st[st.length - 1].end) : 9 * 60; tt.push({ id: uid(), start: minToT(lastEnd + 10), end: minToT(lastEnd + 60), text: "Study block " + (st.length + 1), type: "Study" }); } else if (st.length) { const rm = st[st.length - 1].id; P().timetable = tt.filter((r) => r.id !== rm); } touchP(); return MP.render(); }
     if (d.hadd !== undefined || d.hsug) { const n = d.hsug || field("newh"); if (n) { P().habits.push({ id: uid(), name: n.slice(0, 60), def: "", active: true }); touchP(); } return MP.render(); }
     if (d.hact) { const h = P().habits.find((x) => x.id === d.hact); if (h) { h.active = h.active === false; touchP(); } return MP.render(); }
-    if (d.timer) {
-      if (d.timer === "reset") { clearInterval(timer.h); timer = { left: 1500, run: false, h: null, phase: "focus" }; stopSound(); }
-      else { timer.run = !timer.run; if (timer.run) { if ("Notification" in window && Notification.permission === "default") { try { Notification.requestPermission(); } catch (er) {} } timer.h = setInterval(tick, 1000); if (timer.phase === "focus" && SND().auto) startSound(); } else { clearInterval(timer.h); if (SND().auto) stopSound(); } }
-      return MP.render();
-    }
+    if (d.tstart) { const r = ttFor(today()).find((x) => x.id === d.tstart); if (r) tmStart(rowLen(r) || 25, { row: r.id, label: actOf(r) + " · " + r.text }); return; }
+    if (d.tquick) return tmStart(+d.tquick);
+    if (d.tcustom !== undefined) { const n = parseInt(field("tcmin"), 10); if (!(n > 0 && n <= 600)) { MP.toast("Type minutes between 1 and 600"); return; } return tmStart(n); }
+    if (d.tpomo !== undefined) return tmStart(25, { pomo: true });
+    if (d.tpause !== undefined) { if (tm.run) { tm.left = tm.endAt - Date.now(); tm.run = false; stopSound(); wakeOff(); calBackup(false); } else { tm.endAt = Date.now() + tm.left; tm.run = true; wakeOn(); calBackup(true); if (SND().auto && tm.segs[tm.i].k === "f") startSound(); } tmSave(); return MP.render(); }
+    if (d.tstop !== undefined) return tmStop();
+    if (d.actsel !== undefined) { view.act = d.actsel; return MP.render(); }
+    if (d.actgo !== undefined) { view.act = d.actgo; document.getElementById("sheet").classList.remove("on"); return go("study"); }
+    if (d.actaddrow) { const n = field("newact").slice(0, 30); if (!n) return; const A = ensureActs(); if (!A.some((a) => a.name.toLowerCase() === n.toLowerCase())) A.push({ name: n }); setTT(d.actaddrow, "type", n === "Study" ? "Study" : "Activity"); if (n !== "Study") setTT(d.actaddrow, "act", n); closeModal(); return MP.render(); }
+    if (d.actadd !== undefined) { const n = field("newact").slice(0, 30); if (!n) return; const A = ensureActs(); if (A.some((a) => a.name.toLowerCase() === n.toLowerCase())) { MP.toast("That activity type already exists"); return; } A.push({ name: n }); touchP(); MP.render(); MP.toast("Added " + n); return; }
+    if (d.actdel !== undefined) { const A = ensureActs(), a = A[+d.actdel]; if (!a || a.name === "Study") return; A.splice(+d.actdel, 1); ["timetable", "weekend"].forEach((kk) => { if (Array.isArray(P()[kk])) P()[kk].forEach((r) => { if (r.type === "Activity" && r.act === a.name) r.act = "Other"; }); }); touchP(); MP.render(); MP.toast(a.name + " removed; its rows are now Other"); return; }
     if (d.focus) { const k = iso(today()); dayRec(k).focus = +d.focus; touchDay(k); return MP.render(); }
     if (d.phone) { const k = iso(today()); dayRec(k).phone = d.phone; touchDay(k); return MP.render(); }
     if (d.addev !== undefined) { const v = field("evt"); if (v) { putRec("events", uid(), { d: field("evd") || iso(today()), time: field("evtm"), t: v.slice(0, 120) }); MP.render(); } return; }
@@ -1173,16 +1336,25 @@
   document.addEventListener("change", (e) => {
     const t = e.target, d = t.dataset;
     if (d.done) return markDone(d.done, t.checked);
+    if (d.hfreq) { const h = P().habits.find((x) => x.id === d.hfreq); if (h) { const k2 = t.value; h.freq = k2 === "daily" ? undefined : k2 === "days" ? { k: "days", days: [1, 2, 3, 4, 5] } : k2 === "week" ? { k: "week", n: 3 } : { k: "count", n: 8, unit: "" }; if (!h.freq) delete h.freq; touchP(); } return MP.render(); }
+    if (d.hday) { const [hid, x] = d.hday.split("|"), h = P().habits.find((y) => y.id === hid); if (h && h.freq) { const set = new Set(h.freq.days || []); t.checked ? set.add(+x) : set.delete(+x); h.freq.days = [...set].sort(); touchP(); } return; }
     if (d.sub) { const [tid, sid] = d.sub.split("|"), x = MP.S.tasks[tid]; if (!x) return; const st = (x.sub || []).find((y) => y.id === sid); if (st) st.done = t.checked; x.u = Date.now(); if (x.sub.every((y) => y.done) && !x.done) { MP.toast("All steps done, task ticked"); return markDone(tid, true); } MP.changed(); return MP.render(); }
     if (d.tfp !== undefined) return tfRefresh();
     if (d.menus) { const m = P().menu || (P().menu = { hide: {} }); m.hide = m.hide || {}; if (t.checked) delete m.hide[d.menus]; else m.hide[d.menus] = true; m.preset = "custom"; touchP(); MP.render(); return; }
-    if (d.blk) { const k = iso(today()), r = dayRec(k); r.study = r.study || {}; r.study[d.blk] = t.checked; touchDay(k); MP.render(); }
+    if (d.blk) { blockDone(iso(today()), d.blk, t.checked); MP.render(); }
+    if (d.tbrk !== undefined) { TMR().breaks = t.checked; touchP(); return; }
+    if (d.tkeep !== undefined) { TMR().keep = t.checked; touchP(); return; }
+    if (d.tcal !== undefined) { TMR().cal = t.checked; touchP(); return; }
+    if (d.tevery !== undefined) { TMR().every = Math.max(10, Math.min(120, +t.value || 50)); touchP(); return; }
+    if (d.tblen !== undefined) { TMR().blen = Math.max(2, Math.min(60, +t.value || 10)); touchP(); return; }
+    if (d.acthab !== undefined) { const a = ensureActs()[+d.acthab]; if (a) { a.hab = t.value; touchP(); } return; }
+    if (d.actname !== undefined) { const A = ensureActs(), a = A[+d.actname], nn = t.value.trim().slice(0, 30); if (!a || !nn || a.name === "Study") return MP.render(); const old = a.name; a.name = nn; ["timetable", "weekend"].forEach((kk) => { if (Array.isArray(P()[kk])) P()[kk].forEach((r) => { if (r.type === "Activity" && r.act === old) r.act = nn; }); }); touchP(); return MP.render(); }
+    if (d.ttact) { if (t.value === "__new") { MP.render(); modal(`<h2>New activity type</h2><input class="f" id="newact" maxlength="30" placeholder="e.g. Music practice"><div class="row" style="justify-content:flex-end"><button class="btn ghost" data-close>Cancel</button><button class="btn" data-actaddrow="${E(d.ttact)}">Add</button></div>`); return; } if (t.value === "Study") { setTT(d.ttact, "type", "Study"); } else { setTT(d.ttact, "type", "Activity"); setTT(d.ttact, "act", t.value); } return MP.render(); }
     if (d.col) { P().collections[d.col] = t.checked; touchP(); MP.render(); }
     if (d.sit) { const k = iso(today()), r = dayRec(k); r.sits = r.sits || {}; r.sits[d.sit] = t.checked; touchDay(k); if (r.sits.m && r.sits.a && r.sits.n) MP.toast("Day complete · dot added"); MP.render(); }
     if (d.hist !== undefined) { view.hist = t.value; MP.render(); }
     if (d.alert) { P().alerts = +t.value; touchP(); }
     if (d.autodates !== undefined) { P().autoDates = t.checked; touchP(); }
-    if (d.blen) { const r = P().timetable.find((x) => x.id === d.blen); if (r) { r.end = minToT(tMin(r.start) + +t.value); touchP(); MP.render(); } }
     if (d.jtpl !== undefined) { view.jt = t.value; view.jshuf = 0; P().journalTpl = t.value; touchP(); MP.render(); }
     if (d.jdate !== undefined) { view.jd = t.value; MP.render(); }
     if (d.buddy !== undefined) { if (t.checked) { modal(`<h2>Connect Buddy OS?</h2><p class="small">My Planner will write a feed file (<b>buddy-feed.json</b>) in your private My Planner folder with only the categories you tick. Buddy OS, signed in with your Google account, can read it. Buddy can leave items in <b>buddy-inbox.json</b>: what you tell Buddy yourself is added straight away (you can turn this off), and Buddy's own ideas wait on Today for your approval. Mood and journal are off unless you turn them on.</p><div class="row" style="justify-content:flex-end"><button class="btn ghost" data-close>Cancel</button><button class="btn" data-buddyyes>Connect</button></div>`); t.checked = false; } else { P().links.buddy.on = false; touchP(); MP.render(); MP.toast("Buddy OS disconnected; its feed file will be removed."); } }
@@ -1197,7 +1369,8 @@
     if (d.skind !== undefined) return schedKind(t.id);
     if (d.tviewsel !== undefined) { P().todayView = t.value; touchP(); MP.render(); }
     if (d.printsel !== undefined) { P().printView = t.value; touchP(); MP.render(); }
-    if (d.ttf === "type" || d.ttf === "start" || d.ttf === "end") { setTT(d.id, d.ttf, t.value); MP.render(); }
+    if (d.ttf === "type") { const row = [...P().timetable, ...(Array.isArray(P().weekend) ? P().weekend : [])].find((x) => x.id === d.id); if (t.value === "Activity") { if (!row || !isAct(row)) setTT(d.id, "type", "Study"); } else setTT(d.id, "type", t.value); MP.render(); }
+    if (d.ttf === "start" || d.ttf === "end") { setTT(d.id, d.ttf, t.value); MP.render(); }
     if (d.wrt) { wiz.routine = d.wrt === "1"; MP.render(); }
     if (d.wcol) wiz.cols[d.wcol] = t.checked;
     if (d.restore !== undefined && t.files && t.files[0]) {
@@ -1226,6 +1399,8 @@
     if (d.dayf) { const k = iso(today()); dayRec(k)[d.dayf] = t.value.slice(0, 240); touchDay(k); }
     if (d.sleep !== undefined) { const k = iso(today()); const v = parseFloat(t.value); dayRec(k).sleep = isNaN(v) ? undefined : Math.max(0, Math.min(16, v)); touchDay(k); }
     if (d.hname) { const h = P().habits.find((x) => x.id === d.hname); if (h) { h.name = t.value.slice(0, 60); touchP(); } }
+    if (d.hn) { const h = P().habits.find((y) => y.id === d.hn); if (h && h.freq) { h.freq.n = Math.max(1, Math.min(h.freq.k === "week" ? 7 : 99, parseInt(t.value, 10) || 1)); touchP(); } return; }
+    if (d.hunit) { const h = P().habits.find((y) => y.id === d.hunit); if (h && h.freq) { h.freq.unit = t.value.slice(0, 20); touchP(); } return; }
     if (d.hdef) { const h = P().habits.find((x) => x.id === d.hdef); if (h) { h.def = t.value.slice(0, 80); touchP(); } }
     if (d.prf) { P().practice[d.prf] = d.prf === "text" ? t.value.slice(0, 240) : t.value; touchP(); }
     if (d.shareemails !== undefined) { P().share.emails = t.value.split(/[,;\s]+/).map((x) => x.trim().toLowerCase()).filter((x) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x)).slice(0, 5); touchP(); }
@@ -1233,23 +1408,10 @@
     if (t.id === "helpq") { clearTimeout(window._hq); window._hq = setTimeout(() => { view.hq = t.value; MP.render(); const f = document.getElementById("helpq"); if (f) { f.focus(); f.setSelectionRange(f.value.length, f.value.length); } }, 300); }
   });
   document.addEventListener("click", (e) => { if (e.target.closest(".ytl")) stopSound(); });
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape") { closeModal(); document.getElementById("sheet").classList.remove("on"); } if (e.key === "Enter" && e.target.id === "hq") { view.q = e.target.value; MP.render(); } if (e.key === "Enter" && e.target.id === "helpq") { view.hq = e.target.value; MP.render(); const f = document.getElementById("helpq"); if (f) { f.focus(); f.setSelectionRange(f.value.length, f.value.length); } } });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") { closeModal(); document.getElementById("sheet").classList.remove("on"); } if (e.key === "Enter" && e.target.id === "pinin") tryPin(); if (e.key === "Enter" && e.target.id === "hq") { view.q = e.target.value; MP.render(); } if (e.key === "Enter" && e.target.id === "helpq") { view.hq = e.target.value; MP.render(); const f = document.getElementById("helpq"); if (f) { f.focus(); f.setSelectionRange(f.value.length, f.value.length); } } });
   document.getElementById("sheet").addEventListener("click", (e) => { if (e.target.id === "sheet") e.currentTarget.classList.remove("on"); });
   document.getElementById("modal").addEventListener("click", (e) => { if (e.target.id === "modal") closeModal(); });
 
-  function tick() {
-    timer.left--;
-    if (timer.left <= 0) {
-      if (timer.phase === "focus") {
-        const k = iso(today()), r = dayRec(k), nb = studyRows(today()).find((x) => !(r.study && r.study[x.id]));
-        if (nb) { r.study = r.study || {}; r.study[nb.id] = true; touchDay(k); }
-        notify("Focus round done", nb ? `"${nb.text}" ticked. Take a 5-minute break.` : "Take a 5-minute break.");
-        timer.phase = "break"; timer.left = 300; if (SND().breakStop) stopSound();
-      } else { notify("Break over", "Ready for the next focus round?"); timer.phase = "focus"; timer.left = 1500; clearInterval(timer.h); timer.run = false; stopSound(); }
-      if (route === "study") MP.render();
-    }
-    const el = document.getElementById("timerv"); if (el) el.textContent = `${String(Math.floor(timer.left / 60)).padStart(2, "0")}:${String(timer.left % 60).padStart(2, "0")}`;
-  }
   function notify(title, body) { MP.toast(title + " · " + body); try { if ("Notification" in window && Notification.permission === "granted") new Notification(title, { body, icon: "icons/icon-192.png" }); } catch (e) {} }
 
   /* post-its: drag the ⋮⋮ handle (finger, mouse or S Pen) to reorder */
@@ -1262,7 +1424,7 @@
   document.addEventListener("pointercancel", () => { if (drag) { drag.el.remove(); drag = null; MP.render(); } });
 
   /* ---------- start-up ---------- */
-  MP.VERSION = "1.11";
+  MP.VERSION = "1.12";
   if (MP.sound) MP.sound.onchange = () => { miniPlayer(); if (route === "study") MP.render(); };
   /* Public, read-only helpers for future modules and connectors. */
   MP.api = { today, iso, dayPct, studyHours, streak, tasks, feed: () => MP.buildFeed(MP.S), version: MP.VERSION, schemaVersion: MP.SCHEMA_VERSION };

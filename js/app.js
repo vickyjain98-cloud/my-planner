@@ -56,7 +56,9 @@
   const putRec = (m, id, obj) => { MP.S[m][id] = Object.assign({}, obj, { u: Date.now() }); MP.changed(); MP.bus.emit(m + ".saved", { id }); };
   const delRec = (m, id) => { MP.S[m][id] = { del: 1, u: Date.now() }; MP.changed(); MP.bus.emit(m + ".deleted", { id }); };
 
-  const ttFor = (d) => { const we = d.getDay() === 0 || d.getDay() === 6; const rows = we && Array.isArray(P().weekend) ? P().weekend : P().timetable; return rows.slice().sort((a, b) => (a.start || "").localeCompare(b.start || "")); };
+  const ttFor = (d) => { const we = d.getDay() === 0 || d.getDay() === 6; const rows = we && Array.isArray(P().weekend) ? P().weekend : P().timetable; const o = ((MP.S.days[iso(d)] || {}).tto) || {};
+    /* 1.14: a block changed for "This occurrence" only is stored on that date (days[k].tto) and marked changed */
+    return rows.map((r) => (o[r.id] ? (o[r.id].del ? null : Object.assign({}, r, o[r.id], { chg: true })) : r)).filter(Boolean).sort((a, b) => (a.start || "").localeCompare(b.start || "")); };
   const studyRows = (d) => ttFor(d).filter((r) => r.type === "Study");
   /* ---------- Activities (1.12) ---------- */
   const isAct = (r) => r.type === "Study" || r.type === "Activity";
@@ -471,6 +473,125 @@
       ${soundCard()}
       <section class="card stack mt"><span class="lab">Hours ${selA ? "of " + E(selA) : "of all activities"} · last 7 days</span>${bars(hrs.map((h) => h / mx), days.map((d) => fmt(d, { weekday: "short" })), 140, (v) => (v * mx).toFixed(1) + "h")}</section>`;
   };
+
+  /* ---------- Day and Week view (1.14), like Outlook: half-hour grid, drag to move or resize ---------- */
+  const SLOT = 28; /* pixels per half hour */
+  function lanes(arr) {
+    arr.sort((a, b) => a.s - b.s || b.e - a.e); const res = []; let cl = [], end = -1;
+    const flush = () => { const cols = []; cl.forEach((it) => { let c = cols.findIndex((x) => x <= it.s); if (c < 0) { c = cols.length; cols.push(0); } cols[c] = it.e; it.lane = c; }); cl.forEach((it) => (it.lanes = cols.length)); res.push(...cl); cl = []; };
+    arr.forEach((it) => { if (cl.length && it.s >= end) { flush(); end = -1; } cl.push(it); end = Math.max(end, it.e); }); if (cl.length) flush(); return res;
+  }
+  function dayItems(k) {
+    const d = parseISO(k), out = [], strip = [];
+    ttFor(d).forEach((r) => { if (!r.start) return; const a = tMin(r.start); let b = r.end ? tMin(r.end) : a + 30; if (b <= a) b = r.end ? 1440 : Math.min(1440, a + 30); out.push({ src: "tt", id: r.id, s: a, e: b, title: r.text, sub: isAct(r) ? actOf(r) : r.type, cls: isAct(r) ? "b-act" : "b-tt", chg: r.chg }); });
+    evOn(k).forEach((e) => { if (e.time) { const a = tMin(e.time), b = e.end ? tMin(e.end) : a + (e.kind === "reminder" ? 15 : 30); out.push({ src: "ev", id: e.id, s: a, e: Math.max(b, a + 15), title: e.t, sub: (SLABEL[e.kind] || "Event") + (e.tz && e.tzT ? ` · ${fmtT(e.tzT)} ${zoneName(e.tz)}` : ""), cls: "b-ev " + (PRICLS[e.pri] || ""), rep: !!e.rep }); } else strip.push({ src: "ev", id: e.id, title: e.t }); });
+    tasks().forEach((t) => { if (t.cal && t.cal.d === k) out.push({ src: "task", id: t.id, s: tMin(t.cal.t), e: tMin(t.cal.t) + 15, title: t.t.split("\n")[0], sub: "To-do", cls: "b-task" + (t.done ? " done" : "") }); else if (tDay(t) === k && !t.done) strip.push({ src: "task", id: t.id, title: "To-do · " + t.t.split("\n")[0] }); });
+    gOn(k).forEach((g) => { if (g.allDay) strip.push({ src: "g", id: g.id, title: g.title }); else { const a = g.d === k ? tMin(g.t) : 0, b = (g.d2 || g.d) === k ? tMin(g.t2) : 1440; out.push({ src: "g", id: g.id, s: a, e: Math.max(b, a + 15), title: g.title, sub: "Google", cls: "b-g", color: g.color }); } });
+    const md = k.slice(5); live("dates").forEach(([id, x]) => { if (x.md === md) strip.push({ src: "date", id, title: (x.type === "Birthday" ? "✿ " : "♥ ") + x.n }); });
+    const mo = moonOf(d), po = portalOf(d); if (mo) strip.push({ src: "x", title: (mo === "P" ? "○ " : "● ") + moonName(mo) }); if (po) strip.push({ src: "x", title: "✦ " + po });
+    return { items: lanes(out), strip };
+  }
+  const blkHTML = (it, k) => { const top = (it.s / 30) * SLOT, h = Math.max(14, ((it.e - it.s) / 30) * SLOT - 2), w = 100 / it.lanes, drag = it.src !== "g";
+    return `<div class="blk ${it.cls} ${it.chg ? "chg" : ""} ${it.e - it.s < 45 ? "short" : ""}" data-bsrc="${it.src}" data-bid="${E(it.id)}" data-bk="${k}" data-bs="${it.s}" data-be="${it.e}" title="${E(it.title)}" style="top:${top}px;height:${h}px;left:calc(${it.lane * w}% + 2px);width:calc(${w}% - 4px);${it.color ? "border-left-color:" + E(it.color) : ""}">
+      ${drag ? '<span class="grip" aria-label="Drag to move">⋮⋮</span>' : ""}<b>${E(it.title)}</b><span>${fmtT(minToT(it.s))}${it.e - it.s >= 30 ? "–" + fmtT(minToT(Math.min(it.e, 1439))) : ""}${it.sub ? " · " + E(it.sub) : ""}${it.chg ? " · changed" : ""}</span>${drag ? '<i class="rz" aria-label="Drag to change length"></i>' : ""}</div>`; };
+  V.day = () => {
+    const k = view.dayK || iso(today()), wk = view.dv === "week", phone = window.innerWidth < 760, t = today();
+    const days = wk ? (phone ? [0, 1, 2].map((i) => iso(addD(parseISO(k), i))) : [...Array(7)].map((_, i) => iso(addD(monday(parseISO(k)), i)))) : [k];
+    const data = days.map((dk) => [dk, dayItems(dk)]), tz2 = P().tz2 && P().tz2 !== HOME() ? P().tz2 : "";
+    const title = wk ? `${fmt(parseISO(days[0]), { day: "numeric", month: "short" })} – ${fmt(parseISO(days[days.length - 1]), { day: "numeric", month: "short", year: "numeric" })}` : fmt(parseISO(k), { weekday: "long", day: "numeric", month: "long" });
+    const nav = `<div class="row" style="gap:6px"><button class="btn ghost sm" data-dnav="0">Today</button><button class="btn ghost sm" data-dnav="-1" aria-label="Back">‹</button><button class="btn ghost sm" data-dnav="1" aria-label="Forward">›</button><div class="tabs"><button class="${wk ? "" : "on"}" data-dvw="day">Day</button><button class="${wk ? "on" : ""}" data-dvw="week">Week</button></div><button class="btn sm" data-sched="${k}">${ic("plus", 16)} Add / schedule</button></div>`;
+    const strip7 = `<div class="dstrip7">${[-3, -2, -1, 0, 1, 2, 3].map((i) => { const dd = addD(parseISO(k), i), kk = iso(dd); return `<button class="${kk === k ? "on" : ""} ${kk === iso(t) ? "td" : ""}" data-dpick="${kk}"><span>${fmt(dd, { weekday: "short" })}</span><b>${dd.getDate()}</b></button>`; }).join("")}</div>`;
+    const mm = (() => { const m0 = new Date(parseISO(k).getFullYear(), parseISO(k).getMonth(), 1), st = addD(m0, -((m0.getDay() + 6) % 7)); return `<div class="dmini"><b class="small">${fmt(m0, { month: "long", year: "numeric" })}</b><div class="dmm">${"MTWTFSS".split("").map((x) => `<span class="muted">${x}</span>`).join("")}${[...Array(42)].map((_, i) => { const dd = addD(st, i), kk = iso(dd); return `<button class="${dd.getMonth() !== m0.getMonth() ? "o" : ""} ${kk === k ? "sel" : ""} ${kk === iso(t) ? "td" : ""}" data-dpick="${kk}">${dd.getDate()}</button>`; }).join("")}</div><button class="link tiny" data-go="planner">← Month view</button></div>`; })();
+    const nowM = nowMin(), cols = data.map(([dk, x]) => `<div class="dcol ${dk === iso(t) ? "istoday" : ""}" data-dk="${dk}">${[...Array(48)].map((_, i) => `<div class="hslot ${i % 2 ? "" : "hr"}" data-slot="${dk}|${minToT(i * 30)}"></div>`).join("")}${x.items.map((it) => blkHTML(it, dk)).join("")}${dk === iso(t) ? `<div class="nowline" style="top:${(nowM / 30) * SLOT}px"></div>` : ""}</div>`).join("");
+    const tcol = `<div class="tcol">${[...Array(24)].map((_, h) => `<div class="tl" style="height:${SLOT * 2}px">${fmtT(minToT(h * 60)).replace(":00", "")}</div>`).join("")}</div>`;
+    const tcol2 = tz2 ? `<div class="tcol t2">${[...Array(24)].map((_, h) => `<div class="tl" style="height:${SLOT * 2}px">${fmtT(msToWall(wallToMs(days[0], minToT(h * 60), HOME()), tz2).t).replace(":00", "")}</div>`).join("")}</div>` : "";
+    const heads = `<div class="dhead" style="grid-template-columns:${tz2 ? "52px " : ""}52px repeat(${days.length},minmax(0,1fr))">${tz2 ? `<span class="tiny muted c">${E(zoneName(tz2))}</span>` : ""}<span class="tiny muted c">${E(zoneName(HOME()))}</span>${data.map(([dk, x]) => `<div class="dh ${dk === iso(t) ? "td" : ""}">${wk ? `<button class="link" data-dpick="${dk}" data-dvday>${fmt(parseISO(dk), { weekday: "short" })} <b>${parseISO(dk).getDate()}</b></button>` : ""}<div class="dstrip">${x.strip.map((it) => `<button class="chip ${it.src === "g" ? "c-gcal" : it.src === "task" ? "c-task" : "c-ev"}" ${it.src === "g" ? `data-gev="${E(it.id)}"` : it.src === "task" ? `data-tedit="${E(it.id)}"` : it.src === "ev" ? `data-sedit="${E(it.id)}"` : ""}>${E(it.title)}</button>`).join("")}</div></div>`).join("")}</div>`;
+    return `${head(wk ? "Week" : "Day", E(title), nav)}${phone ? strip7 : ""}<div class="dwrap ${phone || wk ? "" : "withmini"}">${phone || wk ? "" : mm}
+      <section class="card dcard">${heads}<div class="dgrid" id="dgrid"><div class="dbody" style="grid-template-columns:${tz2 ? "52px " : ""}52px repeat(${days.length},minmax(0,1fr));height:${SLOT * 48}px">${tcol2}${tcol}${cols}</div></div>
+      <span class="tiny muted">Tap an empty slot to add · tap a block to open it · drag a block (or its ⋮⋮ grip on a phone) to move it, or its bottom edge to change its length. Google Calendar items open in Google to change.</span></section></div>`;
+  };
+  let lastW = window.innerWidth; window.addEventListener("resize", () => { if (route === "day" && (lastW < 760) !== (window.innerWidth < 760)) MP.render(); lastW = window.innerWidth; });
+  /* scroll the grid to 9 am, or to now on today, the first time a date is shown */
+  const dayScroll = () => { const g = document.getElementById("dgrid"); if (!g || view.dscr === view.dayK + view.dv) return; view.dscr = view.dayK + view.dv; const k = view.dayK || iso(today()), m = k === iso(today()) || view.dv === "week" ? Math.max(0, nowMin() - 90) : 9 * 60; g.scrollTop = (m / 30) * SLOT; };
+  /* applying a change: one date only, or the whole series */
+  let pend = null;
+  const scopeAsk = (p) => { pend = p; modal(`<h2>${p.del ? "Delete" : "Change"} a repeating item</h2><p class="small">“${E(p.title)}” repeats. ${p.del ? "Delete" : "Change"} it for:</p><div class="stack"><button class="btn" data-scope="one">This occurrence (${fmt(parseISO(p.k), { weekday: "short", day: "numeric", month: "short" })} only)</button><button class="btn ghost" data-scope="all">The entire series</button><button class="btn ghost" data-close>Cancel</button></div>`); };
+  async function evPush(eid) {
+    const e = MP.S.events[eid], s2 = MP.S.sent["ev-" + eid]; if (!e || mode !== "google" || !s2 || s2.del) return;
+    try { const tell = (e.guests || []).length ? (window.confirm("Send the new time to your guests?") ? "all" : "none") : "none"; await G.calPatch(s2.id, buildEv(e), evQs(e, tell)); } catch (er) { MP.toast("Saved here, but Google Calendar said: " + er.message); }
+  }
+  const evTimes = (e, k, s, en) => { const o = { d: k, time: minToT(s), end: en > s ? minToT(Math.min(en, 1439)) : "" }; if (e.tz) { const a = msToWall(wallToMs(k, o.time, HOME()), e.tz); o.tzD = a.d; o.tzT = a.t; o.tzEnd = o.end ? msToWall(wallToMs(k, o.end, HOME()), e.tz).t : ""; } return o; };
+  function evOccurrence(id, k, patch, del) {
+    const e = MP.S.events[id]; if (!e) return; e.skip = [...new Set([...(e.skip || []), k])]; e.u = Date.now();
+    if (!del) { const c = Object.assign({}, e, { d: k, rep: "", repDays: [], repEnd: "", repUntil: "", repCount: "", from: id }, patch); delete c.skip; delete c.u; putRec("events", uid(), c); }
+    MP.changed(); MP.render(); MP.toast(MP.S.sent["ev-" + id] && !MP.S.sent["ev-" + id].del ? "Changed for this day only. Google Calendar still shows the usual time that day; change it there too if you need to." : "Changed for this day only");
+  }
+  function applyScope(which) {
+    const p = pend; pend = null; closeModal(); if (!p) return;
+    if (p.src === "tt") {
+      if (which === "one") { const r = dayRec(p.k); r.tto = r.tto || {}; r.tto[p.id] = p.del ? { del: 1 } : Object.assign({}, (r.tto[p.id] || {}), p.patch); touchDay(p.k); MP.toast(p.del ? "Removed for this day only" : "Changed for this day only"); }
+      else if (p.del) { ["timetable", "weekend"].forEach((kk) => { if (Array.isArray(P()[kk])) P()[kk] = P()[kk].filter((r) => r.id !== p.id); }); touchP(); MP.toast("Removed from every day"); }
+      else { Object.keys(p.patch).forEach((f) => setTT(p.id, f, p.patch[f])); MP.toast("Changed for every day"); }
+    } else if (p.src === "ev") {
+      if (which === "one") { const pt = Object.assign({}, p.full || p.patch); ["rep", "repDays", "repEnd", "repUntil", "repCount"].forEach((f) => delete pt[f]); return evOccurrence(p.id, p.k, Object.assign(pt, { d: p.k }), p.del); }
+      if (p.del) { const key = "ev-" + p.id, s2 = MP.S.sent[key]; if (s2 && !s2.del && mode === "google") G.calDelete(s2.id).catch(() => {}); if (s2 && !s2.del) MP.S.sent[key] = { del: 1, u: Date.now() }; delRec("events", p.id); }
+      else { const e = MP.S.events[p.id], keepD = e.d, keepTz = e.tzD; if (p.full) { Object.assign(e, p.full); } else { Object.assign(e, p.patch); e.d = keepD; if (keepTz) e.tzD = keepTz; } e.u = Date.now(); MP.changed(); evPush(p.id); }
+    }
+    MP.render();
+  }
+  /* routine block from the day page: view / edit / delete */
+  function rtDialog(id, k) {
+    const r = ttFor(parseISO(k)).find((x) => x.id === id); if (!r) return;
+    modal(`<div class="between"><h2>${E(r.text)}</h2><button class="tool" data-close aria-label="Close">✕</button></div><span class="small muted">Part of your daily routine${r.chg ? " · changed for this day" : ""}</span>
+      <div class="grid g2"><label class="stack small">Start<input class="f" type="time" id="rts" value="${E(r.start || "")}"></label><label class="stack small">End<input class="f" type="time" id="rte" value="${E(r.end || "")}"></label></div>
+      <label class="stack small">What<input class="f" id="rtt" maxlength="120" value="${E(r.text)}"></label>
+      ${isAct(r) ? `<label class="stack small">Activity type${sel('id="rta"', actNames(), actOf(r))}</label>` : ""}
+      <div class="row" style="justify-content:flex-end"><button class="btn ghost danger" data-rtdel="${E(id)}|${k}">Delete</button>${isAct(r) && k === iso(today()) ? `<button class="btn ghost" data-tstart="${E(id)}">Start timer</button>` : ""}<button class="btn ghost" data-close>Cancel</button><button class="btn" data-rtsave="${E(id)}|${k}">Save</button></div>`);
+  }
+  /* dragging blocks: mouse or S Pen anywhere on a block; finger on the ⋮⋮ grip (so the page still scrolls) */
+  let bd = null;
+  document.addEventListener("pointerdown", (e) => {
+    const b = e.target.closest(".blk"); if (!b || route !== "day" || b.dataset.bsrc === "g") return;
+    const rz = !!e.target.closest(".rz"), grip = !!e.target.closest(".grip");
+    if (e.pointerType === "touch" && !rz && !grip) return;
+    bd = { el: b, rz, src: b.dataset.bsrc, id: b.dataset.bid, k: b.dataset.bk, s: +b.dataset.bs, e: +b.dataset.be, y0: e.clientY, x0: e.clientX, moved: false, nk: b.dataset.bk, ns: +b.dataset.bs, ne: +b.dataset.be, pid: e.pointerId };
+    if (rz || grip || e.pointerType !== "touch") { try { b.setPointerCapture(e.pointerId); } catch (er) {} }
+    if (rz || grip) e.preventDefault();
+  });
+  document.addEventListener("pointermove", (e) => {
+    if (!bd) return; const dy = e.clientY - bd.y0, dx = e.clientX - bd.x0;
+    if (!bd.moved && Math.hypot(dx, dy) < 5) return; bd.moved = true; e.preventDefault();
+    const dm = Math.round((dy / SLOT) * 2) * 15;
+    if (bd.rz) { bd.ne = Math.max(bd.s + 15, Math.min(1440, bd.e + dm)); bd.el.style.height = ((bd.ne - bd.s) / 30) * SLOT - 2 + "px"; }
+    else {
+      const len = bd.e - bd.s; bd.ns = Math.max(0, Math.min(1440 - len, bd.s + dm)); bd.ne = bd.ns + len; bd.el.style.top = (bd.ns / 30) * SLOT + "px";
+      bd.el.style.pointerEvents = "none"; const u = document.elementFromPoint(e.clientX, e.clientY), col = u && u.closest(".dcol"); bd.el.style.pointerEvents = "";
+      if (col && col.dataset.dk !== bd.nk) { bd.nk = col.dataset.dk; col.appendChild(bd.el); }
+    }
+    bd.el.classList.add("dragging"); const sp = bd.el.querySelector("span:not(.grip)"); if (sp) sp.textContent = fmtT(minToT(bd.ns)) + "–" + fmtT(minToT(Math.min(bd.ne, 1439)));
+  });
+  document.addEventListener("pointerup", () => {
+    if (!bd) return; const x = bd; bd = null;
+    if (!x.moved) { if (x.src === "tt") return rtDialog(x.id, x.k); if (x.src === "ev") return schedDialog(x.id); if (x.src === "task") return taskDialog(x.id); return; }
+    if (x.ns === x.s && x.ne === x.e && x.nk === x.k) return MP.render();
+    blockMoved(x);
+  });
+  document.addEventListener("pointercancel", () => { if (bd) { bd = null; MP.render(); } });
+  /* tap an empty half-hour: the full Add / schedule form, date and times filled in (like Outlook) */
+  document.addEventListener("click", (e) => { const sl = e.target.closest("[data-slot]"); if (!sl || route !== "day") return; const [sk, st] = sl.dataset.slot.split("|"); schedDialog(null, { kind: "event", d: sk, time: st, end: minToT(Math.min(tMin(st) + 30, 1439)) }); });
+  function blockMoved(x) {
+    if (x.src === "task") { const t = MP.S.tasks[x.id]; if (!t || !t.cal) return MP.render(); t.cal = { d: x.nk, t: minToT(x.ns) }; t.u = Date.now(); MP.changed(); MP.render(); MP.toast("Moved to " + fmtT(minToT(x.ns))); return taskCalSync(x.id); }
+    if (x.src === "tt") {
+      if (x.nk !== x.k) { MP.toast("Routine blocks move within their own day. Use Timetable to change other days."); return MP.render(); }
+      const r = ttFor(parseISO(x.k)).find((y) => y.id === x.id); MP.render();
+      return scopeAsk({ src: "tt", id: x.id, k: x.k, title: r ? r.text : "", patch: { start: minToT(x.ns), end: minToT(Math.min(x.ne, 1439)) } });
+    }
+    if (x.src === "ev") {
+      const e = MP.S.events[x.id]; if (!e) return MP.render(); const patch = evTimes(e, x.nk, x.ns, x.ne);
+      if (e.rep) { if (x.nk !== x.k) { MP.render(); return evOccurrence(x.id, x.k, Object.assign(patch, { d: x.nk })); } MP.render(); return scopeAsk({ src: "ev", id: x.id, k: x.k, title: e.t, patch }); }
+      Object.assign(e, patch); e.u = Date.now(); MP.changed(); MP.render(); MP.toast("Moved to " + fmt(parseISO(x.nk), { weekday: "short", day: "numeric" }) + ", " + fmtT(minToT(x.ns))); evPush(x.id);
+    }
+  }
 
   V.planner = () => {
     const m = view.pm || (view.pm = new Date(today().getFullYear(), today().getMonth(), 1)), y = m.getFullYear(), t = today();
@@ -908,7 +1029,7 @@
 
   function shell() {
     const inApp = mode !== "signin" && P().setupDone;
-    document.getElementById("side").innerHTML = inApp ? `<div class="brand">My <span>Planner</span></div>${statusPill()}<button class="navbtn navadd" data-sched>${ic("plus")}Add / schedule</button>` + SCREENS.filter((s) => shownScreen(s[0])).map((s) => `<button class="navbtn ${route === s[0] ? "on" : ""}" data-go="${s[0]}">${ic(s[0])}${s[1]}</button>${s[0] === "study" ? actNav() : ""}`).join("") : "";
+    document.getElementById("side").innerHTML = inApp ? `<div class="brand">My <span>Planner</span></div>${statusPill()}<button class="navbtn navadd" data-sched>${ic("plus")}Add / schedule</button>` + SCREENS.filter((s) => shownScreen(s[0])).map((s) => `<button class="navbtn ${route === s[0] || (route === "day" && s[0] === "planner") ? "on" : ""}" data-go="${s[0]}">${ic(s[0])}${s[1]}</button>${s[0] === "study" ? actNav() : ""}`).join("") : "";
     const quick = [["today", "Today"], ["planner", "Planner"], ["habits", "Habits"], ["todo", "To-Do"], ["more", "More"]];
     document.getElementById("bottom").innerHTML = inApp ? quick.map((q) => `<button class="${route === q[0] || (q[0] === "more" && !quick.some((x) => x[0] === route)) ? "on" : ""}" data-go="${q[0]}">${ic(q[0], 22)}${q[1]}</button>`).join("") : "";
     document.getElementById("sheetin").innerHTML = `<button class="navbtn navadd" data-sched>${ic("plus", 22)}Add / schedule</button>` + SCREENS.filter((s) => shownScreen(s[0])).map((s) => `<button class="navbtn ${route === s[0] ? "on" : ""}" data-go="${s[0]}">${ic(s[0], 22)}${s[1]}</button>${s[0] === "study" ? actNav() : ""}`).join("");
@@ -960,6 +1081,7 @@
     const top = mode === "google" ? `<div class="mobstatus">${statusPill()}</div>` : `<div class="mobstatus">${statusPill()}</div>`;
     main.innerHTML = top + (isLocked(route) ? lockHTML() : (V[route] || V.today)());
     MP.setupPads();
+    if (route === "day") dayScroll();
     document.querySelectorAll("[data-printink]").forEach(drawPrintInk);
     miniPlayer();
   };
@@ -1158,7 +1280,7 @@
   };
   /* does event e happen on date k (handles repeats)? */
   const occurs = (e, k) => {
-    if (!e || !e.d || k < e.d) return false; if (e.d === k) return true;
+    if (!e || !e.d || k < e.d) return false; if (Array.isArray(e.skip) && e.skip.includes(k)) return false; if (e.d === k) return true;
     if (!e.rep || !repMatch(e, k)) return false;
     if (e.repEnd === "until" && e.repUntil && k > e.repUntil) return false;
     if (e.repEnd === "count" && +e.repCount > 0) { let c = 0; for (let dt = parseISO(e.d), i = 0; i < 4000; i++, dt = addD(dt, 1)) { const dk = iso(dt); if (dk === e.d || repMatch(e, dk)) c++; if (dk === k) return c <= +e.repCount; } return false; }
@@ -1300,6 +1422,7 @@
       putRec("tasks", tid, Object.assign({ b: "", done: false }, prev, { t: title.slice(0, 160), due: d, urg: pri === "urgent" || pri === "high", imp: pri !== "low" }));
       rec.tid = tid;
     }
+    if (route === "day" && id && old.rep && rec.rep && (old.time !== rec.time || old.end !== rec.end || old.t !== rec.t || old.pri !== rec.pri || old.note !== rec.note)) { const full = Object.assign({}, rec, { d: old.d }); return scopeAsk({ src: "ev", id, k: view.dayK || iso(today()), title: old.t, patch: rec, full }); }
     putRec("events", eid, rec); closeModal(); MP.render();
     MP.toast(id ? "Saved" : kind === "task" ? "Added to Today and your To-Do list" : "Added to your schedule");
     if (rem !== "" && time && "Notification" in window && Notification.permission === "default") { try { Notification.requestPermission(); } catch (er) {} }
@@ -1373,6 +1496,12 @@
     if (d.wipe !== undefined) return wipeDialog();
     if (d.dowipe !== undefined) return doWipe();
     if (d.menup) { P().menu = d.menup === "simple" ? menuSimple() : { preset: "full", hide: {} }; touchP(); MP.render(); MP.toast(d.menup === "simple" ? "Simple menu" : "Full menu: every screen shown"); return; }
+    if (d.dnav !== undefined) { const step = view.dv === "week" ? (window.innerWidth < 760 ? 3 : 7) : 1; view.dayK = +d.dnav === 0 ? iso(today()) : iso(addD(parseISO(view.dayK || iso(today())), +d.dnav * step)); view.dscr = ""; return MP.render(); }
+    if (d.dvw) { view.dv = d.dvw; view.dscr = ""; return MP.render(); }
+    if (d.dpick) { view.dayK = d.dpick; if (d.dvday !== undefined) view.dv = "day"; view.dscr = ""; return MP.render(); }
+    if (d.scope) return applyScope(d.scope);
+    if (d.rtsave) { const [rid, rk] = d.rtsave.split("|"), r = ttFor(parseISO(rk)).find((x) => x.id === rid); if (!r) return; const patch = {}; const st = field("rts"), en = field("rte"), tx = field("rtt").slice(0, 120); if (st && st !== r.start) patch.start = st; if (en !== (r.end || "")) patch.end = en; if (tx && tx !== r.text) patch.text = tx; const ra = field("rta"); if (ra && isAct(r) && ra !== actOf(r)) { if (ra === "Study") { patch.type = "Study"; } else { patch.type = "Activity"; patch.act = ra; } } if (!Object.keys(patch).length) return closeModal(); return scopeAsk({ src: "tt", id: rid, k: rk, title: r.text, patch }); }
+    if (d.rtdel) { const [rid, rk] = d.rtdel.split("|"), r = ttFor(parseISO(rk)).find((x) => x.id === rid); return scopeAsk({ src: "tt", id: rid, k: rk, title: r ? r.text : "", del: true }); }
     if (d.qsave !== undefined) return quickSave(false);
     if (d.qfix !== undefined) return quickSave(true);
     if (d.gev) return gcalDialog(d.gev);
@@ -1402,6 +1531,7 @@
     if (d.sched !== undefined) { document.getElementById("sheet").classList.remove("on"); return schedDialog(null, d.sched ? { d: d.sched } : null); }
     if (d.sedit) return schedDialog(d.sedit);
     if (d.ssave !== undefined) return schedSave(d.ssave || null);
+    if (d.sdel && route === "day" && MP.S.events[d.sdel] && MP.S.events[d.sdel].rep) return scopeAsk({ src: "ev", id: d.sdel, k: view.dayK || iso(today()), title: MP.S.events[d.sdel].t, del: true });
     if (d.sdel) { const ev = MP.S.events[d.sdel], key = "ev-" + d.sdel, s2 = MP.S.sent[key]; if (s2 && !s2.del && mode === "google") { const tell = ev && (ev.guests || []).length ? window.confirm("Tell your guests the meeting is cancelled?") : false; G.calDelete(s2.id, tell ? "sendUpdates=all" : "sendUpdates=none").catch(() => {}); } if (s2 && !s2.del) MP.S.sent[key] = { del: 1, u: Date.now() }; delRec("events", d.sdel); closeModal(); MP.render(); MP.toast(ev && ev.tid ? "Deleted (the To-Do task stays)" : "Deleted"); return; }
     if (d.cal) return calDialog(d.cal);
     if (d.calgo) return calSend(d.calgo);
@@ -1477,7 +1607,7 @@
     if (d.wnext !== undefined) { if (wiz.step === 1) { wiz.name = field("wname"); if (!wiz.name) { MP.toast("Please add a name"); return; } } if (wiz.step < 4) { wiz.step++; return MP.render(); } return finishSetup(); }
     if (d.wback !== undefined) { wiz.step = Math.max(1, wiz.step - 1); return MP.render(); }
     if (d.print !== undefined) { window.print(); return; }
-    if (d.day) return dayDialog(d.day);
+    if (d.day) { view.dayK = d.day; view.dv = view.dv || "day"; view.dscr = ""; return go("day"); }
     if (d.hgo) { closeModal(); view.hist = d.hgo; return go("history"); }
     if (d.hsearch !== undefined) { view.q = field("hq"); return MP.render(); }
     if (d.backup !== undefined) { download(`my-planner-backup-${iso(today())}.json`, JSON.stringify(MP.S), "application/json"); return MP.toast("Backup downloaded. Keep it somewhere private."); }
@@ -1581,7 +1711,7 @@
   document.addEventListener("pointercancel", () => { if (drag) { drag.el.remove(); drag = null; MP.render(); } });
 
   /* ---------- start-up ---------- */
-  MP.VERSION = "1.13";
+  MP.VERSION = "1.14";
   if (MP.sound) MP.sound.onchange = () => { miniPlayer(); if (route === "study") MP.render(); };
   /* Public, read-only helpers for future modules and connectors. */
   MP.api = { today, iso, dayPct, studyHours, streak, tasks, feed: () => MP.buildFeed(MP.S), version: MP.VERSION, schemaVersion: MP.SCHEMA_VERSION };

@@ -242,7 +242,19 @@ window.MP_HELP = [
 [
 "○ Purnima and ● Amavasya (Hindu calendar, tithi at sunrise, New Delhi).",
 "✦ Portal days (1/1, 11:11, 8/8 Lion’s Gate and more).",
-"✿ Birthdays and ♥ anniversaries, your events, and study hours on past days."
+"✿ Birthdays and ♥ anniversaries, your events, Google Calendar events, and activity hours on past days."
+]
+],
+[
+"steps",
+[
+"Tap any date to open its Day page: a half-hour grid like Outlook's Day view, opening at 9 am (or now, for today). Things with no time (to-dos, birthdays, Purnima) sit in a strip at the top.",
+"Switch between Day and Week (7 days on a laptop, 3 on a phone). Use ‹ › or the small month to move around.",
+"Tap an empty half-hour to add something there: the full Add / schedule form opens with the date and times filled in.",
+"Tap any block to open it and edit it. Google Calendar items open with a link to change them in Google.",
+"Drag a block to move it (on a phone, drag its ⋮⋮ grip so the page still scrolls), or drag its bottom edge to make it longer or shorter. Blocks snap to 15 minutes.",
+"For anything that repeats (your routine, a weekly meeting) you're asked: This occurrence (that day only, shown with a dashed outline and 'changed') or The entire series.",
+"Settings → Second time zone adds another column of times beside India time."
 ]
 ],
 [

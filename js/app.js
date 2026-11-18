@@ -223,6 +223,66 @@
   }
   const moveAll = () => `<span class="row" style="gap:6px"><button class="btn ghost sm" data-tmove="0">Move all to today</button><button class="btn ghost sm" data-tmove="1">Move all to tomorrow</button></span>`;
   /* Today: the whole list. Overdue first, then today's tasks; anything ticked today stays, struck through, until midnight. */
+  /* ---------- Time picker (1.16): tap a time box → hour and minute with ▲▼ (hold to repeat), scroll or swipe on them, AM/PM ---------- */
+  let tp = null;
+  const tpClose = () => { if (tp) { tp.box.remove(); tp = null; } };
+  function tpOpen(inp) {
+    tpClose(); const v = inp.value || minToT(Math.ceil(nowMin() / 5) * 5 % 1440), m = tMin(v);
+    tp = { inp, h: Math.floor(m / 60), mi: m % 60, box: document.createElement("div") };
+    tp.box.className = "tpick"; tp.box.setAttribute("role", "dialog"); tp.box.setAttribute("aria-label", "Pick a time");
+    const draw = () => { const h12 = tp.h % 12 || 12; tp.box.innerHTML = `<div class="tpcols"><div class="tpc" data-tpw="h"><button type="button" data-tps="h|1" aria-label="Hour up">▲</button><b>${h12}</b><button type="button" data-tps="h|-1" aria-label="Hour down">▼</button></div><span class="tpsep">:</span><div class="tpc" data-tpw="m"><button type="button" data-tps="m|5" aria-label="Minutes up">▲</button><b>${String(tp.mi).padStart(2, "0")}</b><button type="button" data-tps="m|-5" aria-label="Minutes down">▼</button></div><div class="tpap"><button type="button" class="${tp.h < 12 ? "on" : ""}" data-tpap="am">AM</button><button type="button" class="${tp.h >= 12 ? "on" : ""}" data-tpap="pm">PM</button></div></div>
+      <div class="tpquick">${[0, 15, 30, 45].map((q) => `<button type="button" data-tpq="${q}">:${String(q).padStart(2, "0")}</button>`).join("")}</div><div class="row" style="justify-content:space-between"><button type="button" class="link tiny" data-tpclear>Clear</button><span class="row" style="gap:6px"><button type="button" class="btn ghost sm" data-tpcancel>Cancel</button><button type="button" class="btn sm" data-tpok>Done</button></span></div>`; };
+    tp.draw = draw; draw(); document.body.appendChild(tp.box);
+    const r = inp.getBoundingClientRect(), bw = 250, left = Math.min(window.innerWidth - bw - 8, Math.max(8, r.left)), top = r.bottom + 230 > window.innerHeight ? Math.max(8, r.top - 230) : r.bottom + 6;
+    Object.assign(tp.box.style, { left: left + "px", top: top + "px" });
+  }
+  const tpStep = (w, n) => { if (!tp) return; if (w === "h") tp.h = (tp.h + n + 24) % 24; else { let t2 = tp.h * 60 + tp.mi + n; t2 = (t2 + 1440) % 1440; if (Math.abs(n) === 5) t2 = Math.round(t2 / 5) * 5 % 1440; tp.h = Math.floor(t2 / 60); tp.mi = t2 % 60; } tp.draw(); };
+  const tpSet = (val) => { const inp = tp.inp; tpClose(); inp.value = val; if (inp.dataset.ttf) inp.dataset.tpset = "1"; inp.dispatchEvent(new Event("input", { bubbles: true })); inp.dispatchEvent(new Event("change", { bubbles: true })); };
+  /* tapping a time box opens the picker instead of the phone's clock; typing with a keyboard still works */
+  document.addEventListener("pointerdown", (e) => { const inp = e.target.closest && e.target.closest('input[type="time"]'); if (!inp || inp.disabled) return; e.preventDefault(); tpOpen(inp); }, true);
+  document.addEventListener("click", (e) => { if (e.target.closest && e.target.closest('input[type="time"]')) e.preventDefault(); }, true);
+  let tpRep = null; const tpStop = () => { clearTimeout(tpRep); clearInterval(tpRep); tpRep = null; };
+  document.addEventListener("pointerdown", (e) => { const b = e.target.closest && e.target.closest("[data-tps]"); if (!b || !tp) return; e.preventDefault(); const [w, n] = b.dataset.tps.split("|"); tpStep(w, +n); tpRep = setTimeout(() => { tpRep = setInterval(() => tpStep(w, +n), 90); }, 400); });
+  ["pointerup", "pointercancel", "pointerleave"].forEach((ev) => document.addEventListener(ev, tpStop));
+  document.addEventListener("wheel", (e) => { const c = e.target.closest && e.target.closest("[data-tpw]"); if (!c || !tp) return; e.preventDefault(); tpStep(c.dataset.tpw, c.dataset.tpw === "h" ? (e.deltaY < 0 ? 1 : -1) : (e.deltaY < 0 ? 5 : -5)); }, { passive: false });
+  let tpY = null; document.addEventListener("touchstart", (e) => { const c = e.target.closest && e.target.closest("[data-tpw]"); tpY = c && tp ? [c.dataset.tpw, e.touches[0].clientY] : null; }, { passive: true });
+  document.addEventListener("touchmove", (e) => { if (!tpY) return; const dy = e.touches[0].clientY - tpY[1]; if (Math.abs(dy) >= 18) { tpStep(tpY[0], tpY[0] === "h" ? (dy < 0 ? 1 : -1) : (dy < 0 ? 5 : -5)); tpY[1] = e.touches[0].clientY; } e.preventDefault(); }, { passive: false });
+  document.addEventListener("click", (e) => {
+    if (!tp) return; const b = e.target.closest("button"); if (!tp.box.contains(e.target)) { if (!e.target.closest('input[type="time"]')) tpClose(); return; }
+    if (!b) return; const dd = b.dataset;
+    if (dd.tpap) { if (dd.tpap === "am" && tp.h >= 12) tp.h -= 12; if (dd.tpap === "pm" && tp.h < 12) tp.h += 12; tp.draw(); }
+    if (dd.tpq !== undefined) { tp.mi = +dd.tpq; tp.draw(); }
+    if (dd.tpok !== undefined) tpSet(minToT(tp.h * 60 + tp.mi));
+    if (dd.tpclear !== undefined) tpSet("");
+    if (dd.tpcancel !== undefined) tpClose();
+  });
+  document.addEventListener("keydown", (e) => { if (tp && e.key === "Escape") tpClose(); if (tp && e.key === "Enter") tpSet(minToT(tp.h * 60 + tp.mi)); });
+
+  /* ---------- Set up your planner (1.16): a checklist on Today until the menu has been chosen ---------- */
+  const SETUP_STEPS = () => [
+    ["menu", "Choose your menu", "Pick Simple or Full, or tick only the screens you use. Hidden screens keep their data.", "menu", !!(P().menu && P().menu.chosen)],
+    ["acts", "Your activities", "Check the activity types (Study, Work, Meditation…) and link them to habits.", "acts", !!(P().setupSeen || {}).acts],
+    ["rit", "Plan my day and Shut down", "Choose whether they appear, and the time of the evening reminder.", "rit", !!(P().setupSeen || {}).rit],
+    ...(mode === "google" ? [["gcal", "Google Calendar", "Show your Google Calendar inside the planner.", "gcal", !!(P().gcal && P().gcal.on !== undefined) || !!(P().setupSeen || {}).gcal]] : []),
+    ["lock", "Journal lock (optional)", "Lock Journal, Mood, 3-6-9 and History with a PIN.", "lock", !!P().lock || !!(P().setupSeen || {}).lock]
+  ];
+  function setupCard() {
+    const st = SETUP_STEPS(), menuDone = st[0][4], left = st.filter((x) => !x[4]).length;
+    if (menuDone && (P().setupSeen || {}).hidden) return ""; if (!left) return "";
+    return `<section class="card stack setupcard mb"><div class="between wrap"><span class="lab">Set up your planner · ${st.length - left} of ${st.length} done</span>${menuDone ? `<button class="link tiny" data-setuphide>Hide this</button>` : `<span class="tiny over">Please choose your menu</span>`}</div>
+      ${st.map(([id, ttl, txt, anchor, done]) => `<div class="between wrap small setuprow ${done ? "done" : ""}"><span style="flex:1;min-width:180px"><b>${done ? "✓ " : ""}${E(ttl)}</b><br><span class="tiny muted">${E(txt)}</span></span>${done ? "" : `<button class="btn ${id === "menu" ? "" : "ghost"} sm" data-setupgo="${anchor}">${id === "menu" ? "Choose now" : "Open"}</button>`}</div>`).join("")}</section>`;
+  }
+  /* settings opens at the right card, highlighted */
+  const setupFocus = () => { const a = view.sAnchor; if (!a || route !== "prefs") return; view.sAnchor = ""; const el = document.getElementById("set-" + a); if (el) { el.scrollIntoView({ block: "center" }); el.classList.add("flash"); setTimeout(() => el.classList.remove("flash"), 2600); } if ((P().setupSeen || {})[a] === undefined && a !== "menu") { P().setupSeen = Object.assign({}, P().setupSeen, { [a]: true }); touchP(); } };
+  /* people who used the planner before 1.16: a one-time prompt to choose their menu */
+  let menuAsked = false;
+  function maybeMenuPrompt() {
+    if (menuAsked || route !== "today" || !P().setupDone || (P().menu && P().menu.chosen) || mode === "signin") return; menuAsked = true;
+    try { if (sessionStorage.getItem("mp-menuask")) return; sessionStorage.setItem("mp-menuask", "1"); } catch (e) {}
+    setTimeout(() => { if (document.getElementById("modal").classList.contains("on")) return; modal(`<h2>Choose the screens you see</h2><p class="small">My Planner has many screens. Pick the ones you use and hide the rest; nothing is deleted, and you can change it any time in Settings → Menu.</p>
+      <div class="stack"><button class="btn" data-menup="simple" data-menuclose>Simple: Today, Planner, To-Do, Activity, Habits, Journal, Settings, Help</button><button class="btn ghost" data-menup="full" data-menuclose>Full: show everything</button><button class="btn ghost" data-setupgo="menu">Let me pick the screens</button><button class="link tiny" data-close>Ask me later</button></div>`); }, 900);
+  }
+
   /* ---------- Plan my day and Shut down (1.15) ---------- */
   const RIT = () => P().ritual || { plan: true, shut: true, at: "21:30" };
   const ritSet = (o) => { P().ritual = Object.assign({}, RIT(), o); touchP(); };
@@ -320,6 +380,28 @@
       ${G.today.length ? `<div class="ttable">${taskHead()}${G.today.map(taskRow).join("")}</div>` : ""}${G.today.length ? "" : '<span class="small muted">Nothing for today. Tap Task to add one.</span>'}</section>`;
   }
   /* Post-its: pinned tasks only, coloured by priority; write on them with the S Pen; drag the handle to reorder. */
+  /* 1.16: post-its float over every screen (top right by default). Drag one anywhere by its top bar; positions are kept per device. */
+  const PP = () => { try { return JSON.parse(localStorage.getItem("mp-postpos") || "{}"); } catch (e) { return {}; } };
+  const PPsave = (o) => { try { localStorage.setItem("mp-postpos", JSON.stringify(o)); } catch (e) {} };
+  function postitLayer() {
+    let L = document.getElementById("postlayer"); if (!L) { L = document.createElement("div"); L.id = "postlayer"; document.body.appendChild(L); }
+    const inApp = mode !== "signin" && P().setupDone && route !== "day";
+    const k = iso(today()), T = inApp ? tasks().filter((t) => t.pin && (!t.done || (t.doneAt && dayOf(t.doneAt) === k))).sort((a, b) => (a.pinO || 0) - (b.pinO || 0)).slice(0, 8) : [];
+    if (!T.length) { L.innerHTML = ""; return; }
+    const pos = PP(), small = window.innerWidth < 700, col = (localStorage.getItem("mp-postcol") || (small ? "1" : "")) === "1", W = small ? 150 : 180;
+    if (col) { L.innerHTML = `<button class="postchip" data-postcol="0" title="Show your post-its">📌 ${T.length}</button>`; return; }
+    L.innerHTML = `<button class="postchip on" data-postcol="1" title="Tuck the post-its away">📌 ${T.length} · hide</button>` + T.map((t, i) => {
+      const p = pos[t.id], x = p ? Math.min(Math.max(0, p.x * window.innerWidth), window.innerWidth - W) : window.innerWidth - W - 16 - (small ? (i % 2) * (W + 10) : (i % 2) * 14), y = p ? Math.min(Math.max(50, p.y * window.innerHeight), window.innerHeight - 90) : 58 + (small ? Math.floor(i / 2) : i) * 132, ink = ((MP.S.ink["postit-" + t.id] || {}).s || []).length;
+      return `<div class="pfloat p${tPri(t)} ${t.done ? "done" : ""}" data-pid="${E(t.id)}" style="left:${x}px;top:${y}px;width:${W}px;--r:${((t.id.charCodeAt(0) + i) % 5) - 2}deg;z-index:${(p && p.z) || 10 + i}">
+        <div class="pbar" title="Drag to move"><span class="row" style="gap:2px"><button class="tool" data-pnote="${E(t.id)}" title="Write on it" aria-label="Write on this post-it">${ic("penm", 14)}</button><input type="checkbox" class="cb sm" data-done="${E(t.id)}" ${t.done ? "checked" : ""} aria-label="Done"></span><button class="tool" data-tpin="${E(t.id)}" title="Unpin" aria-label="Unpin">✕</button></div>
+        <button class="ptext" data-tedit="${E(t.id)}">${E(t.t)}</button>${ink ? `<canvas class="printink" data-printink="postit-${E(t.id)}" height="70"></canvas>` : ""}</div>`; }).join("");
+    L.querySelectorAll("[data-printink]").forEach(drawPrintInk);
+  }
+  let pdrag = null;
+  document.addEventListener("pointerdown", (e) => { const bar = e.target.closest(".pfloat .pbar"); if (!bar || e.target.closest("button,input")) return; const n = bar.closest(".pfloat"), r = n.getBoundingClientRect(); e.preventDefault(); pdrag = { n, id: n.dataset.pid, dx: e.clientX - r.left, dy: e.clientY - r.top }; n.classList.add("lift"); n.style.zIndex = 60; try { bar.setPointerCapture(e.pointerId); } catch (er) {} });
+  document.addEventListener("pointermove", (e) => { if (!pdrag) return; const x = Math.min(Math.max(0, e.clientX - pdrag.dx), window.innerWidth - pdrag.n.offsetWidth), y = Math.min(Math.max(0, e.clientY - pdrag.dy), window.innerHeight - 40); pdrag.n.style.left = x + "px"; pdrag.n.style.top = y + "px"; });
+  document.addEventListener("pointerup", () => { if (!pdrag) return; const n = pdrag.n, o = PP(), z = Math.max(10, ...Object.values(o).map((v) => v.z || 0)) + 1; o[pdrag.id] = { x: parseFloat(n.style.left) / window.innerWidth, y: parseFloat(n.style.top) / window.innerHeight, z }; PPsave(o); n.classList.remove("lift"); n.style.zIndex = z; pdrag = null; });
+  window.addEventListener("resize", () => { clearTimeout(window._mpPl); window._mpPl = setTimeout(postitLayer, 200); });
   function postitStrip() {
     const k = iso(today()), T = tasks().filter((t) => t.pin && (!t.done || (t.doneAt && dayOf(t.doneAt) === k))).sort((a, b) => (a.pinO || 0) - (b.pinO || 0)).slice(0, 8);
     if (!T.length) return "";
@@ -388,13 +470,13 @@
     if (tv === "journal") return headr + (lockOn() && !unlocked ? `<section class="card stack center"><span class="small">${ic("lock", 16)} Your journal is locked.</span><button class="btn sm" data-go="journal">Unlock</button></section>` : journalSpread());
     const hs = activeHabits().filter((h) => dueOn(h, t) || (h.freq && h.freq.k === "week")), pct = dayPct(t) || 0, tm = moodOf(t);
     const ritBar = `<div class="row ritbar">${!(MP.S.days[k] || {}).plan && RIT().plan !== false && new Date().getHours() < 17 ? `<button class="btn ghost sm" data-planopen>☀ Plan my day</button>` : ""}${new Date().getHours() >= 16 && RIT().shut !== false ? `<button class="btn ${(MP.S.days[k] || {}).shut ? "ghost" : ""} sm" data-shutopen>🌙 ${(MP.S.days[k] || {}).shut ? "Shut down again" : "Shut down my day"}</button>` : ""}${t.getDay() === 0 || t.getDay() === 6 ? `<button class="btn ghost sm" data-go="review">📊 Your weekly review</button>` : ""}</div>`;
-    return headr + whatsNewCard() + ritBar + quickBox() + `<div class="grid g2">
+    return headr + whatsNewCard() + setupCard() + ritBar + quickBox() + `<div class="grid g2">
       <section class="card stack"><div class="between"><span class="lab">Today's affirmation</span>${writeBtns()}</div><p class="quote">“${E(a.text)}”</p><span class="tiny muted">${E(a.src)}</span></section>
       <section class="card hero stack">${sr.length ? (nb ? `<div class="between"><span class="lab inherit">Up next · ${fmtT(nb.start)}</span><span class="tiny" style="opacity:.85">${rowLen(nb)} min</span></div><h2 class="inherit">${E(nb.text)}</h2><span class="small" style="opacity:.85">${E(actOf(nb))}</span>` : `<h2 class="inherit">All activities done today</h2>`) : `<h2 class="inherit">No activities yet</h2><span class="small">Add Activity rows in your Timetable.</span>`}
       <div class="bar"><i style="width:${sr.length ? (doneB / sr.length) * 100 : 0}%"></i></div><div class="between wrap"><span class="small" style="opacity:.9">${doneB} of ${sr.length} blocks · ${hm(am.done)} of ${hm(am.plan)} done</span><button class="btn inv" data-go="study">Timer</button></div></section></div>
       <section class="card stack mt"><div class="between"><span class="lab">Habits today</span><span class="small accb">${hs.filter((h) => (rec.h || {})[h.id] === "d").length} of ${hs.length} · ${Math.round(pct * 100)}%</span></div>
       ${hs.length ? `<div class="row habrow">${hs.map((h) => { const f = h.freq || {}, cnt = f.k === "count" ? `<b class="tiny">${((rec.hn || {})[h.id] || 0)}/${f.n}</b>` : f.k === "week" ? `<b class="tiny">${weekDone(h, t)}/${f.n} wk</b>` : ""; return `<button class="hb" data-h="${E(h.id)}" aria-label="${E(h.name)}: tap to change">${dots((rec.h || {})[h.id] || "e", (rec.h || {})[h.id])}<span>${E(h.name.split(" ")[0])}</span>${cnt}</button>`; }).join("")}</div><span class="tiny muted">Tap a circle: empty → Done (100%) → Partial (50%) → Missed</span>` : `<span class="small muted">No habits yet. <button class="link" data-go="habits">Add habits →</button></span>`}</section>
-      ${schedCard()}${inboxCard()}${postitStrip()}${todoCard()}<div class="grid g2 mt">
+      ${schedCard()}${inboxCard()}${todoCard()}<div class="grid g2 mt">
       <section class="card stack"><div class="between"><span class="lab">Mood check-in</span><button class="link" data-go="mood">Open →</button></div>
       <div class="row">${Object.keys(MOODCOL).map((w) => `<button class="moodbtn" data-moodq="${w}" style="${tm === w ? `background:${MOODCOL[w]};color:#1d1d1d` : ""}">${w}</button>`).join("")}</div>
       <div class="between"><div><div class="lab">Winning streak</div><div class="big">${streak()} days</div></div><div class="row" style="gap:6px">${[...Array(7)].map((_, i) => { const d = addD(monday(t), i), q = dayPct(d), on = q !== null && q >= 0.7; return `<span class="wd"><span class="wdot ${on ? "on" : ""}"></span>${"MTWTFSS"[i]}</span>`; }).join("")}</div></div></section></div>`;
@@ -940,28 +1022,28 @@
     const sh = P().share, acc = mode === "google" && G.user ? E(G.user.email) : "Demo mode · this device only";
     const mp = (P().menu || {}).preset || (P().menu ? "custom" : "full");
     return `${head("Make it yours", "Settings")}
-      <section class="card stack mb"><div class="between wrap"><span class="lab">Menu · choose the screens you see</span><span class="row" style="gap:6px"><button class="btn sm ${mp === "simple" ? "" : "ghost"}" data-menup="simple">Simple</button><button class="btn sm ${mp === "full" ? "" : "ghost"}" data-menup="full">Full</button></span></div>
+      <section class="card stack mb" id="set-menu"><div class="between wrap"><span class="lab">Menu · choose the screens you see</span><span class="row" style="gap:6px"><button class="btn sm ${mp === "simple" ? "" : "ghost"}" data-menup="simple">Simple</button><button class="btn sm ${mp === "full" ? "" : "ghost"}" data-menup="full">Full</button></span></div>
         <div class="row">${SCREENS.filter((x) => x[0] !== "today" && x[0] !== "prefs").map((x) => `<label class="pill row"><input type="checkbox" data-menus="${x[0]}" ${shownScreen(x[0]) ? "checked" : ""}> ${x[1]}</label>`).join("")}</div>
-        <span class="tiny muted">Hidden screens keep all their data; tick them again any time. Today and Settings always stay.</span></section>
-      <section class="card stack mb"><span class="lab">Google Calendar · time zones · meeting links</span>
+        <span class="tiny muted">Hidden screens keep all their data; tick them again any time. Today and Settings always stay.</span>${P().menu && P().menu.chosen ? "" : `<button class="btn sm" data-menukeep style="align-self:flex-start">Keep this menu</button>`}</section>
+      <section class="card stack mb" id="set-gcal"><span class="lab">Google Calendar · time zones · meeting links</span>
         ${mode !== "google" ? '<span class="small muted">Sign in with Google to see your Google Calendar inside the planner.</span>' : G.hasCal ? `<label class="row small"><input type="checkbox" data-gcon ${(P().gcal || {}).on !== false ? "checked" : ""}> Show my Google Calendar inside the planner (Today, Planner, Timetable, day sheets)</label>
           <div class="row small" style="gap:6px">Calendars: <b>${Object.values((P().gcal || {}).cals || { primary: { on: true, name: "Main calendar" } }).filter((v) => v.on).map((v) => E(v.name || "Main calendar")).join(", ")}</b><button class="btn ghost sm" data-gcpick>Choose calendars</button><button class="btn ghost sm" data-gcnow>Refresh now</button></div>`
           : `<div class="row"><button class="btn sm" data-gcconnect>Connect Google Calendar</button></div><span class="tiny muted">Shows the events in your Google Calendar inside the planner. Google will ask you to allow it once.</span>`}
         <span class="tiny muted">Google events are shown on this device only. They are never copied into your My Planner files in Drive, and they never go to Buddy.</span>
         <div class="grid g2"><label class="stack small">Home time zone${sel("data-tzhome", zoneOpts(HOME()), HOME())}</label><label class="stack small">Second time zone on the day page${sel("data-tz2", [["", "None"], ...zoneOpts(P().tz2 || "")], P().tz2 || "")}</label></div>
         <div class="grid g2"><label class="stack small">My Zoom link (optional)<input class="f" type="url" maxlength="300" data-mlink="zoom" value="${E((P().mlinks || {}).zoom || "")}" placeholder="https://zoom.us/j/…"></label><label class="stack small">My Teams link (optional)<input class="f" type="url" maxlength="300" data-mlink="teams" value="${E((P().mlinks || {}).teams || "")}" placeholder="https://teams.microsoft.com/…"></label></div></section>
-      <section class="card stack mb"><span class="lab">Plan my day · Shut down</span>
+      <section class="card stack mb" id="set-rit"><span class="lab">Plan my day · Shut down</span>
         <label class="row small"><input type="checkbox" data-ritplan ${RIT().plan !== false ? "checked" : ""}> Show Plan my day the first time I open the planner each morning</label>
         <label class="row small"><input type="checkbox" data-ritshut ${RIT().shut !== false ? "checked" : ""}> Remind me to shut down my day at <input class="f" type="time" data-ritat value="${E(RIT().at || "21:30")}" style="width:auto"></label>
         ${mode === "google" ? `<label class="row small"><input type="checkbox" data-ritcal ${RIT().cal ? "checked" : ""} ${G.hasCal ? "" : "disabled"}> Also as a daily Google Calendar reminder (rings even when the app is closed)${G.hasCal ? "" : " · connect Google Calendar above first"}</label>` : ""}</section>
-      <section class="card stack mb"><span class="lab">Privacy · journal lock</span>
+      <section class="card stack mb" id="set-lock"><span class="lab">Privacy · journal lock</span>
         ${lockOn() ? `<div class="small">${ic("lock", 14)} On: Journal, Mood, 3-6-9 and History ask for your PIN${bioId() ? " or fingerprint / face" : ""}. They lock again 5 minutes after you leave the app.</div>
         <div class="row">${bioOK() && !bioId() ? `<button class="btn sm" data-bioset>Use fingerprint or face on this device</button>` : ""}${bioId() ? `<button class="btn ghost sm" data-biooff>Stop using fingerprint / face here</button>` : ""}<button class="btn ghost sm" data-pinchange>Change PIN</button><button class="btn ghost sm danger" data-pinoff>Turn the lock off</button></div>`
         : `<span class="small">Lock Journal, Mood, 3-6-9 and History with a PIN (and fingerprint or face where your phone supports it), so anyone holding the phone can't read them.</span><button class="btn sm" data-pinchange style="align-self:flex-start">Set a PIN</button>`}
         <span class="tiny muted">The PIN is stored only as a scrambled code. Your entries are already protected by your Google account in your own Drive; the lock stops someone holding the phone from reading them in the app. Forgot it? Sign in with Google again to reset.</span></section>
       <section class="stack mb"><span class="lab">Theme</span><div class="grid g3">${THEMES.map((t) => `<button class="themecard ${P().theme === t[0] ? "on" : ""}" data-theme-pick="${t[0]}" data-theme="${t[0]}"><div class="tc"><div class="tcn">${t[1]}</div><div class="row" style="gap:6px">${["--acc", "--acc2", "--soft", "--surf"].map((v) => `<i class="swi" style="background:var(${v})"></i>`).join("")}</div><div class="tch">Up next · Study block</div></div></button>`).join("")}</div></section>
       <div class="grid g2"><section class="card stack"><span class="lab">Profile</span><label class="stack small">Name on Today<input class="f" maxlength="40" value="${E(P().name)}" data-name></label><div class="small">Signed in as <b>${acc}</b></div><div class="row"><button class="btn ghost sm" data-signout>Sign out</button></div></section>
-      <section class="card stack"><span class="lab">Activities</span>${acts().map((a, ix) => `<div class="row" style="gap:6px;flex-wrap:nowrap">${a.name === "Study" ? `<b class="small" style="flex:1">Study</b>` : `<input class="f" style="flex:1;min-width:90px" value="${E(a.name)}" maxlength="30" data-actname="${ix}" aria-label="Activity name">`}${sel(`data-acthab="${ix}"`, [["", "Habit: same name"], ...P().habits.filter((h) => h.active !== false).map((h) => [h.id, "Habit: " + h.name])], a.hab || "", 'style="width:auto;max-width:170px" aria-label="Linked habit"')}${a.name === "Study" ? "" : `<button class="tool" data-actdel="${ix}" aria-label="Remove ${E(a.name)}">${ic("trash", 16)}</button>`}</div>`).join("")}
+      <section class="card stack" id="set-acts"><span class="lab">Activities</span>${acts().map((a, ix) => `<div class="row" style="gap:6px;flex-wrap:nowrap">${a.name === "Study" ? `<b class="small" style="flex:1">Study</b>` : `<input class="f" style="flex:1;min-width:90px" value="${E(a.name)}" maxlength="30" data-actname="${ix}" aria-label="Activity name">`}${sel(`data-acthab="${ix}"`, [["", "Habit: same name"], ...P().habits.filter((h) => h.active !== false).map((h) => [h.id, "Habit: " + h.name])], a.hab || "", 'style="width:auto;max-width:170px" aria-label="Linked habit"')}${a.name === "Study" ? "" : `<button class="tool" data-actdel="${ix}" aria-label="Remove ${E(a.name)}">${ic("trash", 16)}</button>`}</div>`).join("")}
         <div class="row"><input class="f" id="newact" placeholder="New type, e.g. Music practice" maxlength="30" style="flex:1"><button class="btn sm" data-actadd>${ic("plus", 14)} Add</button></div><span class="tiny muted">Finishing an activity block ticks its linked habit for that day.</span>
         <span class="lab mt">Timer</span><label class="row small"><input type="checkbox" data-tkeep ${TMR().keep !== false ? "checked" : ""}> Keep the screen on while a timer runs (goes black and dim after 30 seconds to save battery)</label>
         <label class="row small"><input type="checkbox" data-tcal ${TMR().cal !== false ? "checked" : ""}> Backup alert through Google Calendar, so it rings even if the app is closed</label>
@@ -1155,7 +1237,9 @@
     main.innerHTML = top + (isLocked(route) ? lockHTML() : (V[route] || V.today)());
     MP.setupPads();
     if (route === "day") dayScroll();
-    if (route === "today") maybePlan();
+    postitLayer();
+    if (route === "today") { maybeMenuPrompt(); if (P().menu && P().menu.chosen) maybePlan(); }
+    if (route === "prefs") setupFocus();
     document.querySelectorAll("[data-printink]").forEach(drawPrintInk);
     miniPlayer();
   };
@@ -1305,7 +1389,7 @@
   }
 
   /* ---------- Add / schedule (one form for reminders, tasks, habits, study, events, dates) ---------- */
-  const SKINDS = [["reminder", "⏰ Reminder"], ["task", "✓ New task (To-Do)"], ["habit", "◎ Habit"], ["study", "⏱ Activity session"], ["event", "📅 Event / appointment"], ["wellbeing", "❀ Journal · affirmation · mood"], ["date", "✿ Birthday / anniversary"]];
+  const SKINDS = [["reminder", "⏰ Reminder"], ["task", "✓ New task (To-Do)"], ["habit", "◎ Habit"], ["study", "⏱ Activity session"], ["event", "📅 Meeting / event / appointment"], ["wellbeing", "❀ Journal · affirmation · mood"], ["date", "✿ Birthday / anniversary"]];
   const SLABEL = { reminder: "Reminder", task: "Task", habit: "Habit", study: "Activity", event: "Event", wellbeing: "Wellbeing", date: "Special date" };
   const SPRI = [["low", "Low"], ["med", "Medium"], ["high", "High"], ["urgent", "Urgent"]];
   const PRICOL = { low: "2", med: "5", high: "6", urgent: "11" };
@@ -1569,13 +1653,16 @@
     if (d.dosignout !== undefined) return doSignOut();
     if (d.wipe !== undefined) return wipeDialog();
     if (d.dowipe !== undefined) return doWipe();
-    if (d.menup) { P().menu = d.menup === "simple" ? menuSimple() : { preset: "full", hide: {} }; touchP(); MP.render(); MP.toast(d.menup === "simple" ? "Simple menu" : "Full menu: every screen shown"); return; }
+    if (d.menup) { P().menu = Object.assign(d.menup === "simple" ? menuSimple() : { preset: "full", hide: {} }, { chosen: true }); touchP(); if (d.menuclose !== undefined) closeModal(); MP.render(); MP.toast(d.menup === "simple" ? "Simple menu" : "Full menu: every screen shown"); return; }
     if (d.dnav !== undefined) { const step = view.dv === "week" ? (window.innerWidth < 760 ? 3 : 7) : 1; view.dayK = +d.dnav === 0 ? iso(today()) : iso(addD(parseISO(view.dayK || iso(today())), +d.dnav * step)); view.dscr = ""; return MP.render(); }
     if (d.dvw) { view.dv = d.dvw; view.dscr = ""; return MP.render(); }
     if (d.dpick) { view.dayK = d.dpick; if (d.dvday !== undefined) view.dv = "day"; view.dscr = ""; return MP.render(); }
     if (d.scope) return applyScope(d.scope);
     if (d.rtsave) { const [rid, rk] = d.rtsave.split("|"), r = ttFor(parseISO(rk)).find((x) => x.id === rid); if (!r) return; const patch = {}; const st = field("rts"), en = field("rte"), tx = field("rtt").slice(0, 120); if (st && st !== r.start) patch.start = st; if (en !== (r.end || "")) patch.end = en; if (tx && tx !== r.text) patch.text = tx; const ra = field("rta"); if (ra && isAct(r) && ra !== actOf(r)) { if (ra === "Study") { patch.type = "Study"; } else { patch.type = "Activity"; patch.act = ra; } } if (!Object.keys(patch).length) return closeModal(); return scopeAsk({ src: "tt", id: rid, k: rk, title: r.text, patch }); }
     if (d.rtdel) { const [rid, rk] = d.rtdel.split("|"), r = ttFor(parseISO(rk)).find((x) => x.id === rid); return scopeAsk({ src: "tt", id: rid, k: rk, title: r ? r.text : "", del: true }); }
+    if (d.setupgo) { closeModal(); view.sAnchor = d.setupgo; return go("prefs"); }
+    if (d.setuphide !== undefined) { P().setupSeen = Object.assign({}, P().setupSeen, { hidden: true }); touchP(); return MP.render(); }
+    if (d.menukeep !== undefined) { P().menu = Object.assign({ preset: "full", hide: {} }, P().menu || {}, { chosen: true }); touchP(); MP.toast("Menu saved"); return MP.render(); }
     if (d.planopen !== undefined) return planDialog();
     if (d.shutopen !== undefined) return shutDialog();
     if (d.plandone !== undefined || d.planskip !== undefined) { const k = iso(today()), r = dayRec(k); r.plan = { at: Date.now(), skipped: d.planskip !== undefined }; touchDay(k); closeModal(); MP.render(); MP.toast(d.planskip !== undefined ? "Skipped for today" : "Have a good day"); return; }
@@ -1605,11 +1692,12 @@
     if (d.tnew !== undefined) return taskDialog(null);
     if (d.tedit) return taskDialog(d.tedit);
     if (d.tsave !== undefined) return taskSave(d.tsave);
-    if (d.tpin) { const x = MP.S.tasks[d.tpin]; if (x) { x.pin = !x.pin; if (x.pin) x.pinO = Date.now(); x.u = Date.now(); MP.changed(); MP.render(); MP.toast(x.pin ? "Pinned as a post-it on Today" : "Removed from post-its"); } return; }
+    if (d.tpin) { const x = MP.S.tasks[d.tpin]; if (x) { x.pin = !x.pin; if (x.pin) x.pinO = Date.now(); x.u = Date.now(); MP.changed(); MP.render(); MP.toast(x.pin ? "Pinned as a post-it (top right of every screen)" : "Removed from post-its"); } return; }
     if (d.tmove !== undefined) { const to = iso(addD(today(), +d.tmove)), G2 = taskGroups(); G2.overdue.forEach((x) => { const r = MP.S.tasks[x.id]; r.d = to; r.inbox = false; r.u = Date.now(); }); MP.changed(); MP.render(); MP.toast(`Moved ${G2.overdue.length} task${G2.overdue.length === 1 ? "" : "s"} to ${+d.tmove ? "tomorrow" : "today"}`); return; }
     if (d.tundo) return markDone(d.tundo, false);
     if (d.pnote) return postitPad(d.pnote);
     if (d.pclose !== undefined) { closeModal(); return MP.render(); }
+    if (d.postcol !== undefined) { try { localStorage.setItem("mp-postcol", d.postcol); } catch (er) {} return postitLayer(); }
     if (d.sched !== undefined) { document.getElementById("sheet").classList.remove("on"); return schedDialog(null, d.sched ? { d: d.sched } : null); }
     if (d.sedit) return schedDialog(d.sedit);
     if (d.ssave !== undefined) return schedSave(d.ssave || null);
@@ -1703,7 +1791,7 @@
     if (d.hday) { const [hid, x] = d.hday.split("|"), h = P().habits.find((y) => y.id === hid); if (h && h.freq) { const set = new Set(h.freq.days || []); t.checked ? set.add(+x) : set.delete(+x); h.freq.days = [...set].sort(); touchP(); } return; }
     if (d.sub) { const [tid, sid] = d.sub.split("|"), x = MP.S.tasks[tid]; if (!x) return; const st = (x.sub || []).find((y) => y.id === sid); if (st) st.done = t.checked; x.u = Date.now(); if (x.sub.every((y) => y.done) && !x.done) { MP.toast("All steps done, task ticked"); return markDone(tid, true); } MP.changed(); return MP.render(); }
     if (d.tfp !== undefined) return tfRefresh();
-    if (d.menus) { const m = P().menu || (P().menu = { hide: {} }); m.hide = m.hide || {}; if (t.checked) delete m.hide[d.menus]; else m.hide[d.menus] = true; m.preset = "custom"; touchP(); MP.render(); return; }
+    if (d.menus) { const m = P().menu || (P().menu = { hide: {} }); m.hide = m.hide || {}; if (t.checked) delete m.hide[d.menus]; else m.hide[d.menus] = true; m.preset = "custom"; m.chosen = true; touchP(); MP.render(); return; }
     if (d.blk) { blockDone(iso(today()), d.blk, t.checked); MP.render(); }
     if (d.tbrk !== undefined) { TMR().breaks = t.checked; touchP(); return; }
     if (d.rtop) { const k = iso(today()), r = dayRec(k), cur = (r.top3 || []).filter((x) => x !== d.rtop); if (t.checked) { if (cur.length >= 3) { t.checked = false; MP.toast("Three is the limit. Untick one first."); return; } cur.push(d.rtop); } r.top3 = cur; touchDay(k); return; }
@@ -1742,7 +1830,7 @@
     if (d.tviewsel !== undefined) { P().todayView = t.value; touchP(); MP.render(); }
     if (d.printsel !== undefined) { P().printView = t.value; touchP(); MP.render(); }
     if (d.ttf === "type") { const row = [...P().timetable, ...(Array.isArray(P().weekend) ? P().weekend : [])].find((x) => x.id === d.id); if (t.value === "Activity") { if (!row || !isAct(row)) setTT(d.id, "type", "Study"); } else setTT(d.id, "type", t.value); MP.render(); }
-    if (d.ttf === "start" || d.ttf === "end") { setTT(d.id, d.ttf, t.value); MP.render(); }
+    if (d.ttf === "start" || d.ttf === "end") { setTT(d.id, d.ttf, t.value); if (t.dataset.tpset) { delete t.dataset.tpset; MP.render(); } else if (!t.dataset.tpwait) { t.dataset.tpwait = "1"; t.addEventListener("focusout", () => setTimeout(() => { if (!document.activeElement || !document.activeElement.matches("input[data-ttf]")) MP.render(); }, 0), { once: true }); } }
     if (d.wrt) { wiz.routine = d.wrt === "1"; MP.render(); }
     if (d.wcol) wiz.cols[d.wcol] = t.checked;
     if (d.restore !== undefined && t.files && t.files[0]) {
@@ -1798,7 +1886,7 @@
   document.addEventListener("pointercancel", () => { if (drag) { drag.el.remove(); drag = null; MP.render(); } });
 
   /* ---------- start-up ---------- */
-  MP.VERSION = "1.15";
+  MP.VERSION = "1.16";
   if (MP.sound) MP.sound.onchange = () => { miniPlayer(); if (route === "study") MP.render(); };
   /* Public, read-only helpers for future modules and connectors. */
   MP.api = { today, iso, dayPct, studyHours, streak, tasks, feed: () => MP.buildFeed(MP.S), version: MP.VERSION, schemaVersion: MP.SCHEMA_VERSION };

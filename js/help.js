@@ -18,7 +18,8 @@ window.MP_HELP = [
 "Open My Planner and tap Sign in with Google. Choose your own account.",
 "If Google says the app isn't verified, tap Continue. It is a private family app.",
 "Allow access to “only the specific Google Drive files you use with this app”.",
-"Follow the 4-step welcome: your name and theme, a suggested routine (or blank), habits, and affirmation collections."
+"Follow the 4-step welcome: your name and theme, a suggested routine (or blank), habits, and affirmation collections.",
+"Then work through the Set up your planner card on Today. Choose your menu first (Simple, Full, or tick only the screens you use); the card stays until you do. The other steps (activities, Plan my day and Shut down, Google Calendar, journal lock) each open the right place in Settings."
 ]
 ],
 [
@@ -100,7 +101,7 @@ window.MP_HELP = [
 "steps",
 [
 "Tap Add / schedule.",
-"Choose what it is: Reminder, New task, Habit, Study session, Event / appointment, Journal · affirmation · mood, or Birthday / anniversary.",
+"Choose what it is: Reminder, New task, Habit, Activity session, Meeting / event / appointment, Journal · affirmation · mood, or Birthday / anniversary.",
 "Type a title, then pick the date, start time and (optional) end time. Leave the time empty for an all-day item.",
 "Set the priority: Low, Medium, High or Urgent. It shows as a coloured bar in the app and the same colour in Google Calendar.",
 "Pick a reminder (at the time, 5 min to 1 day before).",
@@ -137,7 +138,8 @@ window.MP_HELP = [
 [
 "steps",
 [
-"Edit any time or activity directly; changes save as you type.",
+"Tap a start or end time to open the time picker: ▲▼ for hours and minutes (hold to run fast), or scroll / swipe on the numbers; pick AM or PM, or tap :00 :15 :30 :45, then Done. You can still type a time with a keyboard; the row moves into place when you leave the box.",
+"Edit any activity directly; changes save as you type.",
 "Choose a Type. Rows of type Study are your study blocks.",
 "Add a row with Add a row; delete with the bin icon.",
 "Need a different weekend? Tap Different weekend timetable."
@@ -291,7 +293,7 @@ window.MP_HELP = [
 "Tap New task (or Task on Today). Fill in the Date, write the task in as much detail as you like, tick Urgent and/or Important, and add a Due date if there is a deadline.",
 "Add steps (one per line) to get a small checklist inside the task. Ticking the last step ticks the task.",
 "No date yet? Tick Keep it in the Inbox and give it a date later.",
-"Tick Show as a post-it to pin it on Today. Tap the pen on a post-it to write on it with the S Pen; drag the ⋮⋮ handle to reorder post-its.",
+"Tick Show as a post-it to pin it. Post-its float at the top right of every screen; drag one anywhere by its top bar and it stays there on that device. Tap the pen to write on it with the S Pen, tick it when done, or ✕ to unpin. Tap 📌 to tuck them away or bring them back.",
 "Tick Add to Google Calendar to put a 5-minute block in your Calendar, 2 hours from now (you can change the time). When you tick the task done, the Calendar item gets a ✓."
 ]
 ],
@@ -522,7 +524,7 @@ window.MP_HELP = [
 [
 "list",
 [
-"Menu: hide screens you don't use, or choose Simple or Full. Hidden screens keep their data.",
+"Menu: hide screens you don't use, or choose Simple or Full. Hidden screens keep their data. Until you choose, Today shows a Set up your planner reminder.",
 "Privacy: set a 4–6 digit PIN to lock Journal, Mood, 3-6-9 and History; add fingerprint or face on phones that support it. It locks again 5 minutes after you leave. Forgot it? Sign in with Google again to reset."
 ]
 ]
@@ -636,6 +638,7 @@ window.MP_HELP = [
 "Plan my day opens by itself the first time you open the planner each morning (or tap ☀ Plan my day on Today): sort anything unfinished (Today, Tomorrow, Later or Drop), glance at today's calendar, pick your top 3 tasks and see today's activities. Skip it any time.",
 "Your top 3 get a ★ on Today and fill the Top 3 box on the Detailed day sheet.",
 "Shut down (from 4 pm, 🌙 on Today, and a reminder at 9:30 pm): tick what you did, move what's left, write one line about the day and set your evening mood.",
+"After Shut down: ticked items are done; moved ones appear tomorrow (or in Later); dropped ones are deleted. Your line and mood are saved privately, the 9:30 pm reminder stops for that day, and the button changes to Shut down again in case you want to add more. Nothing is locked: you can still add or tick things that night. Tomorrow's Plan my day picks up whatever is still open, and your line shows in the Weekly review.",
 "Weekly review (in the menu, and on Today at the weekend): habits by day, time per activity and meetings, to-dos done and overdue, mood trend, top wins and journal highlights; then set 3 goals for next week."
 ]
 ],

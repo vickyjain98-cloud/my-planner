@@ -293,7 +293,7 @@ window.MP_HELP = [
 "Tap New task (or Task on Today). Fill in the Date, write the task in as much detail as you like, tick Urgent and/or Important, and add a Due date if there is a deadline.",
 "Add steps (one per line) to get a small checklist inside the task. Ticking the last step ticks the task.",
 "No date yet? Tick Keep it in the Inbox and give it a date later.",
-"Tick Show as a post-it to pin it. Post-its float at the top right of every screen; drag one anywhere by its top bar and it stays there on that device. Tap the pen to write on it with the S Pen, tick it when done, or ✕ to unpin. Tap 📌 to tuck them away or bring them back.",
+"Tick Show as a post-it to pin it. Your post-its float as one small stack at the top right of every screen, one note at a time: tap ‹ or › to go through them (it shows 1 of 5 and so on). Drag the stack anywhere by its top bar and it stays there on that device. Tap the pen to write on a note with the S Pen, tick it to strike it out when done, or ✕ to unpin it. Tap 📌 to tuck them away or bring them back.",
 "Tick Add to Google Calendar to put a 5-minute block in your Calendar, 2 hours from now (you can change the time). When you tick the task done, the Calendar item gets a ✓."
 ]
 ],
@@ -638,6 +638,7 @@ window.MP_HELP = [
 "Plan my day opens by itself the first time you open the planner each morning (or tap ☀ Plan my day on Today): sort anything unfinished (Today, Tomorrow, Later or Drop), glance at today's calendar, pick your top 3 tasks and see today's activities. Skip it any time.",
 "Your top 3 get a ★ on Today and fill the Top 3 box on the Detailed day sheet.",
 "Shut down (from 4 pm, 🌙 on Today, and a reminder at 9:30 pm): tick what you did, move what's left, write one line about the day and set your evening mood.",
+"Under Still open, each unfinished to-do for today (and any overdue one) has three buttons: Tomorrow moves it to tomorrow, Later puts it in the To-Do Inbox with no date, and Drop deletes it. If you have nothing open, this part says so.",
 "After Shut down: ticked items are done; moved ones appear tomorrow (or in Later); dropped ones are deleted. Your line and mood are saved privately, the 9:30 pm reminder stops for that day, and the button changes to Shut down again in case you want to add more. Nothing is locked: you can still add or tick things that night. Tomorrow's Plan my day picks up whatever is still open, and your line shows in the Weekly review.",
 "Weekly review (in the menu, and on Today at the weekend): habits by day, time per activity and meetings, to-dos done and overdue, mood trend, top wins and journal highlights; then set 3 goals for next week."
 ]

@@ -233,7 +233,7 @@
     const draw = () => { const h12 = tp.h % 12 || 12; tp.box.innerHTML = `<div class="tpcols"><div class="tpc" data-tpw="h"><button type="button" data-tps="h|1" aria-label="Hour up">▲</button><b>${h12}</b><button type="button" data-tps="h|-1" aria-label="Hour down">▼</button></div><span class="tpsep">:</span><div class="tpc" data-tpw="m"><button type="button" data-tps="m|5" aria-label="Minutes up">▲</button><b>${String(tp.mi).padStart(2, "0")}</b><button type="button" data-tps="m|-5" aria-label="Minutes down">▼</button></div><div class="tpap"><button type="button" class="${tp.h < 12 ? "on" : ""}" data-tpap="am">AM</button><button type="button" class="${tp.h >= 12 ? "on" : ""}" data-tpap="pm">PM</button></div></div>
       <div class="tpquick">${[0, 15, 30, 45].map((q) => `<button type="button" data-tpq="${q}">:${String(q).padStart(2, "0")}</button>`).join("")}</div><div class="row" style="justify-content:space-between"><button type="button" class="link tiny" data-tpclear>Clear</button><span class="row" style="gap:6px"><button type="button" class="btn ghost sm" data-tpcancel>Cancel</button><button type="button" class="btn sm" data-tpok>Done</button></span></div>`; };
     tp.draw = draw; draw(); document.body.appendChild(tp.box);
-    const r = inp.getBoundingClientRect(), bw = 250, left = Math.min(window.innerWidth - bw - 8, Math.max(8, r.left)), top = r.bottom + 230 > window.innerHeight ? Math.max(8, r.top - 230) : r.bottom + 6;
+    const r = inp.getBoundingClientRect(), bw = 206, left = Math.min(window.innerWidth - bw - 8, Math.max(8, r.left)), top = r.bottom + 190 > window.innerHeight ? Math.max(8, r.top - 190) : r.bottom + 6;
     Object.assign(tp.box.style, { left: left + "px", top: top + "px" });
   }
   const tpStep = (w, n) => { if (!tp) return; if (w === "h") tp.h = (tp.h + n + 24) % 24; else { let t2 = tp.h * 60 + tp.mi + n; t2 = (t2 + 1440) % 1440; if (Math.abs(n) === 5) t2 = Math.round(t2 / 5) * 5 % 1440; tp.h = Math.floor(t2 / 60); tp.mi = t2 % 60; } tp.draw(); };
@@ -303,7 +303,7 @@
     const t = today(), k = iso(t), G2 = taskGroups(), open = [...G2.overdue, ...G2.today.filter((x) => !x.done)], done = G2.today.filter((x) => x.done), rec = MP.S.days[k] || {};
     modal(`<div class="between"><h2>Shut down</h2><button class="tool" data-close aria-label="Close">✕</button></div><span class="small muted">Close the day so tomorrow starts clean.</span>
       <div class="stack" style="gap:4px"><span class="lab">Done today · ${done.length}</span>${done.map((x) => `<span class="small">✓ ${E(x.t.split("\n")[0])}</span>`).join("") || '<span class="small muted">Nothing ticked yet. Tick anything you did:</span>'}</div>
-      ${open.length ? `<div class="stack" style="gap:4px"><span class="lab">Still open · ${open.length}</span>${open.map((x) => `<div class="between wrap small rit-row"><label class="row" style="flex:1;min-width:160px"><input type="checkbox" class="cb sm" data-done="${E(x.id)}"> ${E(x.t.split("\n")[0])}</label><span class="row" style="gap:4px"><button class="pill tiny out" data-rmove="${E(x.id)}|1">Tomorrow</button><button class="pill tiny out" data-rmove="${E(x.id)}|inbox">Later</button><button class="pill tiny out" data-rmove="${E(x.id)}|drop">Drop</button></span></div>`).join("")}<button class="link tiny" data-rmoveall style="align-self:flex-start">Move everything still open to tomorrow</button></div>` : ""}
+      ${open.length ? `<div class="stack" style="gap:4px"><span class="lab">Still open · ${open.length}</span>${open.map((x) => `<div class="between wrap small rit-row"><label class="row" style="flex:1;min-width:160px"><input type="checkbox" class="cb sm" data-done="${E(x.id)}"> ${E(x.t.split("\n")[0])}</label><span class="row" style="gap:4px"><button class="pill tiny out" data-rmove="${E(x.id)}|1">Tomorrow</button><button class="pill tiny out" data-rmove="${E(x.id)}|inbox">Later</button><button class="pill tiny out" data-rmove="${E(x.id)}|drop">Drop</button></span></div>`).join("")}<button class="link tiny" data-rmoveall style="align-self:flex-start">Move everything still open to tomorrow</button></div>` : `<div class="stack" style="gap:2px"><span class="lab">Still open · 0</span><span class="small muted">Nothing left open today. When a to-do for today (or an overdue one) isn\'t ticked, it shows here with three buttons: Tomorrow, Later (Inbox) and Drop.</span></div>`}
       <label class="stack small">One line about today<input class="f" id="shutnote" maxlength="200" value="${E((rec.shut || {}).note || "")}" placeholder="What went well, or what you'd change"></label>
       <div class="stack" style="gap:4px"><span class="lab">Evening mood</span><div class="row">${Object.keys(MOODCOL).map((w) => `<button class="moodbtn sm" data-shutmood="${w}" style="${((rec.mood || {}).pm || {}).w === w ? `background:${MOODCOL[w]};color:#1d1d1d` : ""}">${w}</button>`).join("")}</div></div>
       <div class="row" style="justify-content:flex-end"><button class="btn ghost" data-close>Not now</button><button class="btn" data-shutdone>Shut down</button></div>`);
@@ -390,15 +390,17 @@
     if (!T.length) { L.innerHTML = ""; return; }
     const pos = PP(), small = window.innerWidth < 700, col = (localStorage.getItem("mp-postcol") || (small ? "1" : "")) === "1", W = small ? 150 : 180;
     if (col) { L.innerHTML = `<button class="postchip" data-postcol="0" title="Show your post-its">📌 ${T.length}</button>`; return; }
-    L.innerHTML = `<button class="postchip on" data-postcol="1" title="Tuck the post-its away">📌 ${T.length} · hide</button>` + T.map((t, i) => {
-      const p = pos[t.id], x = p ? Math.min(Math.max(0, p.x * window.innerWidth), window.innerWidth - W) : window.innerWidth - W - 16 - (small ? (i % 2) * (W + 10) : (i % 2) * 14), y = p ? Math.min(Math.max(50, p.y * window.innerHeight), window.innerHeight - 90) : 58 + (small ? Math.floor(i / 2) : i) * 132, ink = ((MP.S.ink["postit-" + t.id] || {}).s || []).length;
-      return `<div class="pfloat p${tPri(t)} ${t.done ? "done" : ""}" data-pid="${E(t.id)}" style="left:${x}px;top:${y}px;width:${W}px;--r:${((t.id.charCodeAt(0) + i) % 5) - 2}deg;z-index:${(p && p.z) || 10 + i}">
+    /* 1.16.1: one post-it at a time, with ‹ 1 of 5 › to move between them */
+    let n = 0; try { n = +localStorage.getItem("mp-postidx") || 0; } catch (e) {} n = ((n % T.length) + T.length) % T.length;
+    const t = T[n], p = pos.stack, x = p ? Math.min(Math.max(0, p.x * window.innerWidth), window.innerWidth - W) : window.innerWidth - W - 16, y = p ? Math.min(Math.max(50, p.y * window.innerHeight), window.innerHeight - 150) : 58, ink = ((MP.S.ink["postit-" + t.id] || {}).s || []).length;
+    L.innerHTML = `<button class="postchip on" data-postcol="1" title="Tuck the post-its away">📌 ${T.length} · hide</button><div class="pfloat p${tPri(t)} ${t.done ? "done" : ""} ${T.length > 1 ? "pstack" : ""}" data-pid="${E(t.id)}" style="left:${x}px;top:${y}px;width:${W}px;--r:${(n % 3) - 1}deg">
         <div class="pbar" title="Drag to move"><span class="row" style="gap:2px"><button class="tool" data-pnote="${E(t.id)}" title="Write on it" aria-label="Write on this post-it">${ic("penm", 14)}</button><input type="checkbox" class="cb sm" data-done="${E(t.id)}" ${t.done ? "checked" : ""} aria-label="Done"></span><button class="tool" data-tpin="${E(t.id)}" title="Unpin" aria-label="Unpin">✕</button></div>
-        <button class="ptext" data-tedit="${E(t.id)}">${E(t.t)}</button>${ink ? `<canvas class="printink" data-printink="postit-${E(t.id)}" height="70"></canvas>` : ""}</div>`; }).join("");
+        <button class="ptext" data-tedit="${E(t.id)}">${E(t.t)}</button>${ink ? `<canvas class="printink" data-printink="postit-${E(t.id)}" height="70"></canvas>` : ""}
+        ${T.length > 1 ? `<div class="pnav"><button class="tool" data-postnav="-1" aria-label="Previous post-it">‹</button><span>${n + 1} of ${T.length}</span><button class="tool" data-postnav="1" aria-label="Next post-it">›</button></div>` : ""}</div>`;
     L.querySelectorAll("[data-printink]").forEach(drawPrintInk);
   }
   let pdrag = null;
-  document.addEventListener("pointerdown", (e) => { const bar = e.target.closest(".pfloat .pbar"); if (!bar || e.target.closest("button,input")) return; const n = bar.closest(".pfloat"), r = n.getBoundingClientRect(); e.preventDefault(); pdrag = { n, id: n.dataset.pid, dx: e.clientX - r.left, dy: e.clientY - r.top }; n.classList.add("lift"); n.style.zIndex = 60; try { bar.setPointerCapture(e.pointerId); } catch (er) {} });
+  document.addEventListener("pointerdown", (e) => { const bar = e.target.closest(".pfloat .pbar"); if (!bar || e.target.closest("button,input")) return; const n = bar.closest(".pfloat"), r = n.getBoundingClientRect(); e.preventDefault(); pdrag = { n, id: "stack", dx: e.clientX - r.left, dy: e.clientY - r.top }; n.classList.add("lift"); n.style.zIndex = 60; try { bar.setPointerCapture(e.pointerId); } catch (er) {} });
   document.addEventListener("pointermove", (e) => { if (!pdrag) return; const x = Math.min(Math.max(0, e.clientX - pdrag.dx), window.innerWidth - pdrag.n.offsetWidth), y = Math.min(Math.max(0, e.clientY - pdrag.dy), window.innerHeight - 40); pdrag.n.style.left = x + "px"; pdrag.n.style.top = y + "px"; });
   document.addEventListener("pointerup", () => { if (!pdrag) return; const n = pdrag.n, o = PP(), z = Math.max(10, ...Object.values(o).map((v) => v.z || 0)) + 1; o[pdrag.id] = { x: parseFloat(n.style.left) / window.innerWidth, y: parseFloat(n.style.top) / window.innerHeight, z }; PPsave(o); n.classList.remove("lift"); n.style.zIndex = z; pdrag = null; });
   window.addEventListener("resize", () => { clearTimeout(window._mpPl); window._mpPl = setTimeout(postitLayer, 200); });
@@ -1697,6 +1699,7 @@
     if (d.tundo) return markDone(d.tundo, false);
     if (d.pnote) return postitPad(d.pnote);
     if (d.pclose !== undefined) { closeModal(); return MP.render(); }
+    if (d.postnav) { let n = 0; try { n = +localStorage.getItem("mp-postidx") || 0; localStorage.setItem("mp-postidx", n + +d.postnav); } catch (er) {} return postitLayer(); }
     if (d.postcol !== undefined) { try { localStorage.setItem("mp-postcol", d.postcol); } catch (er) {} return postitLayer(); }
     if (d.sched !== undefined) { document.getElementById("sheet").classList.remove("on"); return schedDialog(null, d.sched ? { d: d.sched } : null); }
     if (d.sedit) return schedDialog(d.sedit);
@@ -1886,7 +1889,7 @@
   document.addEventListener("pointercancel", () => { if (drag) { drag.el.remove(); drag = null; MP.render(); } });
 
   /* ---------- start-up ---------- */
-  MP.VERSION = "1.16";
+  MP.VERSION = "1.16.1";
   if (MP.sound) MP.sound.onchange = () => { miniPlayer(); if (route === "study") MP.render(); };
   /* Public, read-only helpers for future modules and connectors. */
   MP.api = { today, iso, dayPct, studyHours, streak, tasks, feed: () => MP.buildFeed(MP.S), version: MP.VERSION, schemaVersion: MP.SCHEMA_VERSION };

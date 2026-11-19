@@ -610,6 +610,7 @@
   MP.diaryAfter = () => { document.querySelectorAll("canvas.dink").forEach(setupInk); if (MP.dobjAfter) MP.dobjAfter(); };
   /* used by PDF import: add pages after the current one, then show the first */
   MP.diaryAddPages = (list) => { const c = cur(); if (!c) return []; const base = c.pg.length ? (c.pg[ST.idx][1].o || 0) : 0, nx = c.pg[ST.idx + 1], step = nx ? ((nx[1].o || base + 1) - base) / (list.length + 1) : 1; const ids = list.map((x, i) => { const id = newPage(ST.did, ST.sid, { tpl: "blank", col: "#FFFFFF", tex: "smooth" }, base + step * (i + 1), false); Object.assign(PS()[id], x, { fr: 1 }); return id; }); MP.changed(); ST.idx = pagesOf(ST.did, ST.sid).findIndex((x) => x[0] === ids[0]); keep(); return ids; };
+  MP.diaryGoto = (pid) => { const p = PS()[pid]; if (!p) return; if (ST.did !== p.d) ST.did = p.d; ST.sid = p.s; ST.idx = Math.max(0, pagesOf(p.d, p.s).findIndex((x) => x[0] === pid)); keep(); rerender(); };
   MP.diaryRatio = (pid) => { const p = PS()[pid]; return p ? ratioOf(p, DS()[p.d]) : 846 / 600; };
   MP.diaryCur = () => { const c = cur(); return c && c.pg.length ? c.pg[ST.idx][0] : null; };
   MP.diaryTheme = () => { const c = cur(); return c ? c.d.theme : null; };

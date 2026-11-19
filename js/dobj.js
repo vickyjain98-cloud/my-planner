@@ -315,7 +315,9 @@
   function toolsHTML() {
     const o = selObj();
     let h = `<span class="dins">${cbtn("photo", "🖼", "Photo from gallery", "", "Photo")}${cbtn("camera", "📷", "Take a photo", "", "Camera")}${cbtn("stk", "★", "Stickers", "", "Sticker")}${cbtn("shp", "◇", "Shapes, lines, arrows and diagrams", "", "Shapes")}${cbtn("txt", "T", "Text box", "", "Text box")}${cbtn("imp", "⇪", "Import a picture or design", "", "Import")}${cbtn("web", "🔎", "Find designs online", "", "Designs")}${cbtn("pdf", "📄", "Add a PDF as pages to write on", "", "PDF")}${cbtn("undo", MP.ic("undo", 22), "Undo", "", "Undo")}</span>`;
-    if (!o) return h + `<span class="tiny muted" style="margin-left:6px">Tap an item to move, resize or rotate it</span>`;
+    const cl = clip();
+    if (cl) h += `<span class="vsep"></span>` + cbtn("paste", "📋", "Paste the copied item on this page", "", "Paste");
+    if (!o) return h + `<span class="tiny muted" style="margin-left:6px">Tap an item to move, resize or rotate it${cl ? "" : ". Copy or Cut it to paste on another page."}</span>`;
     h += `<span class="vsep"></span>`;
     if (o.k === "photo") h += cbtn("crop", "✂ Crop", "Crop") + cbtn("replace", "Replace", "Replace photo") + cbtn("polar", o.pf ? "▢ Border on" : "▢ Border", "White photo border");
     if (o.k === "frame") h += cbtn("fill", "📷 Add photo", "Put a photo in this frame");
@@ -324,9 +326,35 @@
     if (o.k === "diagram") { const tr = o.dt === "mind" || o.dt === "tree"; h += cbtn("dadd", tr ? "+ Branch" : "+ Add", tr ? "Add a branch under the picked box" : "Add a box after the picked one") + (tr ? cbtn("dsib", "+ Same level", "Add a box next to the picked one") : "") + cbtn("drm", "− Remove", "Remove the picked box") + (o.dt === "flow" ? cbtn("ddec", "◇ Decision", "Make the picked box a decision") : "") + cbtn("dedit", "✎ Text", "Type in the picked box") + cbtn("dpal", "🎨 Colours", "Change colours") + `<span class="tiny muted">${DSN && DSN.oid === o.id && DSN.nid ? "Box picked" : "Tap a box to pick it"}</span>`; }
     if (o.k === "line") h += colIn("stroke", o.sc, "Line colour", `<span class="cdot ring" style="border-color:${o.sc || "#333"}"></span>`) + `<select class="f sm" data-ob-sw aria-label="Line width">${[1, 2, 3, 5, 8].map((n) => `<option value="${n}" ${(o.sw ?? 3) == n ? "selected" : ""}>${n} pt</option>`).join("")}</select>` + `<select class="f sm" data-ob-lt aria-label="Line type">${[["s", "Straight"], ["e", "Elbow"], ["c", "Curved"]].map(([k, n]) => `<option value="${k}" ${o.t === k ? "selected" : ""}>${n}</option>`).join("")}</select>` + cbtn("a1", "◀", "Arrow at start", o.a1 ? 'style="background:var(--soft)"' : "") + cbtn("a2", "▶", "Arrow at end", o.a2 ? 'style="background:var(--soft)"' : "");
     if (o.k !== "line") h += cbtn("rot0", "⟲", "Straighten to 0°", "", `${Math.round(o.r || 0)}° · Straighten`);
-    return h + cbtn("fwd", "⬆", "Bring forward", "", "Forward") + cbtn("back", "⬇", "Send backward", "", "Back") + cbtn("dup", "⧉", "Duplicate", "", "Copy") + cbtn("del", "🗑", "Delete", "", "Delete");
+    return h + cbtn("fwd", "⬆", "Bring forward", "", "Forward") + cbtn("back", "⬇", "Send backward", "", "Back") + cbtn("dup", "⧉", "Duplicate on this page", "", "Duplicate") + cbtn("copy", "⎘", "Copy, then paste on any page (Ctrl+C)", "", "Copy") + cbtn("cut", "✂", "Cut, then paste on any page (Ctrl+X)", "", "Cut") + cbtn("moveto", "↪", "Move to another page", "", "Move to page") + cbtn("del", "🗑", "Delete", "", "Delete");
   }
   const tools = () => { const t = document.querySelector(".dtools .dctx"); if (t) t.innerHTML = toolsHTML(); };
+  /* 1.25.2: copy / cut / paste and move between pages (kept for this session, so you can turn pages in between) */
+  const clip = () => { try { return JSON.parse(sessionStorage.getItem("mp-dclip") || "null"); } catch (e) { return null; } };
+  const freeze = (pid, o) => { const c = JSON.parse(JSON.stringify(o)); delete c.id; if (c.k === "line") ["p1", "p2"].forEach((k) => { const p = anchor(objsOf(pid), c[k]); c[k] = { x: p.x, y: p.y }; }); return c; };
+  const setClip = (pid, o) => { try { sessionStorage.setItem("mp-dclip", JSON.stringify({ o: freeze(pid, o), from: pid })); } catch (e) {} };
+  const removeObj = (pid, id) => { PS()[pid].obj = objsOf(pid).filter((x) => x.id !== id).map((x) => { if (x.k === "line") ["p1", "p2"].forEach((k) => { if (x[k].o === id) { const p = anchor(objsOf(pid), x[k]); x[k] = { x: p.x, y: p.y }; } }); return x; }); };
+  const placeOn = (pid, c, nudge) => { const o = JSON.parse(JSON.stringify(c)); o.id = oid(); o.z = topZ(pid); const r = ratioFor(pid), d = nudge ? 0.03 : 0;
+    if (o.k === "line") ["p1", "p2"].forEach((k) => { o[k] = { x: Math.min(0.98, o[k].x + d), y: Math.min(r - 0.02, o[k].y + d) }; });
+    else { o.x = Math.min(Math.max(0, o.x + d), 1 - Math.min(o.w, 1)); o.y = Math.min(Math.max(0, o.y + d), Math.max(0, r - o.h)); }
+    objsOf(pid).push(o); return o; };
+  function pasteHere() { const cl = clip(), pid = target(); if (!cl) return MP.toast("Copy or cut an item first"); if (!pid) return MP.toast("Add a page first"); snap(pid); const o = placeOn(pid, cl.o, cl.from === pid && objsOf(pid).some((x) => x.x === cl.o.x && x.y === cl.o.y)); SEL = { pid, id: o.id }; save(pid); renderLayer(pid); tools(); MP.toast("Pasted"); }
+  function moveDlg(pid, id) {
+    const src = PS()[pid], d = MP.S.diaries[src.d] || {}, secs = (d.secs || []);
+    const groups = secs.map((s) => [s, Object.entries(PS()).filter(([, p]) => p && !p.del && p.d === src.d && p.s === s.id).sort((a, b) => (a[1].o || 0) - (b[1].o || 0))]);
+    MP.modal(`<div class="between"><h2>Move to another page</h2><button class="tool" data-close aria-label="Close">✕</button></div>
+      <label class="stack small">Page<select class="f" id="dmvto">${groups.map(([s, ps]) => `<optgroup label="${E(s.name)}">${ps.map(([p2], i) => `<option value="${E(p2)}" ${p2 === pid ? "disabled" : ""}>${E(s.name)} · page ${i + 1}${p2 === pid ? " (this page)" : ""}</option>`).join("")}</optgroup>`).join("")}</select></label>
+      <label class="row small mt"><input type="checkbox" id="dmvgo" checked> Go to that page afterwards</label>
+      <p class="tiny muted">It keeps its size and place. To put a copy on another page instead, use Copy, turn the page and tap 📋 Paste.</p>
+      <div class="row" style="justify-content:flex-end;gap:8px;margin-top:12px"><button class="btn ghost" data-close>Cancel</button><button class="btn" data-ob-moveok="${E(pid)}|${E(id)}">Move</button></div>`);
+    const sel = document.getElementById("dmvto"); const opts = [...sel.options].filter((x) => !x.disabled), idx = opts.findIndex((x) => x.value === pid); if (sel) { const after = [...sel.options].findIndex((x) => x.value === pid); const nx = [...sel.options].slice(after + 1).find((x) => !x.disabled) || opts[0]; if (nx) sel.value = nx.value; }
+  }
+  document.addEventListener("keydown", (e) => {
+    if (!(e.ctrlKey || e.metaKey) || e.altKey) return; const t = e.target; if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+    if (!document.querySelector(".dpg")) return; const k = e.key.toLowerCase(), o = selObj(), pid = SEL && SEL.pid;
+    if ((k === "c" || k === "x") && o) { e.preventDefault(); setClip(pid, o); if (k === "x") { snap(pid); removeObj(pid, o.id); SEL = null; save(pid); renderLayer(pid); } tools(); MP.toast(k === "x" ? "Cut · turn to any page and press Ctrl+V" : "Copied · Ctrl+V to paste"); }
+    if (k === "v" && clip()) { e.preventDefault(); pasteHere(); }
+  });
   MP.dobjTools = () => `<span class="dctx row wrap" style="gap:4px;align-items:center">${toolsHTML()}</span>`;
 
   document.addEventListener("click", async (e) => {
@@ -343,6 +371,8 @@
       case "imp": return importDlg();
       case "web": return webDlg();
       case "pdf": return addPdf();
+      case "paste": return pasteHere();
+      case "moveok": { const [fp, fid] = b.dataset.obMoveok.split("|"), to = (document.getElementById("dmvto") || {}).value, go = (document.getElementById("dmvgo") || {}).checked; const ob = objsOf(fp).find((x) => x.id === fid); if (!ob || !to || to === fp) return MP.closeModal(); snap(fp); snap(to); const c = freeze(fp, ob); removeObj(fp, fid); const n = placeOn(to, c, false); save(fp); save(to); MP.closeModal(); SEL = go ? { pid: to, id: n.id } : null; if (go && MP.diaryGoto) MP.diaryGoto(to); else { renderLayer(fp); tools(); } MP.toast("Moved"); return; }
       case "undo": { const p2 = target(), h = hist[p2]; if (!h || !h.length) return MP.toast("Nothing to undo"); const s = JSON.parse(h.pop()); PS()[p2].obj = s.obj; PS()[p2].bgim = s.bgim; SEL = null; save(p2); renderLayer(p2); return tools(); }
     }
     if (!o) return;
@@ -377,6 +407,9 @@
       case "rot0": o.r = 0; return done();
       case "fwd": o.z = topZ(pid); return done();
       case "back": { const mn = Math.min(...objsOf(pid).map((x) => x.z || 0)); o.z = mn - 1; return done(); }
+      case "copy": hist[pid].pop(); setClip(pid, o); tools(); MP.toast("Copied · turn to any page and tap 📋 Paste"); return;
+      case "cut": setClip(pid, o); removeObj(pid, o.id); SEL = null; MP.toast("Cut · turn to any page and tap 📋 Paste"); return done();
+      case "moveto": hist[pid].pop(); return moveDlg(pid, o.id);
       case "dup": { const c = JSON.parse(JSON.stringify(o)); c.id = oid(); c.z = topZ(pid); if (c.k === "line") { ["p1", "p2"].forEach((k) => { const p = anchor(objsOf(pid), c[k]); c[k] = { x: p.x + 0.03, y: p.y + 0.03 }; }); } else { c.x += 0.03; c.y += 0.03; } objsOf(pid).push(c); SEL = { pid, id: c.id }; return done(); }
       case "del": { PS()[pid].obj = objsOf(pid).filter((x) => x.id !== o.id).map((x) => { if (x.k === "line") ["p1", "p2"].forEach((k) => { if (x[k].o === o.id) { const p = anchor(objsOf(pid), x[k]); x[k] = { x: p.x, y: p.y }; } }); return x; }); SEL = null; MP.toast("Deleted · tap ↶ to undo"); return done(); }
     }

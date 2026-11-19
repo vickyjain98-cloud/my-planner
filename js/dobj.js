@@ -136,14 +136,18 @@
   }
 
   /* ---------- drawing the items ---------- */
+  const rgba = (h, a) => { const x = (h || "#ffffff").replace("#", ""); if (x.length < 6) return h; const n = [0, 2, 4].map((i) => parseInt(x.slice(i, i + 2), 16)); return `rgba(${n[0]},${n[1]},${n[2]},${a ?? 1})`; };
+  const cssFill = (c, g, a) => !c ? "transparent" : g ? (g.d === "r" ? `radial-gradient(circle,${rgba(c, a)},${rgba(g.c, a)})` : `linear-gradient(${g.d === "v" ? "180deg" : g.d === "h" ? "90deg" : "135deg"},${rgba(c, a)},${rgba(g.c, a)})`) : rgba(c, a);
   const box = (o) => `left:${o.x * 100}cqw;top:${o.y * 100}cqw;width:${o.w * 100}cqw;height:${o.h * 100}cqw;transform:rotate(${o.r || 0}deg);z-index:${(o.z || 1) + 1}`;
   function objHTML(o) {
     if (o.k === "photo") { const c = o.cr || { x: 0, y: 0, w: 1, h: 1 }; return `<div class="dob photo ${o.pf ? "polar" : ""}" data-ob="${o.id}" style="${box(o)}"><div class="clip"><img data-im="${E(o.im)}" alt="" draggable="false" style="width:${100 / c.w}%;height:${100 / c.h}%;left:${(-c.x / c.w) * 100}%;top:${(-c.y / c.h) * 100}%"></div></div>`; }
     if (o.k === "frame") return `<div class="dob frame" data-ob="${o.id}" style="${box(o)}"><span>📷 Add photo</span></div>`;
     if (o.k === "sticker") return `<div class="dob sticker" data-ob="${o.id}" style="${box(o)}">${o.im ? `<img data-im="${E(o.im)}" alt="" draggable="false" style="width:100%;height:100%;object-fit:contain">` : stickerSVG(o.s)}</div>`;
-    if (o.k === "text") return `<div class="dob textb" data-ob="${o.id}" style="${box(o)};background:${o.bg || "transparent"};${o.bc ? `border:2px solid ${o.bc};` : ""}"><div class="otx" style="font-family:'${E(o.font || "Caveat")}',cursive;font-size:${(o.sz || 4.4)}cqw;color:${o.tc || "var(--ink)"}">${o.html || ""}</div></div>`;
+    if (o.k === "text") return `<div class="dob textb" data-ob="${o.id}" style="${box(o)};background:${cssFill(o.bg, o.g, o.fo)};${o.bc ? `border:${o.bw || 2}px ${o.sd === "dash" ? "dashed" : o.sd === "dot" ? "dotted" : "solid"} ${o.bc};` : ""}"><div class="otx" style="font-family:'${E(o.font || "Caveat")}',cursive;font-size:${(o.sz || 4.4)}cqw;color:${o.tc || "var(--ink)"}">${o.html || ""}</div></div>`;
     if (o.k === "diagram") return diagHTML(o);
-    if (o.k === "shape") { const s = SH[o.sh] || SH.rect, sw = (o.sw ?? 3) / 6; return `<div class="dob shape" data-ob="${o.id}" style="${box(o)}"><svg viewBox="0 0 100 100" preserveAspectRatio="none"><path d="${s.d}" fill="${o.f || "none"}" stroke="${o.sc || "#333"}" stroke-width="${o.sw ?? 3}" vector-effect="non-scaling-stroke" fill-rule="evenodd"/>${s.x ? `<path d="${s.x}" fill="none" stroke="${o.sc || "#333"}" stroke-width="${o.sw ?? 3}" vector-effect="non-scaling-stroke"/>` : ""}</svg><div class="otx" style="color:${o.tc || "#222"};font-family:'${E(o.font || "Manrope")}',sans-serif">${o.html || ""}</div></div>`; }
+    if (o.k === "shape") { const s = SH[o.sh] || SH.rect, gid = "g" + o.id, da = o.sd === "dash" ? 'stroke-dasharray="8 6"' : o.sd === "dot" ? 'stroke-dasharray="1.5 5" stroke-linecap="round"' : "", st = `stroke="${o.sw === 0 ? "none" : o.sc || "#333"}" stroke-width="${o.sw ?? 3}" vector-effect="non-scaling-stroke" ${da}`;
+      const grad = o.f && o.g ? (o.g.d === "r" ? `<radialGradient id="${gid}"><stop offset="0" stop-color="${o.f}"/><stop offset="1" stop-color="${o.g.c}"/></radialGradient>` : `<linearGradient id="${gid}" x1="0" y1="0" x2="${o.g.d === "v" ? 0 : 1}" y2="${o.g.d === "h" ? 0 : 1}"><stop offset="0" stop-color="${o.f}"/><stop offset="1" stop-color="${o.g.c}"/></linearGradient>`) : "";
+      return `<div class="dob shape" data-ob="${o.id}" style="${box(o)}"><svg viewBox="0 0 100 100" preserveAspectRatio="none">${grad ? `<defs>${grad}</defs>` : ""}<path d="${s.d}" fill="${o.f ? (grad ? `url(#${gid})` : o.f) : "none"}" fill-opacity="${o.fo ?? 1}" ${st} fill-rule="evenodd"/>${s.x ? `<path d="${s.x}" fill="none" ${st}/>` : ""}</svg><div class="otx" style="color:${o.tc || "#222"};font-family:'${E(o.font || "Manrope")}',sans-serif">${o.html || ""}</div></div>`; }
     return "";
   }
   const linesSVG = (objs, sel) => `<svg class="dlines" viewBox="0 0 100 ${RATIO * 100}" preserveAspectRatio="none"><defs><marker id="dah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="context-stroke"/></marker></defs>${objs.filter((o) => o.k === "line").map((o) => { const d = linePath(o, objs), sw = (o.sw ?? 3) / 6; return `<path d="${d}" fill="none" stroke="${o.sc || "#333"}" stroke-width="${sw}" ${o.a1 ? 'marker-start="url(#dah)"' : ""} ${o.a2 ? 'marker-end="url(#dah)"' : ""} stroke-linejoin="round" stroke-linecap="round"/><path d="${d}" class="lhit" data-ob="${o.id}" fill="none" stroke="transparent" stroke-width="${Math.max(3, sw * 3)}"/>`; }).join("")}</svg>`;
@@ -228,10 +232,11 @@
     const hit = e.target.closest("[data-ob]");
     if (!hit) { if (SEL) { SEL = null; renderLayer(pid); tools(); } return; }
     const o = objs.find((x) => x.id === hit.dataset.ob); if (!o) return;
-    if (o.k === "text" && hit.querySelector(".otx[contenteditable]") && e.target.closest(".otx")) return; /* editing text: let the cursor work */
+    if ((o.k === "text" || o.k === "shape") && hit.querySelector(".otx[contenteditable]") && e.target.closest(".otx")) return; /* editing text: let the cursor work */
+    if (e.target.closest(".dnt[contenteditable]")) return;
     const was = SEL && SEL.id === o.id; SEL = { pid, id: o.id }; snap(pid);
-    const dn = e.target.closest("[data-dn]"); if (o.k === "diagram") { const nid = dn ? dn.dataset.dn : null; if (!DSN || DSN.oid !== o.id || DSN.nid !== nid) { DSN = { oid: o.id, nid }; drag = { pid, o, mode: "move", p0, o0: JSON.parse(JSON.stringify(o)), pg, moved: false, was: true }; e.preventDefault(); L.setPointerCapture(e.pointerId); renderLayer(pid); tools(); return; } }
-    drag = { pid, o, mode: "move", p0, o0: JSON.parse(JSON.stringify(o)), pg, moved: false, was }; e.preventDefault(); L.setPointerCapture(e.pointerId);
+    const dn = e.target.closest("[data-dn]"); if (o.k === "diagram" && !(was && DSN && DSN.oid === o.id && dn && DSN.nid === dn.dataset.dn)) { const nid = dn ? dn.dataset.dn : null; if (!DSN || DSN.oid !== o.id || DSN.nid !== nid) { DSN = { oid: o.id, nid }; drag = { pid, o, mode: "move", p0, o0: JSON.parse(JSON.stringify(o)), pg, moved: false, was: true }; e.preventDefault(); L.setPointerCapture(e.pointerId); renderLayer(pid); tools(); return; } }
+    drag = { pid, o, mode: "move", p0, o0: JSON.parse(JSON.stringify(o)), pg, moved: false, was, dn: dn && dn.dataset.dn }; e.preventDefault(); L.setPointerCapture(e.pointerId);
     if (!was) { renderLayer(pid); tools(); }
   });
   document.addEventListener("pointermove", (e) => {
@@ -260,7 +265,9 @@
   });
   document.addEventListener("pointerup", () => {
     if (!drag) return; const d = drag; drag = null;
-    if (d.moved) save(d.pid); else { hist[d.pid] && hist[d.pid].pop(); if (d.o.k === "frame" && d.mode === "move") fillFrame(d.pid, d.o.id); }
+    if (d.moved) save(d.pid); else { hist[d.pid] && hist[d.pid].pop(); if (d.o.k === "frame" && d.mode === "move") fillFrame(d.pid, d.o.id);
+      else if (d.mode === "move" && d.was && (d.o.k === "text" || d.o.k === "shape")) { const el = document.querySelector(`[data-ob="${d.o.id}"]`); if (el) editText(d.pid, d.o, el); }
+      else if (d.mode === "move" && d.was && d.o.k === "diagram" && d.dn) { const el = document.querySelector(`[data-ob="${d.o.id}"] [data-dn="${d.dn}"]`); if (el) editNode(d.pid, d.o, el); } }
   });
   document.addEventListener("dblclick", (e) => {
     const hit = e.target.closest && e.target.closest(".selecting .dobjs [data-ob]"); if (!hit) return; const pid = hit.closest("[data-dobjs]").dataset.dobjs, o = objsOf(pid).find((x) => x.id === hit.dataset.ob); if (!o) return;
@@ -274,9 +281,13 @@
     t.addEventListener("blur", () => { x.t = (t.textContent || "").trim().slice(0, 120) || "…"; save(pid); renderLayer(pid); }, { once: true });
   }
   function editText(pid, o, el) {
-    const t = el.querySelector(".otx"); t.setAttribute("contenteditable", "true"); t.focus(); const s = window.getSelection(); s.selectAllChildren(t); s.collapseToEnd();
-    t.addEventListener("blur", () => { o.html = MP.diaryClean(t.innerHTML); t.removeAttribute("contenteditable"); save(pid); }, { once: true });
+    const t = el.querySelector(".otx"); if (!t || t.isContentEditable) return; t.setAttribute("contenteditable", "true"); el.classList.add("editing"); t.focus(); const s = window.getSelection(); s.selectAllChildren(t); s.collapseToEnd();
+    const grow = () => { if (o.k !== "text") return; const pg = el.closest(".dpg"); if (!pg) return; const need = (t.scrollHeight + 12) / pg.getBoundingClientRect().width; if (need > o.h) { o.h = need; el.style.height = o.h * 100 + "cqw"; } };
+    t.addEventListener("input", grow);
+    t.addEventListener("blur", () => { o.html = MP.diaryClean(t.innerHTML); t.removeAttribute("contenteditable"); el.classList.remove("editing"); t.removeEventListener("input", grow); save(pid); renderLayer(pid); }, { once: true });
   }
+  /* in Type mode, tap a text box or shape to type in it */
+  document.addEventListener("click", (e) => { const el = e.target.closest && e.target.closest(".dpg.typing .dob.textb, .dpg.typing .dob.shape"); if (!el) return; const pid = el.closest("[data-dobjs]").dataset.dobjs, o = objsOf(pid).find((x) => x.id === el.dataset.ob); if (o) editText(pid, o, el); });
 
   /* ---------- adding things ---------- */
   const target = () => { const id = MP._dActive && document.querySelector(`[data-dobjs="${CSS.escape(MP._dActive)}"]`) ? MP._dActive : MP.diaryCur && MP.diaryCur(); return id; };
@@ -297,21 +308,21 @@
 
   /* ---------- toolbar in Select mode ---------- */
   const selObj = () => (SEL ? objsOf(SEL.pid).find((o) => o.id === SEL.id) : null);
-  const cbtn = (a, t, l, extra = "") => `<button type="button" class="tool" data-ob-${a} title="${l}" aria-label="${l}" ${extra}>${t}</button>`;
+  const cbtn = (a, t, l, extra = "", s) => `<button type="button" class="tool" data-ob-${a} title="${l}" aria-label="${l}" ${extra}>${s ? MP.dlb(t, s) : t}</button>`;
   const colIn = (a, v, l, sw) => `<label class="tool" title="${l}" style="position:relative">${sw}<input type="color" data-ob-${a} value="${v && v.startsWith("#") ? v : "#333333"}" class="overlay-input" aria-label="${l}"></label>`;
   function toolsHTML() {
     const o = selObj();
-    let h = `<span class="dins">${cbtn("photo", "🖼", "Photo from gallery")}${cbtn("camera", "📷", "Take a photo")}${cbtn("stk", "★", "Stickers")}${cbtn("shp", "◇", "Shapes, lines and arrows")}${cbtn("txt", "T", "Text box")}${cbtn("imp", "⇪", "Import a picture or design")}${cbtn("web", "🔎", "Find designs online")}${cbtn("pdf", "📄", "Add a PDF as pages to write on")}${cbtn("undo", MP.ic("undo", 18), "Undo")}</span>`;
+    let h = `<span class="dins">${cbtn("photo", "🖼", "Photo from gallery", "", "Photo")}${cbtn("camera", "📷", "Take a photo", "", "Camera")}${cbtn("stk", "★", "Stickers", "", "Sticker")}${cbtn("shp", "◇", "Shapes, lines, arrows and diagrams", "", "Shapes")}${cbtn("txt", "T", "Text box", "", "Text box")}${cbtn("imp", "⇪", "Import a picture or design", "", "Import")}${cbtn("web", "🔎", "Find designs online", "", "Designs")}${cbtn("pdf", "📄", "Add a PDF as pages to write on", "", "PDF")}${cbtn("undo", MP.ic("undo", 22), "Undo", "", "Undo")}</span>`;
     if (!o) return h + `<span class="tiny muted" style="margin-left:6px">Tap an item to move, resize or rotate it</span>`;
     h += `<span class="vsep"></span>`;
     if (o.k === "photo") h += cbtn("crop", "✂ Crop", "Crop") + cbtn("replace", "Replace", "Replace photo") + cbtn("polar", o.pf ? "▢ Border on" : "▢ Border", "White photo border");
     if (o.k === "frame") h += cbtn("fill", "📷 Add photo", "Put a photo in this frame");
-    if (o.k === "shape") h += colIn("fill", o.f, "Fill colour", `<span class="cdot" style="background:${o.f || "transparent"}"></span>`) + cbtn("nofill", "∅", "No fill") + colIn("stroke", o.sc, "Outline colour", `<span class="cdot ring" style="border-color:${o.sc || "#333"}"></span>`) + `<select class="f sm" data-ob-sw aria-label="Outline width">${[0, 1, 2, 3, 5, 8].map((n) => `<option value="${n}" ${(o.sw ?? 3) == n ? "selected" : ""}>${n ? n + " pt" : "No outline"}</option>`).join("")}</select>` + colIn("tc", o.tc, "Text colour", "A") + cbtn("edit", "✎ Text", "Type in the shape");
-    if (o.k === "text") h += `<select class="f sm" data-ob-font aria-label="Font">${["Caveat", "Kalam", "Patrick Hand", "Dancing Script", "Fraunces", "Playfair Display", "Poppins", "Inter"].map((f) => `<option ${o.font === f ? "selected" : ""}>${f}</option>`).join("")}</select>` + cbtn("smaller", "A−", "Smaller") + cbtn("bigger", "A+", "Bigger") + colIn("tc", o.tc, "Text colour", "A") + colIn("bg", o.bg, "Box colour", `<span class="cdot" style="background:${o.bg || "transparent"}"></span>`) + cbtn("nobg", "∅", "No box colour") + cbtn("border", "▭", "Border on/off") + cbtn("edit", "✎ Edit", "Edit text");
+    if (o.k === "shape") h += cbtn("fillpanel", `<span class="cdot" style="background:${cssFill(o.f, o.g, o.fo)}"></span>`, "Fill, transparency, gradient and outline", "", "Fill & line") + cbtn("nofill", "▢", "No fill: outline only, the page shows through", "", "Outline only") + colIn("tc", o.tc, "Text colour", MP.dlb("A", "Text colour")) + cbtn("edit", "✎", "Type in the shape", "", "Type text");
+    if (o.k === "text") h += `<select class="f sm" data-ob-font aria-label="Font">${["Caveat", "Kalam", "Patrick Hand", "Dancing Script", "Fraunces", "Playfair Display", "Poppins", "Inter"].map((f) => `<option ${o.font === f ? "selected" : ""}>${f}</option>`).join("")}</select>` + cbtn("smaller", "A−", "Smaller") + cbtn("bigger", "A+", "Bigger") + colIn("tc", o.tc, "Text colour", MP.dlb("A", "Text colour")) + cbtn("fillpanel", `<span class="cdot" style="background:${cssFill(o.bg, o.g, o.fo)}"></span>`, "Box colour, transparency, gradient and border", "", "Box & border") + cbtn("edit", "✎", "Type in the box", "", "Type text");
     if (o.k === "diagram") { const tr = o.dt === "mind" || o.dt === "tree"; h += cbtn("dadd", tr ? "+ Branch" : "+ Add", tr ? "Add a branch under the picked box" : "Add a box after the picked one") + (tr ? cbtn("dsib", "+ Same level", "Add a box next to the picked one") : "") + cbtn("drm", "− Remove", "Remove the picked box") + (o.dt === "flow" ? cbtn("ddec", "◇ Decision", "Make the picked box a decision") : "") + cbtn("dedit", "✎ Text", "Type in the picked box") + cbtn("dpal", "🎨 Colours", "Change colours") + `<span class="tiny muted">${DSN && DSN.oid === o.id && DSN.nid ? "Box picked" : "Tap a box to pick it"}</span>`; }
     if (o.k === "line") h += colIn("stroke", o.sc, "Line colour", `<span class="cdot ring" style="border-color:${o.sc || "#333"}"></span>`) + `<select class="f sm" data-ob-sw aria-label="Line width">${[1, 2, 3, 5, 8].map((n) => `<option value="${n}" ${(o.sw ?? 3) == n ? "selected" : ""}>${n} pt</option>`).join("")}</select>` + `<select class="f sm" data-ob-lt aria-label="Line type">${[["s", "Straight"], ["e", "Elbow"], ["c", "Curved"]].map(([k, n]) => `<option value="${k}" ${o.t === k ? "selected" : ""}>${n}</option>`).join("")}</select>` + cbtn("a1", "◀", "Arrow at start", o.a1 ? 'style="background:var(--soft)"' : "") + cbtn("a2", "▶", "Arrow at end", o.a2 ? 'style="background:var(--soft)"' : "");
-    if (o.k !== "line") h += `<span class="tiny muted">${Math.round(o.r || 0)}°</span>` + cbtn("rot0", "0°", "Straighten");
-    return h + cbtn("fwd", "⬆", "Bring forward") + cbtn("back", "⬇", "Send backward") + cbtn("dup", "⧉", "Duplicate") + cbtn("del", "🗑", "Delete");
+    if (o.k !== "line") h += cbtn("rot0", "⟲", "Straighten to 0°", "", `${Math.round(o.r || 0)}° · Straighten`);
+    return h + cbtn("fwd", "⬆", "Bring forward", "", "Forward") + cbtn("back", "⬇", "Send backward", "", "Back") + cbtn("dup", "⧉", "Duplicate", "", "Copy") + cbtn("del", "🗑", "Delete", "", "Delete");
   }
   const tools = () => { const t = document.querySelector(".dtools .dctx"); if (t) t.innerHTML = toolsHTML(); };
   MP.dobjTools = () => `<span class="dctx row wrap" style="gap:4px;align-items:center">${toolsHTML()}</span>`;
@@ -340,7 +351,8 @@
       case "replace": hist[pid].pop(); return fillFrame(pid, o.id);
       case "fill": hist[pid].pop(); return fillFrame(pid, o.id);
       case "polar": o.pf = o.pf ? 0 : 1; return done();
-      case "nofill": o.f = ""; return done();
+      case "nofill": o.f = ""; o.g = null; return done();
+      case "fillpanel": hist[pid].pop(); return fillDlg(pid, o.id);
       case "nobg": o.bg = ""; return done();
       case "border": o.bc = o.bc ? "" : "#555555"; return done();
       case "smaller": o.sz = Math.max(2, (o.sz || 4.4) - 0.6); return done();
@@ -380,6 +392,45 @@
     if (d.obFont !== undefined) { snap(pid); o.font = t.value; save(pid); renderLayer(pid); }
   });
   document.addEventListener("keydown", (e) => { if (!SEL || !document.querySelector(".selecting") || /INPUT|TEXTAREA|SELECT/.test(e.target.tagName) || e.target.isContentEditable) return; if (e.key === "Delete" || e.key === "Backspace") { e.preventDefault(); const b = document.querySelector("[data-ob-del]"); if (b) b.click(); } });
+
+  /* ---------- fill and outline (shapes and text boxes) ---------- */
+  const FILLS = ["#FFFFFF", "#FFFDF6", "#F2EFE8", "#FFE3EC", "#FFE5D2", "#FFF6C7", "#DDF5E6", "#DDF0FB", "#ECE4FB", "#FF8C7A", "#E5484D", "#FF9F43", "#FFC145", "#FFE45C", "#B8E05C", "#2ECC71", "#2BB3A6", "#22C3E6", "#4FA3F7", "#4161E0", "#8E5CE6", "#E056A0", "#B8336A", "#C8734F", "#8B6B53", "#6B7A8F", "#2B2B2E", "#000000"];
+  let fp = null;
+  function fillDlg(pid, id) {
+    const o = objsOf(pid).find((x) => x.id === id); if (!o) return; fp = { pid, id }; snap(pid);
+    const shape = o.k === "shape", fc = shape ? o.f : o.bg, lc = shape ? o.sc || "#333333" : o.bc || "", lw = shape ? o.sw ?? 3 : o.bc ? o.bw || 2 : 0, g = o.g;
+    const sw = (attr, c, on) => `<button class="dsw ${on ? "on" : ""}" ${attr}="${c}" style="background:${c}" aria-label="${c}"></button>`;
+    MP.modal(`<div class="between"><h2>${shape ? "Fill and outline" : "Box colour and border"}</h2><button class="tool" data-close aria-label="Close">✕</button></div>
+      <div class="dpsec"><b>Fill</b></div>
+      <div class="row wrap" style="gap:6px;align-items:center"><button class="dsw none ${!fc ? "on" : ""}" data-fpf="" title="No fill: only the outline, the page shows through">∅</button>${FILLS.map((c) => sw("data-fpf", c, fc && fc.toLowerCase() === c.toLowerCase())).join("")}<label class="dsw any" title="Any colour">+<input type="color" data-fpfany value="${fc || "#ffffff"}" class="overlay-input" aria-label="Any fill colour"></label></div>
+      ${fc ? `<label class="row small mt" style="gap:10px">See-through <input type="range" min="0" max="90" step="5" value="${Math.round((1 - (o.fo ?? 1)) * 100)}" data-fpo style="flex:1"> <span class="tiny" data-fpov>${Math.round((1 - (o.fo ?? 1)) * 100)}%</span></label>
+      <div class="dpsec"><b>Gradient</b> <span class="tiny muted">· blend into a second colour</span></div>
+      <div class="row wrap" style="gap:6px;align-items:center"><button class="tool ${!g ? "on" : ""}" data-fpgd="">None</button>${[["h", "→ Across"], ["v", "↓ Down"], ["d", "↘ Corner"], ["r", "◎ Round"]].map(([k, n]) => `<button class="tool ${g && g.d === k ? "on" : ""}" data-fpgd="${k}">${n}</button>`).join("")}</div>
+      ${g ? `<div class="row wrap mt" style="gap:6px;align-items:center"><span class="tiny muted">Second colour</span>${FILLS.map((c) => sw("data-fpg2", c, g.c && g.c.toLowerCase() === c.toLowerCase())).join("")}<label class="dsw any" title="Any colour">+<input type="color" data-fpg2any value="${g.c || "#ffffff"}" class="overlay-input" aria-label="Any second colour"></label></div>` : ""}` : ""}
+      <div class="dpsec"><b>${shape ? "Outline" : "Border"}</b></div>
+      <div class="row wrap" style="gap:6px;align-items:center"><button class="dsw none ${!lw ? "on" : ""}" data-fplw="0" title="No ${shape ? "outline" : "border"}">∅</button>${FILLS.filter((c, i) => i > 8).map((c) => sw("data-fpl", c, lw && lc.toLowerCase() === c.toLowerCase())).join("")}<label class="dsw any" title="Any colour">+<input type="color" data-fplany value="${lc || "#333333"}" class="overlay-input" aria-label="Any outline colour"></label></div>
+      <div class="row wrap mt" style="gap:6px;align-items:center"><span class="tiny muted">Thickness</span>${[1, 2, 3, 5, 8].map((n) => `<button class="tool ${lw === n ? "on" : ""}" data-fplw="${n}">${n}</button>`).join("")}<span class="tiny muted" style="margin-left:10px">Style</span>${[["", "━ Solid"], ["dash", "╍ Dashed"], ["dot", "┈ Dotted"]].map(([k, n]) => `<button class="tool ${(o.sd || "") === k ? "on" : ""}" data-fpsd="${k}">${n}</button>`).join("")}</div>
+      <div class="row" style="justify-content:flex-end;gap:8px;margin-top:14px"><button class="btn ghost" data-fpcancel>Undo changes</button><button class="btn" data-close>Done</button></div>`);
+  }
+  const fpApply = (fn, redraw = true) => { if (!fp) return; const o = objsOf(fp.pid).find((x) => x.id === fp.id); if (!o) return; fn(o, o.k === "shape"); save(fp.pid); renderLayer(fp.pid); tools(); if (redraw) { const a = document.querySelector("#modal .in"), t = a ? a.scrollTop : 0; fillDlg(fp.pid, fp.id); hist[fp.pid].pop(); const b = document.querySelector("#modal .in"); if (b) b.scrollTop = t; } };
+  document.addEventListener("click", (e) => {
+    const b = e.target.closest && e.target.closest("button"); if (!b || !fp) return; const d = b.dataset;
+    if (d.fpf !== undefined) return fpApply((o, sh) => { if (sh) o.f = d.fpf; else o.bg = d.fpf; if (!d.fpf) o.g = null; });
+    if (d.fpgd !== undefined) return fpApply((o, sh) => { o.g = d.fpgd ? { d: d.fpgd, c: (o.g && o.g.c) || "#FFFFFF" } : null; });
+    if (d.fpg2 !== undefined) return fpApply((o) => { if (o.g) o.g.c = d.fpg2; });
+    if (d.fpl !== undefined) return fpApply((o, sh) => { if (sh) { o.sc = d.fpl; if (!o.sw) o.sw = 3; } else { o.bc = d.fpl; if (!o.bw) o.bw = 2; } });
+    if (d.fplw !== undefined) return fpApply((o, sh) => { const n = +d.fplw; if (sh) o.sw = n; else { o.bw = n; if (!n) o.bc = ""; else if (!o.bc) o.bc = "#555555"; } });
+    if (d.fpsd !== undefined) return fpApply((o) => { o.sd = d.fpsd; });
+    if (d.fpcancel !== undefined) { const h = hist[fp.pid]; if (h && h.length) { const s = JSON.parse(h.pop()); PS()[fp.pid].obj = s.obj; save(fp.pid); renderLayer(fp.pid); } fp = null; MP.closeModal(); tools(); return; }
+  });
+  document.addEventListener("input", (e) => {
+    const t = e.target, d = t.dataset || {}; if (!fp) return;
+    if (d.fpo !== undefined) { const v = +t.value; const lab = document.querySelector("[data-fpov]"); if (lab) lab.textContent = v + "%"; return fpApply((o) => { o.fo = 1 - v / 100; }, false); }
+    if (d.fpfany !== undefined) return fpApply((o, sh) => { if (sh) o.f = t.value; else o.bg = t.value; }, false);
+    if (d.fpg2any !== undefined) return fpApply((o) => { if (o.g) o.g.c = t.value; }, false);
+    if (d.fplany !== undefined) return fpApply((o, sh) => { if (sh) { o.sc = t.value; if (!o.sw) o.sw = 3; } else { o.bc = t.value; if (!o.bw) o.bw = 2; } }, false);
+  });
+  document.addEventListener("change", (e) => { const d = e.target.dataset || {}; if (fp && (d.fpfany !== undefined || d.fpg2any !== undefined || d.fplany !== undefined)) fpApply(() => {}); });
 
   /* ---------- dialogs ---------- */
   const dgThumb = (k) => { const [w, h] = DG[k][2]; return `<div style="position:relative;container-type:inline-size;height:66px;max-width:100%;aspect-ratio:${w}/${h}">${diagHTML({ id: "t", dt: k, n: newDiagram(k), pal: 0, x: 0, y: 0, w: 1, h: h / w, r: 0, z: 0 }).replace('class="dob diag"', 'class="dob diag thumb"')}</div>`; };

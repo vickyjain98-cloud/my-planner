@@ -27,6 +27,7 @@
   const hide = () => { if (live) return; if (field) field.classList.remove("vfocus"); btn.hidden = true; bub.classList.remove("on"); field = null; };
   document.addEventListener("focusin", (e) => { if (ok(e.target)) show(e.target); });
   document.addEventListener("focusout", (e) => { if (e.target === field) hideT = setTimeout(hide, 250); });
+  setInterval(() => { if (field && !live && (!document.contains(field) || document.activeElement !== field)) hide(); }, 600); /* the box was redrawn or left */
   window.addEventListener("scroll", () => field && place(), true); window.addEventListener("resize", () => field && place());
 
   /* words that become punctuation */

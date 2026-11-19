@@ -1895,7 +1895,7 @@
   document.addEventListener("pointercancel", () => { if (drag) { drag.el.remove(); drag = null; MP.render(); } });
 
   /* ---------- start-up ---------- */
-  MP.VERSION = "1.21";
+  MP.VERSION = "1.22";
   if (MP.sound) MP.sound.onchange = () => { miniPlayer(); if (route === "study") MP.render(); };
   /* Public, read-only helpers for future modules and connectors. */
   MP.api = { today, iso, dayPct, studyHours, streak, tasks, feed: () => MP.buildFeed(MP.S), version: MP.VERSION, schemaVersion: MP.SCHEMA_VERSION };

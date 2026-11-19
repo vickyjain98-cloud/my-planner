@@ -349,15 +349,15 @@ window.MP_HELP = [
 "Sections are the coloured tabs (like dividers). Tap + Section to add one; tap ✎ on the open section to rename it, change its colour or delete it.",
 "Write: tap the pen for the S Pen (six pens, any colour, eraser, undo), the keyboard to type, or 🎤 to speak. Typing has bold, italic, underline, strikethrough, 12 fonts (four handwriting styles, Kalam also writes Hindi), sizes, text colour, highlighter, headings, lists, checkboxes and alignment.",
 "Turn pages with ‹ ›, a finger swipe, the ← → keys, or the page strip at the bottom. Under the page there is always Continue on next page ›, and on the last page + New page (same layout).",
-"+ Add page… lets you choose the template (16 professional, 20 creative), the page colour (12 quick colours, recent colours, or any colour with +) and the texture (12). Tick Make this the default to use it for every new page in that diary.",
-"⋯ Page changes the current page's template, colour, texture and date, duplicates it, moves it to another section, or deletes it.",
+"+ Add page… opens the same four choices for a new page. Tick Make this the default to use it for every new page in that diary.",
+"⚙ Page setup (top right, next to Page and Book) has four parts: ① Template (30 professional and 30 creative), ② Page colour (44 colours in Soft, Bright, Earthy and Dark, recent colours, or any colour with +), ③ Texture (27, shown on your page colour) and ④ Date style. It also duplicates the page, moves it to another section, or deletes it.",
 "Dates: a new page offers to add today's date. Tap the date on a page to change it, pick a style (chip, handwritten, numbers, week strip) or remove it. ⋯ Diary sets Ask / Always / Never for new pages.",
-"Page shows one page; Book shows two side by side on a tablet or laptop. ⋯ Diary renames the diary, changes its theme or default font, or deletes it."
+"Page shows one page; Book shows two side by side on a tablet or laptop. ⋯ Diary settings renames the diary, changes its theme (and, if you like, the pages already in it), the date setting and default font, or deletes it."
 ]
 ],
 [
 "p",
-"Photos, stickers, shapes and text boxes: tap ✥ in the toolbar. Then 🖼 adds a photo from your gallery, 📷 takes one with the camera, ★ adds a sticker, ◇ opens the shapes (the same groups as Microsoft Word: lines, basic shapes, block arrows, flowchart, callouts, stars and banners), T adds a text box, ⇪ imports a picture or design, and 🔎 opens free design sites matched to your diary's theme."
+"Photos, stickers, shapes and text boxes: tap ✥ Insert in the toolbar. Then 🖼 adds a photo from your gallery, 📷 takes one with the camera, ★ adds a sticker, ◇ opens the shapes (the same groups as Microsoft Word: lines, basic shapes, block arrows, flowchart, callouts, stars and banners), T adds a text box, ⇪ imports a picture or design, and 🔎 opens free design sites matched to your diary's theme."
 ],
 [
 "list",
@@ -366,7 +366,7 @@ window.MP_HELP = [
 "Crop: select a photo and tap ✂ Crop (or double-tap it). Drag the box or its corners, or pick Square, 4:3, 3:4, 16:9 or Original. The whole photo is kept, so you can crop again later.",
 "Photo frames on creative pages (garden log, scrapbook, vision board, travel, recipe) are items too: move, resize or rotate them, and tap one in ✥ mode to fill it with a photo, which is cropped to fit.",
 "Shapes: change the fill, outline colour and width; double-tap to type inside. Lines and arrows: drag an end onto the edge of a shape and it stays attached when you move the shape; choose straight, elbow or curved, and arrowheads at either end.",
-"Text boxes: double-tap to edit; change the font, size, colour, box colour and border.",
+"Text boxes and shapes: tap once to pick, tap again to type (or use ✎ Type text). In Type mode, one tap on a text box or shape starts typing. Text boxes grow as you type. Fill & line (shapes) and Box & border (text boxes) set the colour, how see-through it is, a gradient into a second colour, and the outline colour, thickness and style. ▢ Outline only removes the fill so the page shows through.",
 "⬆ ⬇ bring an item forward or back, ⧉ duplicates, 🗑 deletes, and ↶ undoes. You can still write over photos with the pen.",
 "Import: a picture can become a photo, a sticker, or the page background. Everything you import is kept in My imports to reuse on any page.",
 "Diagrams: ◇ opens Diagrams at the top: flowchart, process flow, mind map, cycle, hierarchy, timeline, Venn and pyramid. Tap a box to pick it and double-tap to type in it. + Add puts a new step after the picked box (+ Branch and + Same level for mind maps and hierarchies), − Remove deletes it, ◇ Decision turns a flowchart step into a decision, and 🎨 Colours changes the colour set. The whole diagram moves, resizes and rotates like any other item.",

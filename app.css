@@ -366,3 +366,13 @@ input[type=time]{cursor:pointer}
 
 /* 1.17 writing space that grows */
 .padmore{display:flex;justify-content:flex-end;padding:2px 14px 8px}
+
+/* 1.18 voice input */
+.vmic{position:fixed;z-index:300;width:30px;height:30px;border-radius:50%;border:0;background:var(--acc,#5B765F);color:var(--onacc,#fff);display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.25);padding:0}
+.vmic[hidden]{display:none}
+.vmic.live{background:#D64545;color:#fff;animation:vpulse 1.2s ease-in-out infinite}
+@keyframes vpulse{0%,100%{box-shadow:0 0 0 0 rgba(214,69,69,.55)}50%{box-shadow:0 0 0 9px rgba(214,69,69,0)}}
+.vbub{position:fixed;z-index:300;max-width:292px;background:var(--surf,#fff);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:6px 10px;font-size:13px;box-shadow:0 6px 16px rgba(0,0,0,.18);display:none}
+.vbub.on{display:block}
+.vfocus{padding-right:38px !important}
+@media print{.vmic,.vbub{display:none!important}}

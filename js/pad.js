@@ -13,7 +13,7 @@
     hl: '<path d="M6 14l7-7 4 4-7 7H6z"/><path d="M4 21h10" stroke-width="4" opacity=".4"/>', calli: '<path d="M4 20c4-1 7-4 9-8l3-6 2 2-6 3c-4 2-7 5-8 9z"/>'
   };
   const svg = (p, s = 18) => `<svg aria-hidden="true" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
-  const modeBtns = () => `<span class="seg" role="group" aria-label="Input"><button type="button" class="tool ${MP.inputMode === "pen" ? "on" : ""}" data-mode="pen" title="Write with S Pen or finger" aria-label="Write with pen">${MP.ic("penm", 18)}</button><button type="button" class="tool ${MP.inputMode === "type" ? "on" : ""}" data-mode="type" title="Type with keyboard" aria-label="Type with keyboard">${MP.ic("kbd", 18)}</button></span><span class="vsep"></span>`;
+  const modeBtns = (key) => `<span class="seg" role="group" aria-label="Input"><button type="button" class="tool ${MP.inputMode === "pen" ? "on" : ""}" data-mode="pen" title="Write with S Pen or finger" aria-label="Write with pen">${MP.ic("penm", 18)}</button><button type="button" class="tool ${MP.inputMode === "type" ? "on" : ""}" data-mode="type" title="Type with keyboard" aria-label="Type with keyboard">${MP.ic("kbd", 18)}</button>${MP.voiceOK && key && (MP.S.profile.voice || {}).on !== false ? `<button type="button" class="tool" data-padmic="${MP.esc(key)}" title="Speak instead of typing" aria-label="Speak instead of typing"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>` : ""}</span><span class="vsep"></span>`;
 
   /* 1.17: every writing area can grow — Enter or "+ Add 3 lines" when typing; with the pen, new lines appear as you reach the bottom */
   const tLine = (key, i, v, num, lineH) => `<div class="tline"><span class="tiny muted">${num ? i + 1 : ""}</span><textarea class="typed" rows="1" data-tk="${MP.esc(key)}" data-ti="${i}" maxlength="2000" aria-label="Line ${i + 1}" style="min-height:${lineH - 6}px">${MP.esc(v)}</textarea></div>`;
@@ -25,9 +25,9 @@
     if (MP.inputMode === "type") {
       const tv = (S.typed[key] && S.typed[key].l) || [], n = Math.max(lines, tv.length);
       const hasInk = S.ink[key] && S.ink[key].s && S.ink[key].s.length;
-      return `<div class="pad" data-tpad="${E(key)}"><div class="padbar noprint">${modeBtns()}<span class="tiny muted">Typing${hasInk ? " · your handwriting is kept; switch to the pen to see it" : ""}</span></div><div class="typedbox">${[...Array(n)].map((_, i) => tLine(key, i, tv[i] || "", n > 1, lineH)).join("")}</div>${addBtn(key)}</div>`;
+      return `<div class="pad" data-tpad="${E(key)}"><div class="padbar noprint">${modeBtns(key)}<span class="tiny muted">Typing${hasInk ? " · your handwriting is kept; switch to the pen to see it" : ""}</span></div><div class="typedbox">${[...Array(n)].map((_, i) => tLine(key, i, tv[i] || "", n > 1, lineH)).join("")}</div>${addBtn(key)}</div>`;
     }
-    return `<div class="pad" data-pad="${E(key)}"><div class="padbar noprint">${modeBtns()}
+    return `<div class="pad" data-pad="${E(key)}"><div class="padbar noprint">${modeBtns(key)}
       ${PENS.map((p) => `<button type="button" class="tool ${pen.type === p[0] && !pen.eraser ? "on" : ""}" data-pen="${p[0]}" title="${p[1]}" aria-label="${p[1]}">${svg(PI[p[0]])}</button>`).join("")}
       <span class="vsep"></span>
       ${INKS.map((c) => `<button type="button" class="sw ${pen.color === c ? "on" : ""}" data-ink="${c}" style="background:${c}" aria-label="Ink colour"></button>`).join("")}

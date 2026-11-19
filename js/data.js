@@ -56,6 +56,7 @@ window.MP_DATA = {
   },
   /* Version history: newest first. Shown once per person after an update ("What's new"). */
   changelog: [
+    { v: "1.18", date: "2026-11-19", items: ["Voice input: tap any text box and a 🎤 appears. Speak and your words are typed in, in quick add, tasks, Add / schedule, journal, affirmations, 3-6-9, post-its and more. Say comma or full stop for punctuation. Language and on/off in Settings → Voice input."] },
     { v: "1.17", date: "2026-11-19", items: ["More room to write: Journal, affirmations, 3-6-9, gratitude, wins and post-it notes now grow. With the S Pen new lines appear as you reach the bottom; when typing, Enter adds a line and long lines wrap. + Add 3 lines is at the bottom of every writing area."] },
     { v: "1.16.2", date: "2026-11-19", items: ["Plan my day is now a bright banner at the top of Today, showing what is left over and how many to-dos you have, until you have planned the day."] },
     { v: "1.16.1", date: "2026-11-18", items: ["Post-its now show one at a time: use ‹ › to go through them (1 of 5 and so on). Tick one to strike it out.", "The time picker is smaller and easy to read in every theme, including Midnight Moon.", "Shut down explains where the Tomorrow, Later and Drop buttons appear when nothing is left open."] },

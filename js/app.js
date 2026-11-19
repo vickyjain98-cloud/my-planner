@@ -132,6 +132,7 @@
   MP.toast = (m) => { const t = document.getElementById("toast"); t.textContent = m; t.classList.add("on"); clearTimeout(MP.toast.h); MP.toast.h = setTimeout(() => t.classList.remove("on"), 3200); };
   const modal = (html) => { const m = document.getElementById("modal"); m.querySelector(".in").innerHTML = html; m.classList.add("on"); const f = m.querySelector("input,select,button"); if (f) f.focus(); };
   const closeModal = () => document.getElementById("modal").classList.remove("on");
+  MP.modal = modal; MP.closeModal = closeModal;
   const head = (lab, title, extra = "") => `<div class="between hdr"><div><div class="lab">${lab}</div><h1 class="title">${title}</h1></div>${extra}</div>`;
   const ring = (p, size = 120, stroke = 12, label = "") => { const r = (size - stroke) / 2, c = 2 * Math.PI * r; p = Math.max(0, Math.min(1, p || 0)); return `<svg role="img" aria-label="${Math.round(p * 100)}%" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="var(--soft)" stroke-width="${stroke}"/><circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="var(--acc)" stroke-width="${stroke}" stroke-linecap="round" stroke-dasharray="${c * p} ${c}" transform="rotate(-90 ${size / 2} ${size / 2})"/><text x="50%" y="${label ? 47 : 53}%" text-anchor="middle" style="font-family:var(--disp)" font-size="${size / 4.2}" fill="var(--ink)">${Math.round(p * 100)}%</text>${label ? `<text x="50%" y="66%" text-anchor="middle" font-size="10" fill="var(--muted)" font-weight="700">${label}</text>` : ""}</svg>`; };
   const bars = (vals, labels, h = 150, fv = (v) => Math.round(v * 100) + "%") => { const w = Math.max(260, vals.length * 44), bw = Math.min(28, (w / vals.length) * 0.55); let s = `<svg role="img" aria-label="Bar chart" viewBox="0 0 ${w} ${h + 34}" width="100%" style="max-width:${w}px">`; vals.forEach((v, i) => { const x = (i + 0.5) * (w / vals.length), bh = Math.max(2, Math.min(1, v || 0) * h); s += `<rect x="${x - bw / 2}" y="${h - bh + 10}" width="${bw}" height="${bh}" rx="${bw / 3}" fill="var(--acc)" opacity="${v === null ? 0.2 : 1}"/><text x="${x}" y="${h + 28}" text-anchor="middle" font-size="11" fill="var(--muted)" font-weight="600">${labels[i]}</text>${v !== null ? `<text x="${x}" y="${h - bh + 4}" text-anchor="middle" font-size="10" fill="var(--ink)" font-weight="700">${fv(v)}</text>` : ""}`; }); return s + "</svg>"; };
@@ -1038,6 +1039,7 @@
         <label class="row small"><input type="checkbox" data-ritplan ${RIT().plan !== false ? "checked" : ""}> Show Plan my day the first time I open the planner each morning</label>
         <label class="row small"><input type="checkbox" data-ritshut ${RIT().shut !== false ? "checked" : ""}> Remind me to shut down my day at <input class="f" type="time" data-ritat value="${E(RIT().at || "21:30")}" style="width:auto"></label>
         ${mode === "google" ? `<label class="row small"><input type="checkbox" data-ritcal ${RIT().cal ? "checked" : ""} ${G.hasCal ? "" : "disabled"}> Also as a daily Google Calendar reminder (rings even when the app is closed)${G.hasCal ? "" : " · connect Google Calendar above first"}</label>` : ""}</section>
+      ${MP.voiceCard ? MP.voiceCard() : ""}
       <section class="card stack mb" id="set-lock"><span class="lab">Privacy · journal lock</span>
         ${lockOn() ? `<div class="small">${ic("lock", 14)} On: Journal, Mood, 3-6-9 and History ask for your PIN${bioId() ? " or fingerprint / face" : ""}. They lock again 5 minutes after you leave the app.</div>
         <div class="row">${bioOK() && !bioId() ? `<button class="btn sm" data-bioset>Use fingerprint or face on this device</button>` : ""}${bioId() ? `<button class="btn ghost sm" data-biooff>Stop using fingerprint / face here</button>` : ""}<button class="btn ghost sm" data-pinchange>Change PIN</button><button class="btn ghost sm danger" data-pinoff>Turn the lock off</button></div>`
@@ -1889,7 +1891,7 @@
   document.addEventListener("pointercancel", () => { if (drag) { drag.el.remove(); drag = null; MP.render(); } });
 
   /* ---------- start-up ---------- */
-  MP.VERSION = "1.17";
+  MP.VERSION = "1.18";
   if (MP.sound) MP.sound.onchange = () => { miniPlayer(); if (route === "study") MP.render(); };
   /* Public, read-only helpers for future modules and connectors. */
   MP.api = { today, iso, dayPct, studyHours, streak, tasks, feed: () => MP.buildFeed(MP.S), version: MP.VERSION, schemaVersion: MP.SCHEMA_VERSION };

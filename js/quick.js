@@ -16,6 +16,7 @@
   MP.quickParse = (raw, now = new Date()) => {
     const out = { t: "", kind: "", d: "", time: "", end: "", rep: "", repDays: [], urg: false, imp: false, due: "", heard: [] };
     let s = " " + String(raw || "").replace(/\s+/g, " ").trim() + " ";
+    s = s.replace(/([\w.])([,;!?])(?=\s)/g, "$1 $2"); /* "6 pm, thanks" (voice typing adds commas) */
     const take = (re, fn) => { const m = s.match(re); if (!m) return false; s = s.slice(0, m.index) + " " + s.slice(m.index + m[0].length); if (fn) fn(m); return true; };
     const base = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const dateFrom = (day, mon) => { let y = base.getFullYear(), d = new Date(y, mon, day); if (d.getMonth() !== mon) return ""; if (d < base) d = new Date(y + 1, mon, day); return isoD(d); };
@@ -79,7 +80,7 @@
     if (!out.d && (out.time || out.rep)) out.d = isoD(base);
     if (out.kind === "task" && !out.d) out.d = isoD(base);
     /* title: what's left */
-    let t = s.replace(/\s(?:at|on|by|from|to|ko|ki|ka|mein|me)\s*$/i, " ").replace(/^\s*(?:to|ki|ke)\s/i, " ").replace(/\s{2,}/g, " ").trim().replace(/[,;:\-–]+$/, "").trim();
+    let t = s.replace(/\s(?:at|on|by|from|to|ko|ki|ka|mein|me)\s*$/i, " ").replace(/^\s*(?:to|ki|ke)\s/i, " ").replace(/\s{2,}/g, " ").replace(/\s+([,;!?.])/g, "$1").trim().replace(/^[,;:\-–]+\s*/, "").replace(/[,;:\-–]+$/, "").trim();
     out.t = t ? t.charAt(0).toUpperCase() + t.slice(1) : String(raw || "").trim();
     return out;
   };

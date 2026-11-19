@@ -406,6 +406,7 @@ window.MP_HELP = [
 [
 "tip",
 "Rest your palm on the screen while writing: once the S Pen touches, finger touches are ignored. Handwriting is kept even when you switch to typing.",
+"Speak instead of typing: tap any text box and a 🎤 appears at its right edge (or tap 🎤 in a writing area's toolbar). Speak; the words are typed in. Say comma, full stop, question mark or new line for punctuation. Tap the mic again to stop. The first time, a note explains that your browser's speech service (Google or Apple) converts the speech; My Planner keeps no audio. Choose English (India), Hindi, UK or US English, or turn the mic off, in Settings → Voice input. Needs the internet; not available in Firefox.",
 "Need more room? With the pen, two new lines appear by themselves when you write on the last line. When typing, press Enter on the last line for a new one (long lines wrap), and Backspace on an empty line takes you back. Every writing area also has + Add 3 lines at the bottom. Extra lines are saved and sync to your other devices."
 ]
 ]

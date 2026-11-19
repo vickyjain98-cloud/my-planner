@@ -730,3 +730,27 @@ contains the above copyright notice and this license. These can be
 included either as stand-alone text files, human-readable headers or
 in the appropriate machine-readable metadata fields within text or
 binary files as long as those fields can be easily viewed by the user.
+
+== caveat ==
+Copyright 2014 The Caveat Project Authors (https://github.com/googlefonts/caveat)
+
+This Font Software is licensed under the SIL Open Font License, Version 1.1.
+Licensed under the SIL Open Font License, Version 1.1 (full text above).
+
+== kalam ==
+Copyright (c) 2014 Indian Type Foundry (info@indiantypefoundry.com) Kalam-Regular.ttf: Copyright (c) 2014 Indian Type Foundry (info@indiantypefoundry.com) Kalam-Bold.ttf: Copyright (c) 2014 Indian Type Foundry (info@indiantypefoundry.com)
+
+This Font Software is licensed under the SIL Open Font License, Version 1.1.
+Licensed under the SIL Open Font License, Version 1.1 (full text above).
+
+== patrick-hand ==
+Copyright (c) 2010-2012 Patrick Wagesreiter (mail@patrickwagesreiter.at)
+
+This Font Software is licensed under the SIL Open Font License, Version 1.1.
+Licensed under the SIL Open Font License, Version 1.1 (full text above).
+
+== dancing-script ==
+Copyright 2016 The Dancing Script Project Authors (https://github.com/googlefonts/DancingScript), with Reserved Font Name 'Dancing Script'.
+
+This Font Software is licensed under the SIL Open Font License, Version 1.1.
+Licensed under the SIL Open Font License, Version 1.1 (full text above).

@@ -40,6 +40,21 @@
       </div><canvas class="ink" data-lines="${lines}" data-lh="${lineH}" aria-label="Writing area"></canvas>${addBtn(key)}</div>`;
   };
 
+  /* Draw one stroke. x is stored as a fraction of the width; y is multiplied by ys (1 = pixels for pads, the width for diary pages); k scales line width. */
+  MP.strokeOn = (ctx, s, w, ys, k) => {
+    const pts = s.p; if (!pts || !pts.length) return;
+    ctx.save(); ctx.lineCap = s.t === "hl" ? "square" : "round"; ctx.lineJoin = "round"; ctx.strokeStyle = s.c;
+    ctx.globalAlpha = s.t === "hl" ? 0.3 : s.t === "pencil" ? 0.6 : s.t === "marker" ? 0.88 : 1; if (s.t === "hl") ctx.globalCompositeOperation = "multiply";
+    for (let i = 1; i < pts.length; i++) {
+      const a = pts[i - 1], b = pts[i]; let lw = s.z;
+      if (s.t === "fountain") lw = s.z * (0.35 + (b[2] ?? 0.5) * 1.3); else if (s.t === "pencil") lw = s.z * 0.8; else if (s.t === "marker") lw = s.z * 2.4; else if (s.t === "hl") lw = s.z * 5;
+      else if (s.t === "calli") { const ang = Math.atan2((b[1] - a[1]) * ys, (b[0] - a[0]) * w); lw = s.z * (0.25 + 1.6 * Math.abs(Math.sin(ang - Math.PI / 4))); }
+      ctx.lineWidth = lw * k; ctx.beginPath(); ctx.moveTo(a[0] * w, a[1] * ys); ctx.lineTo(b[0] * w, b[1] * ys); ctx.stroke();
+    }
+    if (pts.length === 1) { ctx.beginPath(); ctx.arc(pts[0][0] * w, pts[0][1] * ys, (s.z * k) / 2, 0, 7); ctx.fillStyle = s.c; ctx.fill(); }
+    ctx.restore();
+  };
+  MP.PENS = PENS; MP.INKS = INKS; MP.penSvg = (t) => svg(PI[t]);
   const redo = {};
   const strokesOf = (key) => { const S = MP.S; if (!S.ink[key]) S.ink[key] = { u: 0, s: [] }; return S.ink[key].s; };
   const touchInk = (key) => { MP.S.ink[key].u = Date.now(); MP.changed(); };
@@ -58,19 +73,7 @@
         if (pen.paper === "lined") { ctx.strokeStyle = lc; ctx.lineWidth = 1; for (let i = 1; i <= lines; i++) { ctx.beginPath(); ctx.moveTo(14, i * lh - 8); ctx.lineTo(w - 14, i * lh - 8); ctx.stroke(); } }
         if (pen.paper === "dotted") { ctx.fillStyle = lc; for (let y = lh / 2; y < lines * lh; y += 22) for (let x = 14; x < w; x += 22) { ctx.beginPath(); ctx.arc(x, y, 1.3, 0, 7); ctx.fill(); } }
       }
-      function stroke(s) {
-        const w = cv.clientWidth, pts = s.p; if (!pts || !pts.length) return;
-        ctx.save(); ctx.lineCap = s.t === "hl" ? "square" : "round"; ctx.lineJoin = "round"; ctx.strokeStyle = s.c;
-        ctx.globalAlpha = s.t === "hl" ? 0.3 : s.t === "pencil" ? 0.6 : s.t === "marker" ? 0.88 : 1; if (s.t === "hl") ctx.globalCompositeOperation = "multiply";
-        for (let i = 1; i < pts.length; i++) {
-          const a = pts[i - 1], b = pts[i]; let lw = s.z;
-          if (s.t === "fountain") lw = s.z * (0.35 + (b[2] ?? 0.5) * 1.3); else if (s.t === "pencil") lw = s.z * 0.8; else if (s.t === "marker") lw = s.z * 2.4; else if (s.t === "hl") lw = s.z * 5;
-          else if (s.t === "calli") { const ang = Math.atan2(b[1] - a[1], (b[0] - a[0]) * w); lw = s.z * (0.25 + 1.6 * Math.abs(Math.sin(ang - Math.PI / 4))); }
-          ctx.lineWidth = lw; ctx.beginPath(); ctx.moveTo(a[0] * w, a[1]); ctx.lineTo(b[0] * w, b[1]); ctx.stroke();
-        }
-        if (pts.length === 1) { ctx.beginPath(); ctx.arc(pts[0][0] * w, pts[0][1], s.z / 2, 0, 7); ctx.fillStyle = s.c; ctx.fill(); }
-        ctx.restore();
-      }
+      const stroke = (s) => MP.strokeOn(ctx, s, cv.clientWidth, 1, 1);
       function draw() { paper(); strokesOf(key).forEach(stroke); }
       el._draw = draw; el._size = size;
       let cur = null, lastPen = 0;

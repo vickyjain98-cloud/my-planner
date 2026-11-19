@@ -113,8 +113,9 @@
 
   /* ---------- Sync engine: data split into parts so ink (handwriting) never slows the main file ---------- */
   G.parts = (S) => {
-    const main = {}; Object.keys(S).forEach((k) => { if (k !== "ink") main[k] = S[k]; });
+    const main = {}; Object.keys(S).forEach((k) => { if (k !== "ink" && k !== "dpages") main[k] = S[k]; });
     const p = { "planner.json": main };
+    if (S.dpages && Object.keys(S.dpages).length) p["diary.json"] = { v: 1, dpages: S.dpages }; /* 1.19: diary pages in their own file */
     Object.keys(S.ink).forEach((key) => {
       const m = (key.match(/\d{4}-\d{2}/) || ["misc"])[0];
       const n = `ink-${m}.json`;
@@ -132,11 +133,12 @@
     const files = await G.listFiles();
     let merged = S;
     for (const name of Object.keys(files)) {
-      if (!/^planner\.json$|^ink-[\w-]+\.json$/.test(name)) continue;
+      if (!/^planner\.json$|^diary\.json$|^ink-[\w-]+\.json$/.test(name)) continue;
       const f = files[name];
       if (versions[name] === f.version) continue;
       const remote = await G.download(f.id);
-      if (name === "planner.json") merged = MP.merge(merged, Object.assign({}, remote, { v: 1, ink: {} }));
+      if (name === "planner.json") merged = MP.merge(merged, Object.assign({}, remote, { v: 1, ink: {}, dpages: {} }));
+      else if (name === "diary.json") { const r = MP.blank(); r.dpages = (remote && remote.dpages) || {}; r.profile.u = -1; merged = MP.merge(merged, r); }
       else { const r = MP.blank(); r.ink = (remote && remote.ink) || {}; r.profile.u = -1; merged = MP.merge(merged, r); }
       versions[name] = f.version;
     }

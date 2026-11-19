@@ -31,11 +31,12 @@
   MP.ic = (k, s = 20) => `<svg aria-hidden="true" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${ICON[k] || ""}</svg>`;
   const ic = MP.ic;
 
-  const SCREENS = [["today", "Today"], ["timetable", "Timetable"], ["habits", "Habits"], ["dash", "Habit Dashboard"], ["study", "Activity"], ["planner", "Planner"], ["todo", "To-Do"], ["affirm", "Affirmations"], ["journal", "Journal"], ["three", "3-6-9"], ["mood", "Mood & Wellness"], ["dates", "Special Dates"], ["history", "History & Search"], ["print", "Print"], ["prefs", "Settings"], ["ideas", "Suggestions"], ["help", "Help & Guide"], ["review", "Weekly review"]];
+  const SCREENS = [["today", "Today"], ["timetable", "Timetable"], ["habits", "Habits"], ["dash", "Habit Dashboard"], ["study", "Activity"], ["planner", "Planner"], ["todo", "To-Do"], ["affirm", "Affirmations"], ["journal", "Journal"], ["diary", "Diary"], ["three", "3-6-9"], ["mood", "Mood & Wellness"], ["dates", "Special Dates"], ["history", "History & Search"], ["print", "Print"], ["prefs", "Settings"], ["ideas", "Suggestions"], ["help", "Help & Guide"], ["review", "Weekly review"]];
   const THEMES = [["sage", "Sage Botanical"], ["lavender", "Lavender Dream"], ["beige", "Beige Minimal"], ["blush", "Blush Floral"], ["midnight", "Midnight Moon"], ["ocean", "Ocean Calm"]];
   /* Choose your menu (1.11): hidden screens keep all their data. People who set up before 1.11 keep the full menu. */
   ICON.review = ICON.dash;
-  const MENU_SIMPLE = ["today", "planner", "todo", "study", "habits", "journal", "prefs", "help"];
+  ICON.diary = '<path d="M6 3h11a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6z"/><path d="M6 3v18M9 7h7M9 11h5"/><path d="M19 7h2M19 11h2M19 15h2"/>';
+  const MENU_SIMPLE = ["today", "planner", "todo", "study", "habits", "journal", "diary", "prefs", "help"];
   const shownScreen = (r) => { const m = P().menu; return r === "today" || r === "prefs" || !m || !m.hide || !m.hide[r]; };
   const menuSimple = () => ({ preset: "simple", hide: Object.fromEntries(SCREENS.filter((x) => !MENU_SIMPLE.includes(x[0])).map((x) => [x[0], true])) });
   const TYPES = ["Activity", "Fixed", "Break", "Rest", "Planning", "Morning", "Free"]; /* stored type "Study" = Activity → Study (kept so older data and devices still work) */
@@ -877,6 +878,7 @@
   ];
   const jKey = (k, tpl, i) => (tpl === "free" ? "journal-" + k : `jr-${k}-${tpl}-${i}`);
   const hasEntry = (key) => { const t = MP.S.typed[key], n = MP.S.ink[key]; return (t && t.l && t.l.some(Boolean)) || (n && n.s && n.s.length); };
+  V.diary = () => (MP.diaryView ? MP.diaryView() : "");
   V.journal = () => {
     const k = view.jd || iso(today()), d = parseISO(k), tplId = view.jt || P().journalTpl || "grat", tpl = JT.find((x) => x[0] === tplId) || JT[1], n = Math.floor(d.getTime() / 864e5);
     const fields = tpl[3].map((f, i) => {
@@ -1203,7 +1205,7 @@
     return `<button class="status warn" data-resync>○ Tap to sync with Drive</button>`;
   }
   /* ---------- Journal lock (1.12): PIN (stored only as a salted hash) or this device's fingerprint / face ---------- */
-  const LOCKED = ["journal", "mood", "three", "history"];
+  const LOCKED = ["journal", "mood", "three", "history", "diary"];
   let unlocked = false, hiddenAt = 0;
   const lockOn = () => !!(P().lock && P().lock.h);
   const isLocked = (r) => lockOn() && !unlocked && LOCKED.includes(r);
@@ -1240,6 +1242,7 @@
     const top = mode === "google" ? `<div class="mobstatus">${statusPill()}</div>` : `<div class="mobstatus">${statusPill()}</div>`;
     main.innerHTML = top + (isLocked(route) ? lockHTML() : (V[route] || V.today)());
     MP.setupPads(); MP.growTyped && MP.growTyped();
+    if (route === "diary" && MP.diaryAfter) MP.diaryAfter();
     if (route === "day") dayScroll();
     postitLayer();
     if (route === "today") { maybeMenuPrompt(); if (P().menu && P().menu.chosen) maybePlan(); }
@@ -1891,7 +1894,7 @@
   document.addEventListener("pointercancel", () => { if (drag) { drag.el.remove(); drag = null; MP.render(); } });
 
   /* ---------- start-up ---------- */
-  MP.VERSION = "1.18";
+  MP.VERSION = "1.19";
   if (MP.sound) MP.sound.onchange = () => { miniPlayer(); if (route === "study") MP.render(); };
   /* Public, read-only helpers for future modules and connectors. */
   MP.api = { today, iso, dayPct, studyHours, streak, tasks, feed: () => MP.buildFeed(MP.S), version: MP.VERSION, schemaVersion: MP.SCHEMA_VERSION };

@@ -334,6 +334,34 @@ window.MP_HELP = [
 ]
 },
 {
+"id": "diary",
+"title": "Diary",
+"route": "diary",
+"body": [
+[
+"p",
+"Free notebooks for anything: study notes, personal thoughts, creative ideas. Make as many diaries as you like, name each one, split it into sections, and fill it with pages. Write with the S Pen, type, or speak."
+],
+[
+"steps",
+[
+"Open Diary and tap + New diary. Give it a name and pick one of 20 themes (cover, paper and ink). The first theme suggested matches your planner's theme.",
+"Sections are the coloured tabs (like dividers). Tap + Section to add one; tap ✎ on the open section to rename it, change its colour or delete it.",
+"Write: tap the pen for the S Pen (six pens, any colour, eraser, undo), the keyboard to type, or 🎤 to speak. Typing has bold, italic, underline, strikethrough, 12 fonts (four handwriting styles, Kalam also writes Hindi), sizes, text colour, highlighter, headings, lists, checkboxes and alignment.",
+"Turn pages with ‹ ›, a finger swipe, the ← → keys, or the page strip at the bottom. Under the page there is always Continue on next page ›, and on the last page + New page (same layout).",
+"+ Add page… lets you choose the template (16 professional, 20 creative), the page colour (12 quick colours, recent colours, or any colour with +) and the texture (12). Tick Make this the default to use it for every new page in that diary.",
+"⋯ Page changes the current page's template, colour, texture and date, duplicates it, moves it to another section, or deletes it.",
+"Dates: a new page offers to add today's date. Tap the date on a page to change it, pick a style (chip, handwritten, numbers, week strip) or remove it. ⋯ Diary sets Ask / Always / Never for new pages.",
+"Page shows one page; Book shows two side by side on a tablet or laptop. ⋯ Diary renames the diary, changes its theme or default font, or deletes it."
+]
+],
+[
+"p",
+"Once you have used the S Pen, fingers turn pages and the palm is ignored, so you can rest your hand while writing. Diaries are covered by the journal lock, are never sent to Buddy, and are not included in search or printing. Pages sync through your Google Drive (diary.json and the ink files)."
+]
+]
+},
+{
 "id": "journal",
 "title": "Journal",
 "route": "journal",

@@ -352,6 +352,7 @@ window.MP_HELP = [
 "+ Add page… opens the same four choices for a new page. Tick Make this the default to use it for every new page in that diary.",
 "⚙ Page setup (top right, next to Page and Book) has four parts: ① Template (30 professional and 30 creative), ② Page colour (44 colours in Soft, Bright, Earthy and Dark, recent colours, or any colour with +), ③ Texture (27, shown on your page colour) and ④ Date style. It also duplicates the page, moves it to another section, or deletes it.",
 "Dates: a new page offers to add today's date. Tap the date on a page to change it, pick a style (chip, handwritten, numbers, week strip) or remove it. ⋯ Diary sets Ask / Always / Never for new pages.",
+"Delete a diary: tap 🗑 on its cover on the bookshelf (or Delete in ⋯ Diary settings). It goes to Recently deleted at the bottom of the bookshelf for 30 days, where Restore brings it back with every page, and Delete forever removes it straight away.",
 "Page shows one page; Book shows two side by side on a tablet or laptop. ⋯ Diary settings renames the diary, changes its theme (and, if you like, the pages already in it), the date setting and default font, or deletes it."
 ]
 ],

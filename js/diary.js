@@ -166,7 +166,7 @@
   /* ---------- data ---------- */
   const DS = () => MP.S.diaries, PS = () => MP.S.dpages;
   const alive = (r) => r && !r.del;
-  const diaries = () => Object.entries(DS()).filter(([, d]) => alive(d)).sort((a, b) => (a[1].o || 0) - (b[1].o || 0) || (a[1].c || 0) - (b[1].c || 0));
+  const diaries = () => Object.entries(DS()).filter(([, d]) => alive(d) && !d.bin).sort((a, b) => (a[1].o || 0) - (b[1].o || 0) || (a[1].c || 0) - (b[1].c || 0));
   const pagesOf = (did, sid) => Object.entries(PS()).filter(([, p]) => alive(p) && p.d === did && p.s === sid).sort((a, b) => (a[1].o || 0) - (b[1].o || 0));
   const allPages = (did) => Object.entries(PS()).filter(([, p]) => alive(p) && p.d === did);
   const saveD = (id) => { DS()[id].u = now(); MP.changed(); };
@@ -200,7 +200,7 @@
   /* where you are: kept on this device */
   let ST = {}; try { ST = JSON.parse(localStorage.getItem("mp-dstate") || "{}"); } catch (e) {}
   const keep = () => { try { localStorage.setItem("mp-dstate", JSON.stringify(ST)); } catch (e) {} };
-  const cur = () => { const d = ST.did && alive(DS()[ST.did]) ? DS()[ST.did] : null; if (!d) return null; const ss = secs(d); if (!ss.find((s) => s.id === ST.sid)) ST.sid = ss[0] && ss[0].id; const pg = pagesOf(ST.did, ST.sid); ST.idx = Math.max(0, Math.min(ST.idx || 0, pg.length - 1)); return { d, ss, pg }; };
+  const cur = () => { const d = ST.did && alive(DS()[ST.did]) && !DS()[ST.did].bin ? DS()[ST.did] : null; if (!d) return null; const ss = secs(d); if (!ss.find((s) => s.id === ST.sid)) ST.sid = ss[0] && ss[0].id; const pg = pagesOf(ST.did, ST.sid); ST.idx = Math.max(0, Math.min(ST.idx || 0, pg.length - 1)); return { d, ss, pg }; };
   const wide = () => window.innerWidth >= 900;
   const fmtD = (iso, st) => { const t = new Date(iso + "T12:00:00"), f = (o) => t.toLocaleDateString("en-IN", o);
     if (st === "script") return `${f({ weekday: "long" })}, ${t.getDate()}${[, "st", "nd", "rd"][t.getDate() % 10 > 3 || Math.floor(t.getDate() / 10) === 1 ? 0 : t.getDate() % 10] || "th"} ${f({ month: "long" })}`;
@@ -224,12 +224,16 @@
   }
 
   /* ---------- views ---------- */
-  const coverHTML = (d, n) => { const t = th(d.theme); return `<button class="dcover" data-dopen="${E(d._id)}" style="background:${t[1]}"><span class="dlabel">${E(d.name)}</span><span class="dcmeta">${E(t[0])} · ${n} page${n === 1 ? "" : "s"}</span></button>`; };
+  const coverHTML = (d, n) => { const t = th(d.theme); return `<div class="dcoverw"><button class="dcover" data-dopen="${E(d._id)}" style="background:${t[1]}"><span class="dlabel">${E(d.name)}</span><span class="dcmeta">${E(t[0])} · ${n} page${n === 1 ? "" : "s"}</span></button><button class="dcdel" data-dbin="${E(d._id)}" title="Delete this diary" aria-label="Delete ${E(d.name)}">🗑</button></div>`; };
+  const BIN_DAYS = 30;
+  const binned = () => { const lim = now() - BIN_DAYS * 864e5; return Object.entries(DS()).filter(([id, d]) => { if (!alive(d) || !d.bin) return false; if (d.bin < lim) { purge(id); return false; } return true; }); };
+  function purge(id) { allPages(id).forEach(([pid]) => { PS()[pid] = { u: now(), del: 1, d: id }; if (MP.S.ink["dp-" + pid]) MP.S.ink["dp-" + pid] = { u: now(), s: [] }; }); DS()[id] = { u: now(), del: 1 }; MP.changed(); }
   function shelf() {
     const list = diaries();
     return `<div class="between wrap mb"><div><p class="eyebrow">Your notebooks</p><h1 class="title">Diary</h1></div><button class="btn" data-dnew>+ New diary</button></div>
       ${list.length ? `<div class="dshelf">${list.map(([id, d]) => coverHTML(Object.assign({ _id: id }, d), allPages(id).length)).join("")}</div>`
         : `<section class="card stack center" style="padding:36px"><div class="big">Start your first diary</div><p class="small muted">One for study, one for personal notes, one for creative ideas — name each one and choose its theme. Write with the S Pen, type, or speak.</p><button class="btn" data-dnew>+ New diary</button></section>`}
+      ${(() => { const b = binned(); return b.length ? `<details class="dbin mt"><summary class="small">🗑 Recently deleted (${b.length}) · kept for ${BIN_DAYS} days</summary><div class="stack mt" style="gap:6px">${b.map(([id, d]) => { const left = Math.max(1, Math.ceil((d.bin + BIN_DAYS * 864e5 - now()) / 864e5)); return `<div class="between wrap card" style="padding:8px 12px"><span><b>${E(d.name)}</b> <span class="tiny muted">· ${allPages(id).length} page${allPages(id).length === 1 ? "" : "s"} · deleted for good in ${left} day${left === 1 ? "" : "s"}</span></span><span class="row" style="gap:6px"><button class="btn sm" data-dunbin="${E(id)}">Restore</button><button class="btn ghost sm" data-dpurge="${E(id)}" style="color:#C0392B">Delete forever</button></span></div>`; }).join("")}</div></details>` : ""; })()}
       <button class="card vcard mt" data-go="vault"><span style="font-size:26px">🔐</span><span><b>Logins</b><br><span class="tiny muted">Website and app logins as reminders · its own PIN</span></span></button>
       <p class="tiny muted mt">Diaries are private like your Journal: covered by the journal lock, never shared with Buddy, and not included in search or printing.</p>`;
   }
@@ -276,7 +280,7 @@
       <div class="dstrip" aria-label="Pages">${pg.map(([pid, p], k) => `<button class="dthumb ${pair.includes(k) ? "on" : ""}" data-dgo="${k}" style="background:${bgOf(p.col, p.tex)}" title="Page ${k + 1}"><span>${k + 1}</span></button>`).join("")}<button class="dthumb add" data-dsame title="New page, same layout">+</button></div>`
         : `<section class="card stack center"><p class="small">This section has no pages yet.</p><button class="btn" data-daddpg>+ Add page</button></section>`}`;
   }
-  MP.diaryView = () => (ST.did && DS()[ST.did] && alive(DS()[ST.did]) ? openView() : shelf());
+  MP.diaryView = () => (ST.did && DS()[ST.did] && alive(DS()[ST.did]) && !DS()[ST.did].bin ? openView() : shelf());
 
   /* ---------- dialogs ---------- */
   let nd = null; /* new-diary draft */
@@ -343,6 +347,7 @@
       <label class="stack small mt">Default typing font <select class="f" id="dfontdef">${FONTS.map(([f, n]) => `<option value="${f}" ${d.font === f ? "selected" : ""}>${n}</option>`).join("")}</select></label>
       <div class="row wrap" style="justify-content:space-between;gap:8px;margin-top:14px"><button class="btn ghost sm" data-ddel style="color:#C0392B">Delete this diary</button><span class="row" style="gap:8px"><button class="btn ghost" data-close>Cancel</button><button class="btn" data-dmenuok>Save</button></span></div>`);
   }
+  function binDlg(id) { const d = DS()[id], n = allPages(id).length; MP.modal(`<h2>Delete “${E(d.name)}”?</h2><p class="small">It moves to <b>Recently deleted</b> at the bottom of the bookshelf with its ${n} page${n === 1 ? "" : "s"}. You can restore it for ${BIN_DAYS} days; after that it's deleted for good.</p><div class="row" style="justify-content:flex-end;gap:8px"><button class="btn ghost" data-close>Keep it</button><button class="btn" style="background:#C0392B" data-dbinok="${E(id)}">Delete</button></div>`); }
   function confirmDlg(msg, act) { MP.modal(`<h2>Are you sure?</h2><p class="small">${msg}</p><div class="row" style="justify-content:flex-end;gap:8px"><button class="btn ghost" data-close>Keep it</button><button class="btn" style="background:#C0392B" data-dyes="${act}">Delete</button></div>`); }
   function dateDlg(id) {
     const p = PS()[id]; MP.modal(`<h2>Date on this page</h2><label class="stack small">Date<input class="f" type="date" id="dpdate" value="${E(p.date || todayISO())}" data-novoice></label>
@@ -419,10 +424,14 @@
     if (a.dmenuok !== undefined) { const d = DS()[ST.did], nm = document.getElementById("drename").value.trim(); if (nm) d.name = nm; const th2 = document.getElementById("dtheme").value; if (th2 !== d.theme) { const old = th(d.theme), nw = th(th2), all = document.getElementById("dthall").checked, mine = document.getElementById("dthmine").checked; let n = 0;
         if (all) allPages(ST.did).forEach(([pid, p]) => { const own = p.col !== old[2] || p.tex !== old[3]; if (!own || mine) { p.col = nw[2]; p.tex = nw[3]; p.u = now(); n++; } });
         d.theme = th2; d.def = Object.assign({}, d.def, { col: nw[2], tex: nw[3] }); MP.toast(n ? `Theme changed · ${n} page${n === 1 ? "" : "s"} updated` : "Theme changed for the cover and new pages"); } d.dateAsk = document.getElementById("ddateask").value; d.font = document.getElementById("dfontdef").value; saveD(ST.did); MP.closeModal(); return rerender(); }
-    if (a.ddel !== undefined) { const n = allPages(ST.did).length; return confirmDlg(`This deletes “${E(DS()[ST.did].name)}” and all ${n} page${n === 1 ? "" : "s"} in it, including handwriting. This can't be undone.`, "diary|" + ST.did); }
+    if (a.ddel !== undefined) return binDlg(ST.did);
+    if (a.dbin) return binDlg(a.dbin);
+    if (a.dbinok) { const d = DS()[a.dbinok]; d.bin = now(); saveD(a.dbinok); if (ST.did === a.dbinok) { ST = {}; keep(); } MP.closeModal(); MP.toast(`“${d.name}” moved to Recently deleted`); return rerender(); }
+    if (a.dunbin) { const d = DS()[a.dunbin]; delete d.bin; saveD(a.dunbin); MP.toast(`“${d.name}” restored`); return rerender(); }
+    if (a.dpurge) { const n = allPages(a.dpurge).length; return confirmDlg(`This deletes “${E(DS()[a.dpurge].name)}” and all ${n} page${n === 1 ? "" : "s"} for good, including handwriting and photos on them. This can't be undone.`, "diary|" + a.dpurge); }
     if (a.dyes) {
       const [k, id] = a.dyes.split("|");
-      if (k === "diary") { allPages(id).forEach(([pid]) => { PS()[pid] = { u: now(), del: 1, d: id }; if (MP.S.ink["dp-" + pid]) MP.S.ink["dp-" + pid] = { u: now(), s: [] }; }); DS()[id] = { u: now(), del: 1 }; ST = {}; keep(); }
+      if (k === "diary") { purge(id); ST = {}; keep(); }
       if (k === "sec") { const d = DS()[ST.did]; pagesOf(ST.did, id).forEach(([pid]) => { PS()[pid] = { u: now(), del: 1, d: ST.did }; if (MP.S.ink["dp-" + pid]) MP.S.ink["dp-" + pid] = { u: now(), s: [] }; }); d.secs = d.secs.filter((s) => s.id !== id); saveD(ST.did); ST.sid = (secs(d)[0] || {}).id; ST.idx = 0; keep(); }
       if (k === "page") { PS()[id] = { u: now(), del: 1, d: ST.did }; if (MP.S.ink["dp-" + id]) MP.S.ink["dp-" + id] = { u: now(), s: [] }; ST.idx = Math.max(0, ST.idx - 1); keep(); }
       MP.changed(); MP.closeModal(); return rerender();

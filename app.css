@@ -524,3 +524,7 @@ input[type=time]{cursor:pointer}
 .dob.textb .otx:empty:before{content:"Type here";opacity:.4}
 
 .dsw{box-shadow:inset 0 0 0 1px rgba(128,128,128,.55)}
+.dcoverw{position:relative}.dcoverw .dcover{width:100%}
+.dcdel{position:absolute;top:8px;right:8px;width:36px;height:36px;border-radius:50%;border:0;background:rgba(255,255,255,.9);box-shadow:0 2px 6px rgba(0,0,0,.25);cursor:pointer;font-size:16px;z-index:2}
+.dcdel:hover{background:#fff;transform:scale(1.08)}
+.dbin summary{cursor:pointer;color:var(--muted)}

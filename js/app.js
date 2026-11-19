@@ -1021,7 +1021,8 @@
     const k = MP.tplKit(look, { d: false, H: 846, dt: today(), fill: fillFor(id, today()) });
     return `<svg viewBox="0 0 600 846" class="tplsvg" role="img" aria-label="${E(e[1])}">${e[3](k)}</svg>`;
   };
-  V.print = () => { const pv = P().printView || "detailed", isT = /^t:/.test(pv), look = P().printLook || "pastel"; return `${head("Preview before printing", "Print", `<button class="btn" data-print>${ic("print", 16)} Print / save as PDF</button>`)}<div class="row wrap noprint mb"><label class="row small" style="gap:8px"><span class="lab">Layout</span><select class="f" data-printsel style="width:auto;font-weight:700" aria-label="Print layout"><optgroup label="Classic">${[["summary", "Summary one-pager"], ["detailed", "Detailed Daily Rhythm"], ["hourly", "Hourly time-block sheet"], ["journal", "Journal spread"]].map(([v, n]) => `<option value="${v}" ${pv === v ? "selected" : ""}>${n}</option>`).join("")}</optgroup><optgroup label="Planner sheets · filled with your data">${PT.map(([v, n]) => `<option value="${v}" ${pv === v ? "selected" : ""}>${n}</option>`).join("")}</optgroup></select></label>${isT ? `<label class="row small" style="gap:8px"><span class="lab">Look</span>${sel("data-printlook", Object.entries(MP.TPL_LOOKS || {}), look, 'style="width:auto" aria-label="Look"')}</label>` : ""}<span class="tiny muted">${isT ? "A4 portrait · your to-dos, timetable, events and habits are written in for you" : "A4 portrait · uses your theme · typed and handwritten entries print too"}</span></div>${isT ? `<section class="card a4 tplsheet" id="printarea" style="background:${PAPER[look]}">${tplSheet(pv)}</section>` : `<section class="card a4" id="printarea">${PV[pv] ? PV[pv]() : PV.detailed()}</section>`}`; };
+  V.print = () => { const pv = P().printView || "detailed", isT = /^t:/.test(pv), look = P().printLook || "pastel"; return `${head("Preview before printing", "Print", `<button class="btn" data-print>${ic("print", 16)} Print / save as PDF</button>`)}<div class="row wrap noprint mb"><label class="row small" style="gap:8px"><span class="lab">Layout</span><select class="f" data-printsel style="width:auto;font-weight:700" aria-label="Print layout"><optgroup label="Classic">${[["summary", "Summary one-pager"], ["detailed", "Detailed Daily Rhythm"], ["hourly", "Hourly time-block sheet"], ["journal", "Journal spread"]].map(([v, n]) => `<option value="${v}" ${pv === v ? "selected" : ""}>${n}</option>`).join("")}</optgroup><optgroup label="Planner sheets · filled with your data">${PT.map(([v, n]) => `<option value="${v}" ${pv === v ? "selected" : ""}>${n}</option>`).join("")}</optgroup></select></label>${isT ? `<label class="row small" style="gap:8px"><span class="lab">Look</span>${sel("data-printlook", Object.entries(MP.TPL_LOOKS || {}), look, 'style="width:auto" aria-label="Look"')}</label>` : ""}<span class="tiny muted">${isT ? "A4 portrait · your to-dos, timetable, events and habits are written in for you" : "A4 portrait · uses your theme · typed and handwritten entries print too"}</span></div>
+      <div class="pgal noprint mb" role="listbox" aria-label="Choose a sheet">${[["summary", "Summary"], ["detailed", "Daily rhythm"], ["hourly", "Hourly sheet"], ["journal", "Journal spread"]].map(([v, n]) => `<button class="pgt ${pv === v ? "on" : ""}" data-pgal="${v}"><span class="pgc">${ic("print", 22)}<br>Classic</span><span class="tiny">${n}</span></button>`).join("")}${PT.map(([v, n]) => { const e = (MP.TPL_NEW || []).find((x) => x[0] === v.slice(2)); return `<button class="pgt ${pv === v ? "on" : ""}" data-pgal="${v}"><svg viewBox="0 0 600 846" style="background:${PAPER[look]}">${e && MP.tplKit ? e[3](MP.tplKit(look, { d: false, H: 846, dt: today() })) : ""}</svg><span class="tiny">${E(n)}</span></button>`; }).join("")}</div>${isT ? `<section class="card a4 tplsheet" id="printarea" style="background:${PAPER[look]}">${tplSheet(pv)}</section>` : `<section class="card a4" id="printarea">${PV[pv] ? PV[pv]() : PV.detailed()}</section>`}`; };
 
   /* ---------- Suggestions & feedback ---------- */
   const FB_TYPES = ["New feature", "Improve something", "Problem / bug", "Design & look", "Other"];
@@ -1844,6 +1845,7 @@
     if (d.wnext !== undefined) { if (wiz.step === 1) { wiz.name = field("wname"); if (!wiz.name) { MP.toast("Please add a name"); return; } } if (wiz.step < 4) { wiz.step++; return MP.render(); } return finishSetup(); }
     if (d.wback !== undefined) { wiz.step = Math.max(1, wiz.step - 1); return MP.render(); }
     if (d.print !== undefined) { window.print(); return; }
+    if (d.pgal) { P().printView = d.pgal; touchP(); return MP.render(); }
     if (d.day) { view.dayK = d.day; view.dv = view.dv || "day"; view.dscr = ""; return go("day"); }
     if (d.hgo) { closeModal(); view.hist = d.hgo; return go("history"); }
     if (d.hsearch !== undefined) { view.q = field("hq"); return MP.render(); }
@@ -1954,7 +1956,7 @@
   document.addEventListener("pointercancel", () => { if (drag) { drag.el.remove(); drag = null; MP.render(); } });
 
   /* ---------- start-up ---------- */
-  MP.VERSION = "1.25";
+  MP.VERSION = "1.25.1";
   if (MP.sound) MP.sound.onchange = () => { miniPlayer(); if (route === "study") MP.render(); };
   /* Public, read-only helpers for future modules and connectors. */
   MP.api = { today, iso, dayPct, studyHours, streak, tasks, feed: () => MP.buildFeed(MP.S), version: MP.VERSION, schemaVersion: MP.SCHEMA_VERSION };
@@ -1977,6 +1979,16 @@
     }
     mode = "signin"; MP.render();
   };
-  if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});
+  /* 1.25.1: when a new version arrives, say so and offer a one-tap reload (no more hunting for Ctrl+Shift+R) */
+  if ("serviceWorker" in navigator && location.protocol === "https:") {
+    let hadCtrl = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.register("sw.js").then((reg) => { const chk = () => reg.update().catch(() => {}); setInterval(chk, 30 * 60 * 1000); document.addEventListener("visibilitychange", () => { if (!document.hidden) chk(); }); }).catch(() => {});
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (!hadCtrl) { hadCtrl = true; return; }
+      if (document.getElementById("updbar")) return;
+      const b = document.createElement("div"); b.id = "updbar"; b.className = "noprint"; b.innerHTML = `<span>A new version of My Planner is ready.</span><button class="btn sm" type="button">Reload now</button>`;
+      b.querySelector("button").onclick = () => location.reload(); document.body.appendChild(b);
+    });
+  }
   MP.boot();
 })();

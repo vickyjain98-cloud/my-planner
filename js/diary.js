@@ -62,7 +62,8 @@
   const tx = (x, y, s, o, z = 26, f = "Caveat", anc = "start", col) => `<text x="${x}" y="${y}" font-family="${f},cursive" font-size="${z}" fill="${col || o.a}" text-anchor="${anc}" font-weight="700">${s}</text>`;
   const lb = (x, y, s, o, z = 15) => `<text x="${x}" y="${y}" font-family="Manrope,sans-serif" font-size="${z}" fill="${o.t}" font-weight="600" letter-spacing=".5">${s}</text>`;
   const bx = (x, y, w, h, o, r = 8, dash = "") => `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${r}" fill="none" stroke="${o.l2}" stroke-width="1.5" ${dash ? `stroke-dasharray="${dash}"` : ""}/>`;
-  const ph = (x, y, w, h, o, rot = 0) => `<g transform="rotate(${rot} ${x + w / 2} ${y + h / 2})"><rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${o.d ? "rgba(255,255,255,.08)" : "#fff"}" stroke="${o.l2}"/><rect x="${x + 10}" y="${y + 10}" width="${w - 20}" height="${h - 36}" fill="none" stroke="${o.l2}" stroke-dasharray="6 5"/><text x="${x + w / 2}" y="${y + (h - 26) / 2 + 10}" font-family="Manrope" font-size="13" fill="${o.t}" text-anchor="middle">photo</text></g>`;
+  let FR = null; /* when set, photo frames are collected (they become movable items on the page) instead of drawn */
+  const ph = (x, y, w, h, o, rot = 0) => FR ? (FR.push([x, y, w, h, rot]), "") : `<g transform="rotate(${rot} ${x + w / 2} ${y + h / 2})"><rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${o.d ? "rgba(255,255,255,.08)" : "#fff"}" stroke="${o.l2}"/><rect x="${x + 10}" y="${y + 10}" width="${w - 20}" height="${h - 36}" fill="none" stroke="${o.l2}" stroke-dasharray="6 5"/><text x="${x + w / 2}" y="${y + (h - 26) / 2 + 10}" font-family="Manrope" font-size="13" fill="${o.t}" text-anchor="middle">photo</text></g>`;
   const dots = (o, gap = 30) => { let s = ""; for (let y = 90; y < H - 20; y += gap) for (let x = 40; x < W - 20; x += gap) s += `<circle cx="${x}" cy="${y}" r="1.6" fill="${o.l2}"/>`; return s; };
   const grid = (o, g = 30) => { let s = ""; for (let y = 90; y < H - 20; y += g) s += `<line x1="30" y1="${y}" x2="${W - 30}" y2="${y}" stroke="${o.l}"/>`; for (let x = 30; x <= W - 30; x += g) s += `<line x1="${x}" y1="90" x2="${x}" y2="${H - 26}" stroke="${o.l}"/>`; return s; };
   const box = (o, n, y0 = 120, gap = 54, x = 44) => { let s = ""; for (let i = 0; i < n; i++) s += `<rect x="${x}" y="${y0 + i * gap - 20}" width="22" height="22" rx="4" fill="none" stroke="${o.a}" stroke-width="2"/><line x1="${x + 36}" y1="${y0 + i * gap + 4}" x2="556" y2="${y0 + i * gap + 4}" stroke="${o.l}"/>`; return s; };
@@ -107,7 +108,9 @@
     ["wheel", "Self-care wheel", "c", (o) => { let s = tx(44, 112, "How am I doing?", o, 34); const n = ["Body", "Mind", "People", "Work", "Rest", "Fun", "Money", "Purpose"]; s += `<g fill="none" stroke="${o.l2}">${[50, 100, 150, 200].map((r) => `<circle cx="300" cy="420" r="${r}"/>`).join("")}</g>`; n.forEach((t, i) => { const a = (i / n.length) * Math.PI * 2 - Math.PI / 2; s += `<line x1="300" y1="420" x2="${300 + 200 * Math.cos(a)}" y2="${420 + 200 * Math.sin(a)}" stroke="${o.l2}"/><text x="${300 + 236 * Math.cos(a + 0.39)}" y="${426 + 236 * Math.sin(a + 0.39)}" font-family="Manrope" font-size="15" font-weight="700" fill="${o.a}" text-anchor="middle">${t}</text>`; }); return s + lb(44, 712, "COLOUR EACH SLICE 1–4 · ONE STEP THIS WEEK", o, 13) + ln(756, 40, 2, o); }]
   ];
   const TP = Object.fromEntries(TPL.map((t) => [t[0], t]));
-  const tplSVG = (id, col, acc) => { const d = isDark(col), o = { a: acc, d, l: d ? "rgba(255,255,255,.2)" : "rgba(0,0,0,.13)", l2: d ? "rgba(255,255,255,.35)" : "rgba(0,0,0,.25)", t: d ? "rgba(255,255,255,.7)" : "rgba(0,0,0,.55)" }; return (TP[id] || TP.lined)[3](o); };
+  MP.diaryFrames = (id) => { FR = []; try { (TP[id] || TP.lined)[3]({ a: "#000", d: false, l: "", l2: "", t: "" }); } catch (e) {} const r = FR; FR = null; return r; };
+  const tplSVG = (id, col, acc, live) => { if (live) FR = []; try { return tplSVG0(id, col, acc); } finally { FR = null; } };
+  const tplSVG0 = (id, col, acc) => { const d = isDark(col), o = { a: acc, d, l: d ? "rgba(255,255,255,.2)" : "rgba(0,0,0,.13)", l2: d ? "rgba(255,255,255,.35)" : "rgba(0,0,0,.25)", t: d ? "rgba(255,255,255,.7)" : "rgba(0,0,0,.55)" }; return (TP[id] || TP.lined)[3](o); };
 
   /* ---------- data ---------- */
   const DS = () => MP.S.diaries, PS = () => MP.S.dpages;
@@ -197,10 +200,10 @@
     const t = th(d.theme), dark = isDark(p.col), ink = dark ? (isDark(t[5]) ? "#F5EFE6" : t[5]) : (isDark(t[5]) ? t[5] : "#2B2622");
     const chip = p.date ? `<button class="ddate ds-${E(p.ds || "chip")}" data-ddate="${E(id)}" style="--acc:${t[4]};--on:${isDark(t[4]) ? "#fff" : "#1B1F4B"}" title="Tap to change or remove the date">${fmtD(p.date, p.ds)}</button>` : "";
     const ask = p.ask && !p.date ? `<div class="dask noprint"><span>Add today's date to this page?</span><button class="btn sm" data-dask="yes|${E(id)}">Add date</button><button class="btn ghost sm" data-dask="no|${E(id)}">No</button><button class="link tiny" data-dask="always|${E(id)}">Always</button><button class="link tiny" data-dask="never|${E(id)}">Never ask</button></div>` : "";
-    return `<div class="dpg ${MP.inputMode === "type" ? "typing" : "inking"}" data-dpg="${E(id)}" style="background:${bgOf(p.col, p.tex)};--ink:${ink};--acc:${t[4]}">
-      <svg class="dtpl" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">${tplSVG(p.tpl, p.col, t[4])}</svg>${chip}${ask}
+    return `<div class="dpg ${MP.dSel ? "selecting" : MP.inputMode === "type" ? "typing" : "inking"}" data-dpg="${E(id)}" style="background:${bgOf(p.col, p.tex)};--ink:${ink};--acc:${t[4]}">
+      <svg class="dtpl" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">${tplSVG(p.tpl, p.col, t[4], id !== "preview")}</svg>${chip}${ask}
       <div class="dtxt" data-dtxt="${E(id)}" ${MP.inputMode === "type" ? 'contenteditable="true"' : ""} spellcheck="true" style="font-family:'${E(d.font || "Caveat")}',cursive" aria-label="Typed text on page ${n}">${p.text || ""}</div>
-      <canvas class="dink" data-dink="${E(id)}" aria-label="Handwriting on page ${n}"></canvas><span class="dnum">${n}</span></div>`;
+      <div class="dobjs" data-dobjs="${E(id)}"></div><canvas class="dink" data-dink="${E(id)}" aria-label="Handwriting on page ${n}"></canvas><span class="dnum">${n}</span></div>`;
   }
   function openView() {
     const c = cur(); if (!c) { ST = {}; keep(); return shelf(); }
@@ -211,8 +214,8 @@
         <span class="seg" role="group" aria-label="View"><button class="tool ${!book ? "on" : ""}" data-dview="page" title="One page">▯ Page</button><button class="tool ${book ? "on" : ""}" data-dview="book" title="Two pages side by side${wide() ? "" : " (needs a wider screen)"}">▯▯ Book</button></span>
         <button class="btn ghost sm" data-dmenu>⋯ Diary</button></div>
       <div class="dsecs" role="tablist">${ss.map((s) => `<button class="dsec ${s.id === ST.sid ? "on" : ""}" role="tab" data-dsec="${E(s.id)}" style="--sc:${E(s.col || t[4])}">${E(s.name)} <span class="tiny">${pagesOf(d._id || ST.did, s.id).length}</span>${s.id === ST.sid ? `<span class="dsecedit" data-dsecedit="${E(s.id)}" title="Rename, colour or delete this section">✎</span>` : ""}</button>`).join("")}<button class="dsec add" data-dsecadd>+ Section</button></div>
-      <div class="dtools padbar"><span class="seg" role="group" aria-label="Input"><button type="button" class="tool ${MP.inputMode !== "type" ? "on" : ""}" data-dmode="pen" title="Write with S Pen or finger">${MP.ic("penm", 18)}</button><button type="button" class="tool ${MP.inputMode === "type" ? "on" : ""}" data-dmode="type" title="Type">${MP.ic("kbd", 18)}</button>${MP.voiceOK ? `<button type="button" class="tool" data-dmic title="Speak instead of typing">🎤</button>` : ""}</span><span class="vsep"></span>
-        ${MP.inputMode === "type" ? textBar(d) : penBar()}<span style="margin-left:auto"></span><button class="btn ghost sm" data-dpset title="Template, colour, texture, date, move, delete">⋯ Page</button></div>
+      <div class="dtools padbar"><span class="seg" role="group" aria-label="Input"><button type="button" class="tool ${!MP.dSel && MP.inputMode !== "type" ? "on" : ""}" data-dmode="pen" title="Write with S Pen or finger">${MP.ic("penm", 18)}</button><button type="button" class="tool ${!MP.dSel && MP.inputMode === "type" ? "on" : ""}" data-dmode="type" title="Type">${MP.ic("kbd", 18)}</button><button type="button" class="tool ${MP.dSel ? "on" : ""}" data-dmode="select" title="Photos, stickers, shapes: add, move, resize, rotate">✥</button>${MP.voiceOK ? `<button type="button" class="tool" data-dmic title="Speak instead of typing">🎤</button>` : ""}</span><span class="vsep"></span>
+        ${MP.dSel && MP.dobjTools ? MP.dobjTools() : MP.inputMode === "type" ? textBar(d) : penBar()}<span style="margin-left:auto"></span><button class="btn ghost sm" data-dpset title="Template, colour, texture, date, move, delete">⋯ Page</button></div>
       ${pg.length ? `<div class="dstage ${book ? "book" : "single"}"><button class="darrow l" data-dnav="-1" aria-label="Previous page" ${i === 0 ? "disabled" : ""}>‹</button>
         <div class="dspread">${pair.map((k) => pageHTML(pg[k][0], pg[k][1], d, k + 1)).join(book ? '<div class="dgutter"></div>' : "")}</div>
         <button class="darrow r" data-dnav="1" aria-label="Next page" ${last ? "disabled" : ""}>›</button></div>
@@ -366,8 +369,8 @@
     if (a.dsame !== undefined) return addSame();
     if (a.daddpg !== undefined) return openPicker(null);
     if (a.dpset !== undefined) { const c = cur(); if (!c || !c.pg.length) return; return openPicker(c.pg[ST.idx][0]); }
-    if (a.dmode) { MP.inputMode = a.dmode; MP.pref.set("input", a.dmode); return rerender(); }
-    if (a.dmic !== undefined) { MP.inputMode = "type"; MP.pref.set("input", "type"); rerender(); setTimeout(() => { const ed = document.querySelector(".dtxt[contenteditable]"); if (ed) { ed.focus(); const s = window.getSelection(); s.selectAllChildren(ed); s.collapseToEnd(); setTimeout(() => { const m = document.querySelector(".vmic"); if (m && !m.hidden) m.click(); }, 80); } }, 60); return; }
+    if (a.dmode) { if (a.dmode === "select") MP.dSel = true; else { MP.dSel = false; MP.inputMode = a.dmode; MP.pref.set("input", a.dmode); } MP.dobjClear && MP.dobjClear(); return rerender(); }
+    if (a.dmic !== undefined) { MP.dSel = false; MP.inputMode = "type"; MP.pref.set("input", "type"); rerender(); setTimeout(() => { const ed = document.querySelector(".dtxt[contenteditable]"); if (ed) { ed.focus(); const s = window.getSelection(); s.selectAllChildren(ed); s.collapseToEnd(); setTimeout(() => { const m = document.querySelector(".vmic"); if (m && !m.hidden) m.click(); }, 80); } }, 60); return; }
     if (a.dfmt) { if (a.dfmt === "h") return exec("formatBlock", "<h2>"); if (a.dfmt === "check") return exec("insertHTML", '<span class="dchk" contenteditable="false">☐</span>&nbsp;'); return exec(a.dfmt); }
     if (a.dundo !== undefined || a.dredo !== undefined) { const c = cur(); if (!c || !c.pg.length) return; const key = activeKey || "dp-" + c.pg[ST.idx][0]; if (a.dundo !== undefined) { const s = strokes(key).pop(); if (s) (redo[key] = redo[key] || []).push(s); } else { const s = (redo[key] || []).pop(); if (s) strokes(key).push(s); } touchInk(key); document.querySelectorAll("canvas.dink").forEach((cv) => cv._draw && cv._draw()); return; }
     if (b.closest(".dtools") && (a.pen || a.ink !== undefined || a.eraser !== undefined)) { setTimeout(() => { const bar = document.querySelector(".dtools"); if (bar) bar.querySelectorAll("[data-pen],[data-ink],[data-eraser]").forEach((x) => x.classList.toggle("on", x.dataset.pen ? x.dataset.pen === MP.pen.type && !MP.pen.eraser : x.dataset.ink ? x.dataset.ink === MP.pen.color && !MP.pen.eraser : MP.pen.eraser)); }, 0); return; }
@@ -380,11 +383,11 @@
     if (a.pkok !== undefined) {
       const c = cur(); if (!c) return; const d = c.d;
       if (pk.col && !COLS.some((x) => x[1] === pk.col)) { const r = [pk.col, ...recent().filter((x) => x !== pk.col)].slice(0, 8); try { localStorage.setItem("mp-drecent", JSON.stringify(r)); } catch (er) {} }
-      if (pk.edit) { const p = PS()[pk.edit], dd = document.querySelector("[data-pkdd]"); Object.assign(p, { tpl: pk.tpl, col: pk.col, tex: pk.tex, ds: pk.ds || p.ds, date: pk.date ? (dd && dd.value) || p.date || todayISO() : "", ask: 0 }); saveP(pk.edit); }
+      if (pk.edit) { const p = PS()[pk.edit], dd = document.querySelector("[data-pkdd]"); if (p.tpl !== pk.tpl) { p.obj = (p.obj || []).filter((x) => x.k !== "frame"); p.fr = 0; } Object.assign(p, { tpl: pk.tpl, col: pk.col, tex: pk.tex, ds: pk.ds || p.ds, date: pk.date ? (dd && dd.value) || p.date || todayISO() : "", ask: 0 }); saveP(pk.edit); }
       else { const at = c.pg.length ? (c.pg[ST.idx][1].o || 0) + 0.5 : null; const id = newPage(ST.did, ST.sid, pk, at, !!pk.date); if (pk.ds) PS()[id].ds = pk.ds; if (pk.def) { d.def = { tpl: pk.tpl, col: pk.col, tex: pk.tex }; saveD(ST.did); } ST.idx = pagesOf(ST.did, ST.sid).findIndex((x) => x[0] === id); keep(); }
       MP.closeModal(); return rerender();
     }
-    if (a.pkdup !== undefined) { const p = PS()[pk.edit], id = newPage(ST.did, p.s, p, (p.o || 0) + 0.5, false); Object.assign(PS()[id], { text: p.text, date: p.date, ds: p.ds }); const ink = MP.S.ink["dp-" + pk.edit]; if (ink && ink.s.length) MP.S.ink["dp-" + id] = { u: now(), s: JSON.parse(JSON.stringify(ink.s)) }; ST.idx += 1; keep(); MP.changed(); MP.closeModal(); MP.toast("Page duplicated"); return rerender(); }
+    if (a.pkdup !== undefined) { const p = PS()[pk.edit], id = newPage(ST.did, p.s, p, (p.o || 0) + 0.5, false); Object.assign(PS()[id], { text: p.text, date: p.date, ds: p.ds, obj: JSON.parse(JSON.stringify(p.obj || [])).map((x) => Object.assign(x, { id: "o" + Math.random().toString(36).slice(2, 9) })), fr: 1, bgim: p.bgim }); const ink = MP.S.ink["dp-" + pk.edit]; if (ink && ink.s.length) MP.S.ink["dp-" + id] = { u: now(), s: JSON.parse(JSON.stringify(ink.s)) }; ST.idx += 1; keep(); MP.changed(); MP.closeModal(); MP.toast("Page duplicated"); return rerender(); }
     if (a.pkdel !== undefined) return confirmDlg("This deletes the page, including its handwriting and text. This can't be undone.", "page|" + pk.edit);
     /* dates */
     if (a.ddate) return dateDlg(a.ddate);
@@ -412,7 +415,9 @@
   document.addEventListener("pointerup", (e) => { if (!sw) return; const dx = e.clientX - sw[0], dy = e.clientY - sw[1]; if (Math.abs(dx) > 70 && Math.abs(dx) > 2 * Math.abs(dy) && now() - sw[2] < 800) { const btn = document.querySelector(`.dstage [data-dnav="${dx < 0 ? 1 : -1}"]`); if (btn && !btn.disabled) btn.click(); } sw = null; });
   document.addEventListener("keydown", (e) => { if (!document.querySelector(".dstage") || document.getElementById("modal").classList.contains("on")) return; const t = e.target; if (t.isContentEditable || /INPUT|TEXTAREA|SELECT/.test(t.tagName)) return; if (e.key === "ArrowRight" || e.key === "ArrowLeft") { const btn = document.querySelector(`.dstage [data-dnav="${e.key === "ArrowRight" ? 1 : -1}"]`); if (btn && !btn.disabled) btn.click(); } });
 
-  MP.diaryAfter = () => { document.querySelectorAll("canvas.dink").forEach(setupInk); };
+  MP.diaryAfter = () => { document.querySelectorAll("canvas.dink").forEach(setupInk); if (MP.dobjAfter) MP.dobjAfter(); };
+  MP.diaryCur = () => { const c = cur(); return c && c.pg.length ? c.pg[ST.idx][0] : null; };
+  MP.diaryTheme = () => { const c = cur(); return c ? c.d.theme : null; };
   window.addEventListener("resize", () => { clearTimeout(window._mpDr); window._mpDr = setTimeout(() => document.querySelectorAll("canvas.dink").forEach((cv) => cv._size && cv._size()), 200); });
   MP.diaryThemes = TH; MP.diaryTemplates = TPL;
 })();

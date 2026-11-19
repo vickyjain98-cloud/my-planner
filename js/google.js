@@ -87,7 +87,7 @@
 
   G.listFiles = async () => {
     const f = await G.ensureFolder();
-    const r = await api(`${DRV}?q=${q(`'${f}' in parents and trashed=false`)}&fields=files(id,name,version,mimeType)&pageSize=200&spaces=drive`);
+    const r = await api(`${DRV}?q=${q(`'${f}' in parents and trashed=false and not name contains 'img-'`)}&fields=files(id,name,version,mimeType)&pageSize=200&spaces=drive`); /* 1.20: diary photos (img-…) live in the same folder; list only the data files */
     const j = await r.json();
     const map = {};
     (j.files || []).forEach((x) => { map[x.name] = x; });
@@ -110,6 +110,15 @@
   };
 
   G.deleteFile = (id) => api(`${DRV}/${id}`, { method: "DELETE" });
+  /* 1.20: diary photos and imports, stored as image files in the same My Planner folder */
+  G.uploadBin = async (name, blob, mime) => {
+    const f = await G.ensureFolder(), bnd = "mp" + Math.random().toString(36).slice(2);
+    const meta = JSON.stringify({ name, parents: [f], mimeType: mime });
+    const body = new Blob([`--${bnd}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${bnd}\r\nContent-Type: ${mime}\r\n\r\n`, blob, `\r\n--${bnd}--`]);
+    const r = await api(`${UPL}?uploadType=multipart&fields=id`, { method: "POST", headers: { "Content-Type": "multipart/related; boundary=" + bnd }, body });
+    return (await r.json()).id;
+  };
+  G.downloadBin = async (id) => (await api(`${DRV}/${id}?alt=media`)).blob();
 
   /* ---------- Sync engine: data split into parts so ink (handwriting) never slows the main file ---------- */
   G.parts = (S) => {

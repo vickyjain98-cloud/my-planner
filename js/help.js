@@ -357,6 +357,26 @@ window.MP_HELP = [
 ],
 [
 "p",
+"Photos, stickers, shapes and text boxes: tap ✥ in the toolbar. Then 🖼 adds a photo from your gallery, 📷 takes one with the camera, ★ adds a sticker, ◇ opens the shapes (the same groups as Microsoft Word: lines, basic shapes, block arrows, flowchart, callouts, stars and banners), T adds a text box, ⇪ imports a picture or design, and 🔎 opens free design sites matched to your diary's theme."
+],
+[
+"list",
+[
+"Move: drag the item. Resize: drag a corner (photos and stickers keep their shape; shapes and text boxes also have side handles). Rotate: drag ⟳ above the item; it clicks into place at 0°, 45° and 90°, and 0° straightens it.",
+"Crop: select a photo and tap ✂ Crop (or double-tap it). Drag the box or its corners, or pick Square, 4:3, 3:4, 16:9 or Original. The whole photo is kept, so you can crop again later.",
+"Photo frames on creative pages (garden log, scrapbook, vision board, travel, recipe) are items too: move, resize or rotate them, and tap one in ✥ mode to fill it with a photo, which is cropped to fit.",
+"Shapes: change the fill, outline colour and width; double-tap to type inside. Lines and arrows: drag an end onto the edge of a shape and it stays attached when you move the shape; choose straight, elbow or curved, and arrowheads at either end.",
+"Text boxes: double-tap to edit; change the font, size, colour, box colour and border.",
+"⬆ ⬇ bring an item forward or back, ⧉ duplicates, 🗑 deletes, and ↶ undoes. You can still write over photos with the pen.",
+"Import: a picture can become a photo, a sticker, or the page background. Everything you import is kept in My imports to reuse on any page."
+]
+],
+[
+"p",
+"Photos are shrunk on your device (usually 150–400 KB) and saved as picture files in the My Planner folder in your Google Drive, so they appear on your other devices once you're signed in and online."
+],
+[
+"p",
 "Once you have used the S Pen, fingers turn pages and the palm is ignored, so you can rest your hand while writing. Diaries are covered by the journal lock, are never sent to Buddy, and are not included in search or printing. Pages sync through your Google Drive (diary.json and the ink files)."
 ]
 ]

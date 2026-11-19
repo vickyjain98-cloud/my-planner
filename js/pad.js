@@ -15,12 +15,17 @@
   const svg = (p, s = 18) => `<svg aria-hidden="true" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
   const modeBtns = () => `<span class="seg" role="group" aria-label="Input"><button type="button" class="tool ${MP.inputMode === "pen" ? "on" : ""}" data-mode="pen" title="Write with S Pen or finger" aria-label="Write with pen">${MP.ic("penm", 18)}</button><button type="button" class="tool ${MP.inputMode === "type" ? "on" : ""}" data-mode="type" title="Type with keyboard" aria-label="Type with keyboard">${MP.ic("kbd", 18)}</button></span><span class="vsep"></span>`;
 
+  /* 1.17: every writing area can grow — Enter or "+ Add 3 lines" when typing; with the pen, new lines appear as you reach the bottom */
+  const tLine = (key, i, v, num, lineH) => `<div class="tline"><span class="tiny muted">${num ? i + 1 : ""}</span><textarea class="typed" rows="1" data-tk="${MP.esc(key)}" data-ti="${i}" maxlength="2000" aria-label="Line ${i + 1}" style="min-height:${lineH - 6}px">${MP.esc(v)}</textarea></div>`;
+  const addBtn = (key) => `<div class="padmore noprint"><button type="button" class="link tiny" data-addl="${MP.esc(key)}">+ Add 3 lines</button></div>`;
+  const grow = (ta) => { ta.style.height = "auto"; ta.style.height = ta.scrollHeight + "px"; };
+  MP.growTyped = () => document.querySelectorAll("textarea.typed").forEach(grow);
   MP.padHTML = (key, lines = 6, lineH = 46) => {
     const E = MP.esc, S = MP.S;
     if (MP.inputMode === "type") {
-      const tv = (S.typed[key] && S.typed[key].l) || [];
+      const tv = (S.typed[key] && S.typed[key].l) || [], n = Math.max(lines, tv.length);
       const hasInk = S.ink[key] && S.ink[key].s && S.ink[key].s.length;
-      return `<div class="pad" data-tpad="${E(key)}"><div class="padbar noprint">${modeBtns()}<span class="tiny muted">Typing${hasInk ? " · your handwriting is kept; switch to the pen to see it" : ""}</span></div><div class="typedbox">${[...Array(lines)].map((_, i) => `<div class="tline"><span class="tiny muted">${lines > 1 ? i + 1 : ""}</span><input class="typed" data-tk="${E(key)}" data-ti="${i}" value="${E(tv[i] || "")}" maxlength="300" aria-label="Line ${i + 1}" style="min-height:${lineH - 6}px"></div>`).join("")}</div></div>`;
+      return `<div class="pad" data-tpad="${E(key)}"><div class="padbar noprint">${modeBtns()}<span class="tiny muted">Typing${hasInk ? " · your handwriting is kept; switch to the pen to see it" : ""}</span></div><div class="typedbox">${[...Array(n)].map((_, i) => tLine(key, i, tv[i] || "", n > 1, lineH)).join("")}</div>${addBtn(key)}</div>`;
     }
     return `<div class="pad" data-pad="${E(key)}"><div class="padbar noprint">${modeBtns()}
       ${PENS.map((p) => `<button type="button" class="tool ${pen.type === p[0] && !pen.eraser ? "on" : ""}" data-pen="${p[0]}" title="${p[1]}" aria-label="${p[1]}">${svg(PI[p[0]])}</button>`).join("")}
@@ -32,7 +37,7 @@
       <button type="button" class="tool" data-undo aria-label="Undo">${MP.ic("undo", 18)}</button><button type="button" class="tool" data-redo aria-label="Redo">${MP.ic("redo", 18)}</button>
       <button type="button" class="tool" data-clear aria-label="Clear page">${MP.ic("trash", 18)}</button>
       <select class="f sm" data-paper aria-label="Paper">${["lined", "dotted", "plain"].map((p) => `<option ${pen.paper === p ? "selected" : ""}>${p}</option>`).join("")}</select>
-      </div><canvas class="ink" data-lines="${lines}" data-lh="${lineH}" aria-label="Writing area"></canvas></div>`;
+      </div><canvas class="ink" data-lines="${lines}" data-lh="${lineH}" aria-label="Writing area"></canvas>${addBtn(key)}</div>`;
   };
 
   const redo = {};
@@ -43,7 +48,9 @@
     document.querySelectorAll("[data-pad]").forEach((el) => {
       if (el._size) { el._size(); return; } /* already set up (e.g. a pad in a pop-up when the page re-renders) */
       const key = el.dataset.pad, cv = el.querySelector("canvas"), ctx = cv.getContext("2d");
-      const lh = +cv.dataset.lh, lines = +cv.dataset.lines;
+      const lh = +cv.dataset.lh, base = +cv.dataset.lines;
+      let lines = base + ((MP.S.ink[key] || {}).x || 0);
+      el._more = (n) => { const rec = MP.S.ink[key] || (MP.S.ink[key] = { u: 0, s: [] }); rec.x = (rec.x || 0) + n; lines = base + rec.x; touchInk(key); size(); };
       const css = (v) => getComputedStyle(document.body).getPropertyValue(v).trim();
       function size() { const w = cv.clientWidth || 600, dpr = window.devicePixelRatio || 1; cv.width = w * dpr; cv.height = lines * lh * dpr; cv.style.height = lines * lh + "px"; ctx.setTransform(dpr, 0, 0, dpr, 0, 0); draw(); }
       function paper() {
@@ -81,7 +88,7 @@
         evs.forEach((ev) => { const pt = P(ev); if (cur.erase) erase(pt); else cur.p.push(pt); });
         if (!cur.erase) { draw(); stroke(cur); }
       });
-      const end = () => { if (cur && !cur.erase && cur.p.length) { strokesOf(key).push(cur); touchInk(key); draw(); } cur = null; };
+      const end = () => { if (cur && !cur.erase && cur.p.length) { strokesOf(key).push(cur); touchInk(key); if (Math.max(...cur.p.map((q) => q[1])) > (lines - 1) * lh - 10) el._more(2); else draw(); } cur = null; };
       cv.addEventListener("pointerup", end); cv.addEventListener("pointercancel", end);
       function erase(pt) { const w = cv.clientWidth, arr = strokesOf(key), n = arr.length; const keep = arr.filter((s) => !s.p.some((q) => Math.hypot((q[0] - pt[0]) * w, q[1] - pt[1]) < 14)); if (keep.length !== n) { MP.S.ink[key].s = keep; touchInk(key); draw(); } }
       size();
@@ -97,6 +104,16 @@
   });
 
   document.addEventListener("click", (e) => {
+    const al = e.target.closest("[data-addl]");
+    if (al) {
+      const key = al.dataset.addl, pad = al.closest(".pad");
+      if (pad && pad._more) return pad._more(3);
+      const box = pad && pad.querySelector(".typedbox"); if (!box) return;
+      const S = MP.S; if (!S.typed[key]) S.typed[key] = { u: 0, l: [] };
+      const n = box.querySelectorAll(".tline").length, ta0 = box.querySelector("textarea"), lh = ta0 ? (parseInt(ta0.style.minHeight) || 40) + 6 : 46;
+      for (let i = n; i < n + 3; i++) { box.insertAdjacentHTML("beforeend", tLine(key, i, "", true, lh)); S.typed[key].l[i] = S.typed[key].l[i] || ""; }
+      S.typed[key].u = Date.now(); MP.changed(); box.querySelectorAll("textarea")[n].focus(); return;
+    }
     const m = e.target.closest("[data-mode]");
     if (m) { MP.inputMode = m.dataset.mode; MP.pref.set("input", MP.inputMode); MP.render(); return; }
     const b = e.target.closest("[data-pen],[data-ink],[data-eraser],[data-undo],[data-redo],[data-clear]");
@@ -112,9 +129,21 @@
   });
   document.addEventListener("input", (e) => {
     const t = e.target;
+    if (t.matches("textarea.typed")) grow(t);
     if (t.matches("[data-tk]")) { const k = t.dataset.tk; const S = MP.S; if (!S.typed[k]) S.typed[k] = { u: 0, l: [] }; S.typed[k].l[+t.dataset.ti] = t.value; S.typed[k].u = Date.now(); MP.changed(); }
     if (t.matches("[data-size]")) pen.size = +t.value;
     if (t.matches("[data-inkc]")) { pen.color = t.value; pen.eraser = false; refreshBars(); }
+  });
+  /* Enter moves to the next line, making a new one at the end; Backspace on an empty line goes back */
+  document.addEventListener("keydown", (e) => {
+    const t = e.target; if (!t.matches || !t.matches("textarea.typed")) return;
+    const box = t.closest(".typedbox"), all = [...box.querySelectorAll("textarea.typed")], i = all.indexOf(t);
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      if (i === all.length - 1) { const k = t.dataset.tk, S = MP.S; if (!S.typed[k]) S.typed[k] = { u: 0, l: [] }; S.typed[k].l[i + 1] = S.typed[k].l[i + 1] || ""; S.typed[k].u = Date.now(); MP.changed(); box.insertAdjacentHTML("beforeend", tLine(k, i + 1, "", true, parseInt(t.style.minHeight) + 6 || 46)); }
+      box.querySelectorAll("textarea.typed")[i + 1].focus();
+    }
+    if (e.key === "Backspace" && !t.value && i > 0) { e.preventDefault(); const prev = all[i - 1]; prev.focus(); prev.setSelectionRange(prev.value.length, prev.value.length); }
   });
   document.addEventListener("change", (e) => { if (e.target.matches("[data-paper]")) { pen.paper = e.target.value; refreshBars(); } });
   window.addEventListener("resize", () => { clearTimeout(window._mpRz); window._mpRz = setTimeout(() => document.querySelectorAll("[data-pad]").forEach((el) => el._size && el._size()), 200); });

@@ -1237,7 +1237,7 @@
     if (!P().setupDone) { main.innerHTML = V.setup(); return; }
     const top = mode === "google" ? `<div class="mobstatus">${statusPill()}</div>` : `<div class="mobstatus">${statusPill()}</div>`;
     main.innerHTML = top + (isLocked(route) ? lockHTML() : (V[route] || V.today)());
-    MP.setupPads();
+    MP.setupPads(); MP.growTyped && MP.growTyped();
     if (route === "day") dayScroll();
     postitLayer();
     if (route === "today") { maybeMenuPrompt(); if (P().menu && P().menu.chosen) maybePlan(); }
@@ -1889,7 +1889,7 @@
   document.addEventListener("pointercancel", () => { if (drag) { drag.el.remove(); drag = null; MP.render(); } });
 
   /* ---------- start-up ---------- */
-  MP.VERSION = "1.16.2";
+  MP.VERSION = "1.17";
   if (MP.sound) MP.sound.onchange = () => { miniPlayer(); if (route === "study") MP.render(); };
   /* Public, read-only helpers for future modules and connectors. */
   MP.api = { today, iso, dayPct, studyHours, streak, tasks, feed: () => MP.buildFeed(MP.S), version: MP.VERSION, schemaVersion: MP.SCHEMA_VERSION };

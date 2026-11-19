@@ -133,8 +133,9 @@ input.f,select.f,textarea.f{background:var(--surf);border:1px solid var(--line);
 canvas.ink{display:block;width:100%;touch-action:none;cursor:crosshair}
 .typedbox{padding:6px 16px 12px}.tline{display:flex;gap:10px;align-items:center;border-bottom:1px solid var(--line)}
 .tline span{width:16px;text-align:right}
-input.typed{flex:1;border:0;background:none;font-family:var(--disp);font-style:italic;font-size:18px;outline:none;min-width:0}
-input.typed:focus{background:color-mix(in srgb,var(--soft) 40%,transparent)}
+input.typed,textarea.typed{flex:1;border:0;background:none;font-family:var(--disp);font-style:italic;font-size:18px;outline:none;min-width:0;color:var(--ink)}
+textarea.typed{resize:none;overflow:hidden;line-height:1.45;padding:8px 0 4px;display:block;width:100%}
+input.typed:focus,textarea.typed:focus{background:color-mix(in srgb,var(--soft) 40%,transparent)}
 /* affirmations, mood */
 .aff{font-size:14px;line-height:1.45}.dim{opacity:.5}
 .dotrow{font-size:15px;letter-spacing:2px;color:var(--acc);word-break:break-all}
@@ -362,3 +363,6 @@ input[type=time]{cursor:pointer}
 .phgo{background:#3B2410;color:#FFE9C7;border-radius:999px;padding:8px 16px;font-weight:700;font-size:15px;white-space:nowrap}
 @media (max-width:600px){.planhero{padding:12px 14px;gap:10px}.phsun{font-size:30px}.phtxt b{font-size:21px}.phtxt span{font-size:12.5px}.phgo{padding:6px 12px;font-size:13px}}
 @media (prefers-reduced-motion:reduce){.phsun{animation:none}}
+
+/* 1.17 writing space that grows */
+.padmore{display:flex;justify-content:flex-end;padding:2px 14px 8px}

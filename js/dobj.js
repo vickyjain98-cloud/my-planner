@@ -61,7 +61,8 @@
     tape3: '<rect x="0" y="13" width="40" height="14" fill="#FFD23F" opacity=".9"/><path d="M0 20h40" stroke="#E07A00" stroke-dasharray="4 3"/>',
     arrowc: '<path d="M3 30C12 8 28 8 36 18" stroke="#F2546E" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M30 12l7 6-8 3" stroke="#F2546E" stroke-width="3" fill="none" stroke-linecap="round"/>'
   };
-  const stickerSVG = (k) => `<svg viewBox="0 0 40 40" preserveAspectRatio="none" width="100%" height="100%">${ST[k] || ""}</svg>`;
+  const stickerSVG = (k) => `<svg class="stk" viewBox="0 0 40 40" preserveAspectRatio="none" width="100%" height="100%">${ST[k] || (MP.STK || {})[k] || ""}</svg>`;
+  let stkPack = "Classic";
 
   /* ---------- pictures: shrunk on the device, kept in IndexedDB, copied to your Drive folder ---------- */
   const IMG = {}; /* id → data URL cache */
@@ -257,7 +258,7 @@
       const opp = rot({ x: -sx * o0.w / 2, y: -sy * o0.h / 2 }, r), oppW = { x: c0.x + opp.x, y: c0.y + opp.y };
       const loc = rot({ x: p.x - oppW.x, y: p.y - oppW.y }, -r);
       let w = sx ? Math.max(0.03, loc.x * sx) : o0.w, h = sy ? Math.max(0.03, loc.y * sy) : o0.h;
-      if ((o.k === "photo" || o.k === "sticker") && sx && sy) { const k = Math.max(w / o0.w, h / o0.h); w = o0.w * k; h = o0.h * k; }
+      if ((o.k === "photo" || (o.k === "sticker" && !/^x-/.test(o.s || ""))) && sx && sy) { const k = Math.max(w / o0.w, h / o0.h); w = o0.w * k; h = o0.h * k; }
       const half = rot({ x: (sx || 0) * w / 2, y: (sy || 0) * h / 2 }, r), base = sx && sy ? oppW : { x: c0.x + (sx ? opp.x : 0), y: c0.y + (sy ? opp.y : 0) };
       const nc = sx && sy ? { x: oppW.x + half.x, y: oppW.y + half.y } : { x: base.x + half.x, y: base.y + half.y };
       o.w = w; o.h = h; o.x = nc.x - w / 2; o.y = nc.y - h / 2;
@@ -319,7 +320,7 @@
     if (o.k === "photo") h += cbtn("crop", "✂ Crop", "Crop") + cbtn("replace", "Replace", "Replace photo") + cbtn("polar", o.pf ? "▢ Border on" : "▢ Border", "White photo border");
     if (o.k === "frame") h += cbtn("fill", "📷 Add photo", "Put a photo in this frame");
     if (o.k === "shape") h += cbtn("fillpanel", `<span class="cdot" style="background:${cssFill(o.f, o.g, o.fo)}"></span>`, "Fill, transparency, gradient and outline", "", "Fill & line") + cbtn("nofill", "▢", "No fill: outline only, the page shows through", "", "Outline only") + colIn("tc", o.tc, "Text colour", MP.dlb("A", "Text colour")) + cbtn("edit", "✎", "Type in the shape", "", "Type text");
-    if (o.k === "text") h += `<select class="f sm" data-ob-font aria-label="Font">${["Caveat", "Kalam", "Patrick Hand", "Dancing Script", "Fraunces", "Playfair Display", "Poppins", "Inter"].map((f) => `<option ${o.font === f ? "selected" : ""}>${f}</option>`).join("")}</select>` + cbtn("smaller", "A−", "Smaller") + cbtn("bigger", "A+", "Bigger") + colIn("tc", o.tc, "Text colour", MP.dlb("A", "Text colour")) + cbtn("fillpanel", `<span class="cdot" style="background:${cssFill(o.bg, o.g, o.fo)}"></span>`, "Box colour, transparency, gradient and border", "", "Box & border") + cbtn("edit", "✎", "Type in the box", "", "Type text");
+    if (o.k === "text") h += `<select class="f sm" data-ob-font aria-label="Font">${["Caveat", "Kalam", "Patrick Hand", "Great Vibes", "Pacifico", "Fredoka", "Dancing Script", "Fraunces", "Playfair Display", "Poppins", "Inter"].map((f) => `<option ${o.font === f ? "selected" : ""}>${f}</option>`).join("")}</select>` + cbtn("smaller", "A−", "Smaller") + cbtn("bigger", "A+", "Bigger") + colIn("tc", o.tc, "Text colour", MP.dlb("A", "Text colour")) + cbtn("fillpanel", `<span class="cdot" style="background:${cssFill(o.bg, o.g, o.fo)}"></span>`, "Box colour, transparency, gradient and border", "", "Box & border") + cbtn("edit", "✎", "Type in the box", "", "Type text");
     if (o.k === "diagram") { const tr = o.dt === "mind" || o.dt === "tree"; h += cbtn("dadd", tr ? "+ Branch" : "+ Add", tr ? "Add a branch under the picked box" : "Add a box after the picked one") + (tr ? cbtn("dsib", "+ Same level", "Add a box next to the picked one") : "") + cbtn("drm", "− Remove", "Remove the picked box") + (o.dt === "flow" ? cbtn("ddec", "◇ Decision", "Make the picked box a decision") : "") + cbtn("dedit", "✎ Text", "Type in the picked box") + cbtn("dpal", "🎨 Colours", "Change colours") + `<span class="tiny muted">${DSN && DSN.oid === o.id && DSN.nid ? "Box picked" : "Tap a box to pick it"}</span>`; }
     if (o.k === "line") h += colIn("stroke", o.sc, "Line colour", `<span class="cdot ring" style="border-color:${o.sc || "#333"}"></span>`) + `<select class="f sm" data-ob-sw aria-label="Line width">${[1, 2, 3, 5, 8].map((n) => `<option value="${n}" ${(o.sw ?? 3) == n ? "selected" : ""}>${n} pt</option>`).join("")}</select>` + `<select class="f sm" data-ob-lt aria-label="Line type">${[["s", "Straight"], ["e", "Elbow"], ["c", "Curved"]].map(([k, n]) => `<option value="${k}" ${o.t === k ? "selected" : ""}>${n}</option>`).join("")}</select>` + cbtn("a1", "◀", "Arrow at start", o.a1 ? 'style="background:var(--soft)"' : "") + cbtn("a2", "▶", "Arrow at end", o.a2 ? 'style="background:var(--soft)"' : "");
     if (o.k !== "line") h += cbtn("rot0", "⟲", "Straighten to 0°", "", `${Math.round(o.r || 0)}° · Straighten`);
@@ -438,7 +439,9 @@
   function stickerDlg() {
     const mine = Object.entries(IMS()).filter(([, m]) => m.lib && !m.del);
     MP.modal(`<div class="between"><h2>Stickers</h2><button class="tool" data-close aria-label="Close">✕</button></div>
-      <div class="dstk">${Object.keys(ST).map((k) => `<button class="dstkb" data-stk="${k}" title="Add sticker">${stickerSVG(k)}</button>`).join("")}</div>
+      <div class="dchips">${[["Classic"], ...(MP.STICKER_PACKS || [])].map(([n]) => `<button class="dchip ${stkPack === n ? "on" : ""}" data-stkpack="${E(n)}">${E(n)}</button>`).join("")}</div>
+      <div class="dstk ${stkPack === "Decor" ? "wide" : ""}">${Object.keys(stkPack === "Classic" ? ST : ((MP.STICKER_PACKS || []).find((p) => p[0] === stkPack) || [0, {}])[1]).map((k) => `<button class="dstkb" data-stk="${k}" title="Add sticker">${stickerSVG(k)}</button>`).join("")}</div>
+      ${stkPack === "Decor" ? '<p class="tiny muted">Washi tape, sticky notes and bubbles stretch to any shape: pull a side handle. Put a text box on top to write on them.</p>' : ""}
       ${mine.length ? `<div class="small mt"><b>My imports</b></div><div class="dstk">${mine.map(([id]) => `<button class="dstkb" data-stkim="${E(id)}"><img data-im="${E(id)}" alt="" style="width:100%;height:100%;object-fit:contain"></button>`).join("")}</div>` : ""}
       <p class="tiny muted mt">Tap a sticker to place it, then drag to move, pull a corner to resize, and use ⟳ to rotate. Import your own with ⇪.</p>`);
     fillImgs(document.getElementById("modal"));
@@ -477,7 +480,8 @@
   document.addEventListener("click", async (e) => {
     const b = e.target.closest && e.target.closest("button"); if (!b) return; const d = b.dataset;
     if (d.dgm) { MP.closeModal(); const [w, h] = DG[d.dgm][2]; add(Object.assign({ k: "diagram", dt: d.dgm, n: newDiagram(d.dgm), pal: 0 }, centred(w, h))); return; }
-    if (d.stk) { MP.closeModal(); add(Object.assign({ k: "sticker", s: d.stk }, centred(0.16, /^tape/.test(d.stk) ? 0.06 : 0.16))); return; }
+    if (d.stkpack) { stkPack = d.stkpack; return stickerDlg(); }
+    if (d.stk) { MP.closeModal(); const sz = MP.STK && MP.STK[d.stk] && MP.stkSize ? MP.stkSize(d.stk) : [0.16, /^tape/.test(d.stk) ? 0.06 : 0.16]; add(Object.assign({ k: "sticker", s: d.stk, z: /^x-/.test(d.stk) ? 0 : undefined }, centred(sz[0], sz[1]))); return; }
     if (d.stkim) { MP.closeModal(); const ar = (IMS()[d.stkim] || {}).ar || 1; add(Object.assign({ k: "sticker", im: d.stkim }, centred(0.2, 0.2 * ar))); return; }
     if (d.shp) { MP.closeModal(); const L2 = LINEK[d.shp]; if (L2) { add({ k: "line", t: L2[0], a1: L2[1], a2: L2[2], p1: { x: 0.3, y: RATIO / 2 }, p2: { x: 0.7, y: RATIO / 2 - (L2[0] === "s" ? 0 : 0.12) }, sc: "#333333", sw: 3, x: 0, y: 0, w: 0, h: 0 }); return; } const sq = /oval|circle|^s\d|boom|sun|smiley|donut|nosym|pie|chord|fconn|fsum|for|fseq|heart|moon|plus|oct|hex|pent|hept|dec|dodec|cube|bolt|tear|aquad|acirc/.test(d.shp); add(Object.assign({ k: "shape", sh: d.shp, f: "#FFFFFF", sc: "#333333", sw: 3, html: "" }, centred(sq ? 0.26 : 0.34, sq ? 0.26 : 0.2))); return; }
     if (d.impgo !== undefined) { const f = await pickFile("image/*"); if (!f) return; try { MP.toast("Importing…"); const r = await storeImg(f, true); impId = r.id; importDlg("use"); } catch (er) { MP.toast(er.message || "Couldn't import that"); } return; }

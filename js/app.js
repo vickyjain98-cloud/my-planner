@@ -340,7 +340,7 @@
     const wins = [...ks.flatMap((k) => typedOf("win-" + k).map((x) => [k, x])), ...doneW.filter((x) => tPri(x) === 0).map((x) => [dayOf(x.doneAt), "Done: " + x.t.split("\n")[0]])].slice(0, 12);
     const jh = locked ? [] : ks.map((k) => [k, typedOf("journal-" + k)[0] || ((MP.S.days[k] || {}).shut || {}).note || ""]).filter((x) => x[1]);
     const wrec = MP.S.weeks[wk] || {}, nk = iso(addD(m, 7)), nrec = MP.S.weeks[nk] || {};
-    return `${head(`${fmt(m, { day: "numeric", month: "short" })} – ${fmt(addD(m, 6), { day: "numeric", month: "short", year: "numeric" })}`, "Weekly review", `<div class="row"><button class="btn ghost sm" data-rvw="-7" aria-label="Previous week">‹</button><button class="btn ghost sm" data-rvw="0">This week</button><button class="btn ghost sm" data-rvw="7" aria-label="Next week">›</button></div>`)}
+    return `${head(`${fmt(m, { day: "numeric", month: "short" })} – ${fmt(addD(m, 6), { day: "numeric", month: "short", year: "numeric" })}`, "Weekly review", `<div class="row"><button class="btn ghost sm" data-rvw="-7" aria-label="Previous week">‹</button><button class="btn ghost sm" data-rvw="0">This week</button><button class="btn ghost sm" data-rvw="7" aria-label="Next week">›</button><button class="btn ghost sm" data-go="mreview">Monthly review</button></div>`)}
       <div class="grid g3"><section class="card row" style="gap:16px;flex-wrap:nowrap">${ring(avgP, 110, 11, "HABITS")}<div class="small muted">Average of the days so far. Rest days don't count against you.</div></section>
         <section class="card stack"><span class="lab">To-dos</span><div class="between"><span>Done this week</span><b>${doneW.length}</b></div><div class="between"><span>Carried in from earlier weeks</span><b>${carried}</b></div><div class="between"><span>Overdue right now</span><b class="${stillLate ? "over" : ""}">${stillLate}</b></div></section>
         <section class="card stack"><span class="lab">Time</span>${acts.map((x) => `<div class="between small"><span>${E(x.n)}</span><b>${hm(x.done)} <span class="muted">of ${hm(x.plan)}</span></b></div>`).join("") || '<span class="small muted">No activities this week.</span>'}${meet ? `<div class="between small"><span>Meetings & events</span><b>${hm(meet)}</b></div>` : ""}</section></div>
@@ -350,6 +350,24 @@
         <section class="card stack"><span class="lab">Journal highlights</span>${locked ? `<span class="small">${ic("lock", 14)} Locked. <button class="link" data-go="journal">Unlock</button></span>` : jh.map((x) => `<div class="small"><span class="muted">${fmt(parseISO(x[0]), { weekday: "short" })}</span> · ${E(x[1].slice(0, 140))}</div>`).join("") || '<span class="small muted">First lines of your journal and shut-down notes show here.</span>'}</section></div>
       <section class="card stack mt"><span class="lab">This week's reflection</span><div class="grid g2"><label class="stack small">What worked<textarea class="f" rows="2" maxlength="500" data-wkf="worked" data-wk="${wk}">${E(wrec.worked || "")}</textarea></label><label class="stack small">One thing to change<textarea class="f" rows="2" maxlength="500" data-wkf="change" data-wk="${wk}">${E(wrec.change || "")}</textarea></label></div></section>
       <section class="card stack mt"><span class="lab">Start next week (${fmt(parseISO(nk), { day: "numeric", month: "short" })})</span>${[1, 2, 3].map((i) => `<label class="row small" style="gap:8px"><b style="width:60px">Goal ${i}</b><input class="f" style="flex:1" maxlength="200" data-wkf="g${i}" data-wk="${nk}" value="${E(nrec["g" + i] || "")}" placeholder="One clear goal"></label>`).join("")}<div class="row"><button class="btn ghost sm" data-go="timetable">Check next week's timetable →</button></div></section>`;
+  };
+
+  /* 1.25 Monthly review: the month's numbers, then the same questions as the diary's Monthly review page */
+  V.mreview = () => {
+    const t = today(), base = view.mrv ? parseISO(view.mrv + "-01") : new Date(t.getFullYear(), t.getMonth(), 1), y = base.getFullYear(), mo = base.getMonth(), key = `M${y}-${String(mo + 1).padStart(2, "0")}`;
+    const n = new Date(y, mo + 1, 0).getDate(), days = [...Array(n)].map((_, i) => new Date(y, mo, i + 1)), past = days.filter((d) => d <= t), ks = days.map(iso);
+    const pcts = past.map((d) => dayPct(d)).filter((x) => x !== null && x !== undefined), avgP = pcts.length ? pcts.reduce((a, b) => a + b, 0) / pcts.length : 0;
+    const T = tasks(), doneM = T.filter((x) => x.done && x.doneAt && ks.includes(dayOf(x.doneAt))), acts = actNames().map((nm) => ({ nm, done: past.reduce((s2, d) => s2 + actMins(d, nm).done, 0) })).filter((x) => x.done);
+    const locked = lockOn() && !unlocked, moods = {}; if (!locked) past.forEach((d) => { const w = moodOf(d); if (w) moods[w] = (moods[w] || 0) + 1; });
+    const sl = past.map((d) => (MP.S.days[iso(d)] || {}).sleep).filter(Boolean), wa = past.map((d) => (MP.S.days[iso(d)] || {}).water).filter(Boolean);
+    const r = MP.S.weeks[key] || {}, ta = (f, label, rows = 3) => `<label class="stack small">${label}<textarea class="f" rows="${rows}" maxlength="500" data-wkf="${f}" data-wk="${key}">${E(r[f] || "")}</textarea></label>`;
+    const ym = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    return `${head(fmt(base, { month: "long", year: "numeric" }), "Monthly review", `<div class="row"><button class="btn ghost sm" data-mrv="${ym(new Date(y, mo - 1, 1))}" aria-label="Previous month">‹</button><button class="btn ghost sm" data-mrv="">This month</button><button class="btn ghost sm" data-mrv="${ym(new Date(y, mo + 1, 1))}" aria-label="Next month">›</button><button class="btn ghost sm" data-go="review">Weekly review</button></div>`)}
+      <div class="grid g3"><section class="card row" style="gap:16px;flex-wrap:nowrap">${ring(avgP, 110, 11, "HABITS")}<div class="small muted">Average of ${pcts.length} day${pcts.length === 1 ? "" : "s"} with habits this month.</div></section>
+        <section class="card stack"><span class="lab">To-dos and time</span><div class="between small"><span>Tasks done</span><b>${doneM.length}</b></div>${acts.map((x) => `<div class="between small"><span>${E(x.nm)}</span><b>${hm(x.done)}</b></div>`).join("")}</section>
+        <section class="card stack"><span class="lab">Wellness</span>${locked ? `<span class="small">${ic("lock", 14)} Mood is locked.</span>` : Object.entries(moods).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([w, c]) => `<div class="between small"><span class="row" style="gap:6px"><i class="key" style="background:${MOODCOL[w]}"></i>${E(w)}</span><b>${c} day${c > 1 ? "s" : ""}</b></div>`).join("") || '<span class="small muted">No mood check-ins yet.</span>'}${sl.length ? `<div class="between small"><span>Average sleep</span><b>${(sl.reduce((a, b) => a + b, 0) / sl.length).toFixed(1)} h</b></div>` : ""}${wa.length ? `<div class="between small"><span>Average water</span><b>${(wa.reduce((a, b) => a + b, 0) / wa.length).toFixed(1)} glasses</b></div>` : ""}</section></div>
+      <section class="card stack mt"><span class="lab">Reflect on the month · saved for ${fmt(base, { month: "long" })}</span><div class="grid g2">${ta("how", "How was my month?")}${ta("lessons", "Lessons learned")}${ta("wins", "Accomplishments")}${ta("grateful", "I'm grateful for")}${ta("well", "What did I do well?")}${ta("improve", "What can I improve?")}</div>${ta("next", "Goals for next month", 3)}</section>
+      <p class="tiny muted mt">Prefer pen and paper? Print → Monthly review, or add a Monthly review page in your Diary.</p>`;
   };
 
   /* Quick add (1.13): type it the way you'd say it; the chips show what was understood (tap to correct). */
@@ -780,7 +798,17 @@
     G.done.forEach((t) => { const m = t.doneAt ? fmt(new Date(t.doneAt), { month: "long", year: "numeric" }) : "Before 18 Nov 2026"; (months[m] = months[m] || []).push(t); });
     const sec = (title, arr, extra = "") => (arr.length ? `<section class="card stack mb"><div class="between wrap"><span class="lab">${title} · ${arr.length}</span>${extra}</div><div class="ttable">${taskHead()}${arr.map(taskRow).join("")}</div></section>` : "");
     const fmtLong = (k) => (k ? fmt(parseISO(k), { day: "numeric", month: "short", year: "numeric" }) : "—");
-    return `${head("One list · priority is set from Urgent + Important", "To-Do", `<button class="btn" data-tnew>${ic("plus", 16)} New task</button>`)}
+    const mx = P().todoMode === "matrix", segT = `<span class="seg" role="group" aria-label="View"><button class="tool ${mx ? "" : "on"}" data-tmode="list">☰ List</button><button class="tool ${mx ? "on" : ""}" data-tmode="matrix">⊞ Matrix</button></span>`;
+    if (mx) {
+      const open = tasks().filter((x) => !x.done).sort((a, b) => (tDay(a) || "9").localeCompare(tDay(b) || "9") || tByPri(a, b)), Q = [[], [], [], []];
+      open.forEach((x) => Q[tPri(x)].push(x));
+      const QN = [["Urgent · important", "Do it now", "pri-urg"], ["Important · not urgent", "Plan for later", "pri-med"], ["Urgent · not important", "Assign someone", "pri-high"], ["Not urgent · not important", "Ignore or drop", "pri-low"]];
+      const item = (x) => `<div class="mxrow"><input type="checkbox" class="cb" data-done="${E(x.id)}" aria-label="Done"><button class="ttext" data-tedit="${E(x.id)}">${E(lineOf(x.t))}</button><span class="tiny muted">${tDay(x) ? (tLate(x) ? `<span class="over">${shortD(tDay(x))}</span>` : shortD(tDay(x))) : "Inbox"}</span></div>`;
+      return `${head("Eisenhower matrix · from Urgent + Important", "To-Do", `<span class="row" style="gap:8px">${segT}<button class="btn" data-tnew>${ic("plus", 16)} New task</button></span>`)}${quickBox()}
+        <div class="mxgrid mt">${QN.map(([t, s, c], i) => `<section class="card stack mxq ${c}"><div class="between"><span class="lab">${t}</span><span class="pill tiny ${c}">${s} · ${Q[i].length}</span></div>${Q[i].map(item).join("") || '<span class="small muted">Nothing here.</span>'}</section>`).join("")}</div>
+        <p class="tiny muted mt">Tap a task to change it. Ticking it here marks it done, the same as in the list. Print this as a sheet from Print → Eisenhower matrix.</p>`;
+    }
+    return `${head("One list · priority is set from Urgent + Important", "To-Do", `<span class="row" style="gap:8px">${segT}<button class="btn" data-tnew>${ic("plus", 16)} New task</button></span>`)}
       ${quickBox()}<div class="mb"></div>${sec('<span class="over">Overdue</span>', G.overdue, moveAll())}
       ${sec("Today", G.today) || '<section class="card mb"><span class="small muted">Nothing for today. Tap New task.</span></section>'}
       ${sec("Upcoming", G.upcoming)}${sec("Inbox · no date yet", G.inbox)}
@@ -887,7 +915,7 @@
       return `<section class="stack" style="gap:6px">${label ? `<span class="${f[0].startsWith("@") ? "quote jq" : "lab"}">${E(label)}</span>` : ""}${MP.padHTML(jKey(k, tpl[0], i), f[1], 40)}</section>`;
     }).join("");
     let extra = "";
-    if (tpl[0] === "line") { const past = [1, 2, 3, 4, 5].map((y) => { const pd = new Date(d.getFullYear() - y, d.getMonth(), d.getDate()), pk = jKey(iso(pd), "line", 0), t = MP.S.typed[pk]; return t && t.l && t.l[0] ? `<div class="small"><b>${pd.getFullYear()}</b> · ${E(t.l[0])}</div>` : ""; }).join(""); extra = `<section class="card stack mt"><span class="lab">On this day</span>${past || '<span class="small muted">Earlier years will appear here.</span>'}</section>`; }
+    if (tpl[0] === "line") { const past = [1, 2, 3, 4, 5].map((y) => { const pd = new Date(d.getFullYear() - y, d.getMonth(), d.getDate()), pk = jKey(iso(pd), "line", 0), t = MP.S.typed[pk]; return t && t.l && t.l[0] ? `<div class="small"><b>${pd.getFullYear()}</b> · ${E(t.l[0])}</div>` : ""; }).join(""); const nD = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate(), month = [...Array(nD)].map((_, i) => { const md = new Date(d.getFullYear(), d.getMonth(), i + 1), t2 = MP.S.typed[jKey(iso(md), "line", 0)]; return `<div class="olrow ${i % 4 === 3 ? "alt" : ""}"><span class="tiny muted b">${i + 1}</span><span class="small">${t2 && t2.l && t2.l[0] ? E(t2.l[0]) : ""}</span></div>`; }).join(""); extra = `<section class="card stack mt"><span class="lab">On this day</span>${past || '<span class="small muted">Earlier years will appear here.</span>'}</section><section class="card stack mt"><span class="lab">${fmt(d, { month: "long", year: "numeric" })} · one line a day</span><div class="olgrid">${month}</div></section>`; }
     const entries = {}; [...Object.keys(MP.S.typed), ...Object.keys(MP.S.ink)].forEach((key) => { let m = key.match(/^jr-(\d{4}-\d{2}-\d{2})-(\w+)-/) || key.match(/^journal-(\d{4}-\d{2}-\d{2})$/); if (m && hasEntry(key)) { const dk = m[1], t = m[2] || "free"; (entries[dk] = entries[dk] || new Set()).add(t); } });
     const recent = Object.keys(entries).sort().reverse().slice(0, 14);
     const shuffle = tpl[0] === "prompt" || tpl[0] === "shadow" ? `<button class="link" data-jshuf>Another question</button>` : "";
@@ -925,6 +953,7 @@
       <label class="between small">Slept (hours)<input class="f" type="number" min="0" max="16" step=".5" value="${rec.sleep ?? ""}" style="width:90px" data-sleep></label>
       <span class="lab">Grateful for</span>${MP.padHTML("grateful-" + k, 2, 40)}<span class="lab">Today's win</span>${MP.padHTML("win-" + k, 2, 40)}</section>
       <section class="card stack"><span class="lab">Mood vs sleep · last 14 days</span>${lineChart([days.map((d) => { const w = moodOf(d); return w ? MOODVAL[w] : null; }), days.map((d) => { const r = MP.S.days[iso(d)]; return r && r.sleep ? Math.min(1, Math.max(0, (r.sleep - 4) / 6)) : null; })], days.map((d) => d.getDate()), 130)}<div class="row tiny"><span class="accb">— mood</span><span style="color:var(--acc2);font-weight:700">— sleep</span></div><p class="small" style="margin:0">${insight}</p></section></div>
+      <details class="card mt"><summary class="lab" style="cursor:pointer">Water and sleep · ${fmt(t, { month: "long" })}</summary><div class="wsgrid mt"><span></span>${[...Array(8)].map((_, i) => `<span class="tiny muted c">${i + 1}</span>`).join("")}<span class="tiny muted">sleep</span>${[...Array(t.getDate())].map((_, i) => { const r = MP.S.days[iso(new Date(y, t.getMonth(), i + 1))] || {}; return `<span class="tiny muted">${i + 1}</span>${[...Array(8)].map((__, c) => `<i class="${c < (r.water || 0) ? "on" : ""}"></i>`).join("")}<span class="tiny">${r.sleep ? r.sleep + " h" : "–"}</span>`; }).join("")}</div><span class="tiny muted">Glasses of water and hours slept, day by day. Print it from Print → Water tracker or Sleep tracker.</span></details>
       <section class="card stack mt tablewrap"><div class="between"><span class="lab">Year in Pixels · ${y}</span><span class="tiny muted">${ic("lock", 12)} Private · never in the family summary</span></div><div style="min-width:420px;max-width:560px">${pix}</div><div class="row tiny">${Object.entries(MOODCOL).map(([w, c]) => `<span class="row" style="gap:4px"><i class="key" style="background:${c}"></i>${w}</span>`).join("")}</div></section>`;
   };
 
@@ -968,7 +997,31 @@
     hourly: () => { const t = today(); let rows = ""; for (let h = 6; h <= 23; h++) { const ev = ttFor(t).filter((r) => Math.floor(tMin(r.start) / 60) === h); rows += `<div class="hrow"><span class="tiny muted b">${h > 12 ? h - 12 : h}${h >= 12 ? "pm" : "am"}</span><div class="hev">${ev.map((r) => `<span class="tiny" style="border-left:3px solid ${TCOL[r.type]};${isAct(r) ? "background:var(--soft);font-weight:700" : ""}">${fmtT(r.start)} ${E(r.text)}</span>`).join("")}</div><span class="hnote"></span></div>`; } return `${pHead("Hourly time-blocks")}<div style="flex:1">${rows}</div>`; },
     journal: () => { if (lockOn() && !unlocked) return `${pHead("Journal spread")}<p class="small">${ic("lock", 14)} Your journal is locked. Open Journal, unlock it, then come back to print.</p>`; const t = today(), a = dailyAff(t), typed = typedOf("journal-" + iso(t)), inks = ((MP.S.ink["journal-" + iso(t)] || {}).s || []).length; return `${pHead("Journal spread")}<div class="pgrid eq"><div class="stack" style="gap:3px">${ttFor(t).map((r) => `<div class="tiny jrow ${isAct(r) ? "b" : ""}"><span class="muted">${fmtT(r.start)}</span> ${E(r.text)}</div>`).join("")}</div><div class="stack" style="gap:6px"><div class="pquote sm">“${E(a.text)}”</div><div class="lab">Dear diary</div>${typed.map((x) => `<div class="pline hand">${E(x)}</div>`).join("")}${inks ? `<canvas class="printink" data-printink="journal-${iso(t)}" height="300"></canvas>` : ""}${[...Array(Math.max(4, 14 - typed.length - (inks ? 6 : 0)))].map(() => `<div class="pline"></div>`).join("")}</div></div>`; }
   };
-  V.print = () => { const pv = P().printView || "detailed"; return `${head("Preview before printing", "Print", `<button class="btn" data-print>${ic("print", 16)} Print / save as PDF</button>`)}<div class="row noprint mb"><label class="row small" style="gap:8px"><span class="lab">Layout</span>${sel("data-printsel", [["summary", "Summary one-pager"], ["detailed", "Detailed Daily Rhythm"], ["hourly", "Hourly time-block sheet"], ["journal", "Journal spread"]], pv, 'style="width:auto;font-weight:700" aria-label="Print layout"')}</label><span class="tiny muted">A4 portrait · uses your theme · typed and handwritten entries print too</span></div><section class="card a4" id="printarea">${PV[pv]()}</section>`; };
+  /* 1.25: planner sheets drawn from the shared template library and filled with your own data */
+  const PT = [["t:daily-pl", "Daily planner"], ["t:daily-basic", "Daily planner · basic"], ["t:week-pl", "Weekly planner"], ["t:week-over", "Week overview"], ["t:week-1page", "Week on one page"], ["t:month-pl", "Monthly planner"], ["t:eisen", "Eisenhower matrix · my to-dos"], ["t:habit2", "Habit tracker · this month"], ["t:water", "Water tracker · this month"], ["t:sleep", "Sleep tracker · this month"], ["t:mood-month", "Mood tracker · this month"], ["t:month-rev", "Monthly review (to write)"], ["t:year-cal", "Year calendar"]];
+  const PAPER = { pastel: "#FFFFFF", minimal: "#FFFFFF", serif: "#FBF7EF", midnight: "#1F2536" };
+  const lineOf = (x) => String(x || "").split("\n")[0];
+  const fillFor = (id, t) => {
+    const k = iso(t), m = monday(t), mk = (d) => [...evOn(iso(d)).map((e) => (e.time ? fmtT(e.time) + " " : "") + lineOf(e.t)), ...tasks().filter((x) => !x.done && tDay(x) === iso(d)).map((x) => "○ " + lineOf(x.t))];
+    const open = (() => { const G = taskGroups(), top = topIds(k), all = [...G.overdue, ...G.today.filter((x) => !x.done)]; return [...all.filter((x) => top.includes(x.id)), ...all.filter((x) => !top.includes(x.id))]; })();
+    if (id === "daily-pl" || id === "daily-basic") return { pri: open.slice(0, 3).map((x) => lineOf(x.t)), todo: open.slice(3, 11).map((x) => lineOf(x.t)), sched: [...ttFor(t).map((r) => [Math.floor(MP.tMin(r.start) / 60), `${fmtT(r.start)} ${r.text}`]), ...evOn(k).filter((e) => e.time).map((e) => [Math.floor(MP.tMin(e.time) / 60), `${fmtT(e.time)} ${lineOf(e.t)}`])].sort((a, b) => a[0] - b[0]) };
+    if (/^week/.test(id)) { const w = MP.S.weeks[iso(m)] || {}; return { pri: [w.g1, w.g2, w.g3, w.goal].filter(Boolean), todo: tasks().filter((x) => !x.done && (!tDay(x) || tDay(x) < iso(m))).sort(tByPri).slice(0, 9).map((x) => lineOf(x.t)), days: [...Array(7)].map((_, i) => mk(addD(m, i))) }; }
+    if (id === "month-pl") { const days = {}, n = new Date(t.getFullYear(), t.getMonth() + 1, 0).getDate(); for (let i = 1; i <= n; i++) { const it = mk(new Date(t.getFullYear(), t.getMonth(), i)); if (it.length) days[i] = it; } return { days }; }
+    if (id === "eisen") { const q = [[], [], [], []]; tasks().filter((x) => !x.done).sort(tByPri).forEach((x) => q[x.urg && x.imp ? 0 : x.imp ? 1 : x.urg ? 2 : 3].push(lineOf(x.t))); return { q }; }
+    const monthDays = () => { const n = new Date(t.getFullYear(), t.getMonth() + 1, 0).getDate(); return [...Array(n)].map((_, i) => new Date(t.getFullYear(), t.getMonth(), i + 1)); };
+    if (id === "habit2") { const first = (new Date(t.getFullYear(), t.getMonth(), 1).getDay() + 6) % 7; return { habits: activeHabits().slice(0, 6).map((h) => ({ name: h.name, marks: monthDays().map((d, i) => { const v = ((MP.S.days[iso(d)] || {}).h || {})[h.id]; const p = i + first; return [Math.floor(p / 7), p % 7, v]; }).filter((x) => x[2] === "d" || x[2] === "p") })) }; }
+    if (id === "water") return { water: Object.fromEntries(monthDays().map((d) => [d.getDate(), (MP.S.days[iso(d)] || {}).water || 0])) };
+    if (id === "sleep") return { sleep: Object.fromEntries(monthDays().map((d) => [d.getDate(), (MP.S.days[iso(d)] || {}).sleep || 0])) };
+    if (id === "mood-month") return lockOn() && !unlocked ? null : { mood: Object.fromEntries(monthDays().map((d) => [d.getDate(), MOODCOL[moodOf(d)] || ""]).filter((x) => x[1])), key: Object.entries(MOODCOL) };
+    return null;
+  };
+  const tplSheet = (pv) => {
+    const id = pv.slice(2), e = (MP.TPL_NEW || []).find((x) => x[0] === id), look = P().printLook || "pastel"; if (!e || !MP.tplKit) return "";
+    if (id === "mood-month" && lockOn() && !unlocked) return `<p class="small" style="padding:30px">${ic("lock", 14)} Mood is locked. Open Mood & Wellness, unlock it, then come back to print.</p>`;
+    const k = MP.tplKit(look, { d: false, H: 846, dt: today(), fill: fillFor(id, today()) });
+    return `<svg viewBox="0 0 600 846" class="tplsvg" role="img" aria-label="${E(e[1])}">${e[3](k)}</svg>`;
+  };
+  V.print = () => { const pv = P().printView || "detailed", isT = /^t:/.test(pv), look = P().printLook || "pastel"; return `${head("Preview before printing", "Print", `<button class="btn" data-print>${ic("print", 16)} Print / save as PDF</button>`)}<div class="row wrap noprint mb"><label class="row small" style="gap:8px"><span class="lab">Layout</span><select class="f" data-printsel style="width:auto;font-weight:700" aria-label="Print layout"><optgroup label="Classic">${[["summary", "Summary one-pager"], ["detailed", "Detailed Daily Rhythm"], ["hourly", "Hourly time-block sheet"], ["journal", "Journal spread"]].map(([v, n]) => `<option value="${v}" ${pv === v ? "selected" : ""}>${n}</option>`).join("")}</optgroup><optgroup label="Planner sheets · filled with your data">${PT.map(([v, n]) => `<option value="${v}" ${pv === v ? "selected" : ""}>${n}</option>`).join("")}</optgroup></select></label>${isT ? `<label class="row small" style="gap:8px"><span class="lab">Look</span>${sel("data-printlook", Object.entries(MP.TPL_LOOKS || {}), look, 'style="width:auto" aria-label="Look"')}</label>` : ""}<span class="tiny muted">${isT ? "A4 portrait · your to-dos, timetable, events and habits are written in for you" : "A4 portrait · uses your theme · typed and handwritten entries print too"}</span></div>${isT ? `<section class="card a4 tplsheet" id="printarea" style="background:${PAPER[look]}">${tplSheet(pv)}</section>` : `<section class="card a4" id="printarea">${PV[pv] ? PV[pv]() : PV.detailed()}</section>`}`; };
 
   /* ---------- Suggestions & feedback ---------- */
   const FB_TYPES = ["New feature", "Improve something", "Problem / bug", "Design & look", "Other"];
@@ -1049,6 +1102,7 @@
         : `<span class="small">Lock Journal, Mood, 3-6-9 and History with a PIN (and fingerprint or face where your phone supports it), so anyone holding the phone can't read them.</span><button class="btn sm" data-pinchange style="align-self:flex-start">Set a PIN</button>`}
         <span class="tiny muted">The PIN is stored only as a scrambled code. Your entries are already protected by your Google account in your own Drive; the lock stops someone holding the phone from reading them in the app. Forgot it? Sign in with Google again to reset.</span></section>
       <section class="stack mb"><span class="lab">Theme</span><div class="grid g3">${THEMES.map((t) => `<button class="themecard ${P().theme === t[0] ? "on" : ""}" data-theme-pick="${t[0]}" data-theme="${t[0]}"><div class="tc"><div class="tcn">${t[1]}</div><div class="row" style="gap:6px">${["--acc", "--acc2", "--soft", "--surf"].map((v) => `<i class="swi" style="background:var(${v})"></i>`).join("")}</div><div class="tch">Up next · Study block</div></div></button>`).join("")}</div></section>
+      <section class="card stack mb" id="set-look"><span class="lab">Page look</span><span class="small">Give the planner's headings and labels the look of the diary templates. Your colour theme stays.</span><div class="row wrap" style="gap:8px">${[["", "Classic"], ["pastel", "Pastel script"], ["minimal", "Minimal caps"], ["serif", "Serif"]].map(([v, n]) => `<button class="pill ${(P().look || "") === v ? "sel" : ""}" data-plook="${v}">${n}</button>`).join("")}</div></section>
       <div class="grid g2"><section class="card stack"><span class="lab">Profile</span><label class="stack small">Name on Today<input class="f" maxlength="40" value="${E(P().name)}" data-name></label><div class="small">Signed in as <b>${acc}</b></div><div class="row"><button class="btn ghost sm" data-signout>Sign out</button></div></section>
       <section class="card stack" id="set-acts"><span class="lab">Activities</span>${acts().map((a, ix) => `<div class="row" style="gap:6px;flex-wrap:nowrap">${a.name === "Study" ? `<b class="small" style="flex:1">Study</b>` : `<input class="f" style="flex:1;min-width:90px" value="${E(a.name)}" maxlength="30" data-actname="${ix}" aria-label="Activity name">`}${sel(`data-acthab="${ix}"`, [["", "Habit: same name"], ...P().habits.filter((h) => h.active !== false).map((h) => [h.id, "Habit: " + h.name])], a.hab || "", 'style="width:auto;max-width:170px" aria-label="Linked habit"')}${a.name === "Study" ? "" : `<button class="tool" data-actdel="${ix}" aria-label="Remove ${E(a.name)}">${ic("trash", 16)}</button>`}</div>`).join("")}
         <div class="row"><input class="f" id="newact" placeholder="New type, e.g. Music practice" maxlength="30" style="flex:1"><button class="btn sm" data-actadd>${ic("plus", 14)} Add</button></div><span class="tiny muted">Finishing an activity block ticks its linked habit for that day.</span>
@@ -1235,6 +1289,7 @@
 
   MP.render = () => {
     document.body.dataset.theme = P().theme || MP.pref.get("theme") || "sage";
+    document.body.dataset.look = P().look || "";
     MP.pref.set("theme", document.body.dataset.theme);
     shell();
     const main = document.getElementById("main");
@@ -1678,6 +1733,7 @@
     if (d.rmoveall !== undefined) { const k1 = iso(addD(today(), 1)), G2 = taskGroups(); [...G2.overdue, ...G2.today.filter((x) => !x.done)].forEach((x) => { const r = MP.S.tasks[x.id]; r.d = k1; r.inbox = false; r.u = Date.now(); }); MP.changed(); MP.render(); MP.toast("Moved to tomorrow"); return shutDialog(); }
     if (d.shutmood) { const k = iso(today()), r = dayRec(k); r.mood = r.mood || {}; r.mood.pm = Object.assign({ s: 3 }, r.mood.pm, { w: d.shutmood }); touchDay(k); return shutDialog(); }
     if (d.shutdone !== undefined) { const k = iso(today()), r = dayRec(k); r.shut = { at: Date.now(), note: field("shutnote").slice(0, 200) }; touchDay(k); closeModal(); MP.render(); MP.toast("Day closed. Rest well."); return; }
+    if (d.mrv !== undefined) { view.mrv = d.mrv; return MP.render(); }
     if (d.rvw !== undefined) { const cur = view.rvw ? parseISO(view.rvw) : monday(today()); view.rvw = +d.rvw === 0 ? "" : iso(addD(cur, +d.rvw)); return MP.render(); }
     if (d.qsave !== undefined) return quickSave(false);
     if (d.qfix !== undefined) return quickSave(true);
@@ -1781,6 +1837,8 @@
     if (d.ddel) { const key = "date-" + d.ddel, s2 = MP.S.sent[key]; if (s2 && !s2.del) { if (mode === "google") G.calDelete(s2.id).catch(() => {}); MP.S.sent[key] = { del: 1, u: Date.now() }; } delRec("dates", d.ddel); return MP.render(); }
     if (d.dallcal !== undefined) { const todo = live("dates").filter(([id]) => !(MP.S.sent["date-" + id] && !MP.S.sent["date-" + id].del)); (async () => { for (const [id, x] of todo) await sendKey("date-" + id, { kind: "date", x }, true); MP.toast(todo.length + " added to Google Calendar, repeating every year"); })(); return; }
     if (d.themePick) { P().theme = d.themePick; touchP(); return MP.render(); }
+    if (d.tmode) { P().todoMode = d.tmode; touchP(); return MP.render(); }
+    if (d.plook !== undefined) { P().look = d.plook; touchP(); return MP.render(); }
     if (d.wtheme) { wiz.name = field("wname") || wiz.name; wiz.theme = d.wtheme; document.body.dataset.theme = d.wtheme; return MP.render(); }
     if (d.whab) { const i = wiz.habits.indexOf(d.whab); i >= 0 ? wiz.habits.splice(i, 1) : wiz.habits.push(d.whab); return MP.render(); }
     if (d.wnext !== undefined) { if (wiz.step === 1) { wiz.name = field("wname"); if (!wiz.name) { MP.toast("Please add a name"); return; } } if (wiz.step < 4) { wiz.step++; return MP.render(); } return finishSetup(); }
@@ -1838,6 +1896,7 @@
     if (d.skind !== undefined) return schedKind(t.id);
     if (d.tviewsel !== undefined) { P().todayView = t.value; touchP(); MP.render(); }
     if (d.printsel !== undefined) { P().printView = t.value; touchP(); MP.render(); }
+    if (d.printlook !== undefined) { P().printLook = t.value; touchP(); MP.render(); }
     if (d.ttf === "type") { const row = [...P().timetable, ...(Array.isArray(P().weekend) ? P().weekend : [])].find((x) => x.id === d.id); if (t.value === "Activity") { if (!row || !isAct(row)) setTT(d.id, "type", "Study"); } else setTT(d.id, "type", t.value); MP.render(); }
     if (d.ttf === "start" || d.ttf === "end") { setTT(d.id, d.ttf, t.value); if (t.dataset.tpset) { delete t.dataset.tpset; MP.render(); } else if (!t.dataset.tpwait) { t.dataset.tpwait = "1"; t.addEventListener("focusout", () => setTimeout(() => { if (!document.activeElement || !document.activeElement.matches("input[data-ttf]")) MP.render(); }, 0), { once: true }); } }
     if (d.wrt) { wiz.routine = d.wrt === "1"; MP.render(); }
@@ -1895,7 +1954,7 @@
   document.addEventListener("pointercancel", () => { if (drag) { drag.el.remove(); drag = null; MP.render(); } });
 
   /* ---------- start-up ---------- */
-  MP.VERSION = "1.24";
+  MP.VERSION = "1.25";
   if (MP.sound) MP.sound.onchange = () => { miniPlayer(); if (route === "study") MP.render(); };
   /* Public, read-only helpers for future modules and connectors. */
   MP.api = { today, iso, dayPct, studyHours, streak, tasks, feed: () => MP.buildFeed(MP.S), version: MP.VERSION, schemaVersion: MP.SCHEMA_VERSION };

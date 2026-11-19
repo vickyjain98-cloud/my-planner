@@ -163,12 +163,20 @@
     ["comic", "Comic panels", "c", (o) => `<g fill="none" stroke="${o.d ? "#ddd" : "#333"}" stroke-width="4">${[[40, 80, 250, 230], [300, 80, 260, 230], [40, 320, 520, 230], [40, 560, 170, 250], [220, 560, 340, 250]].map(([x, y, w, h]) => `<rect x="${x}" y="${y}" width="${w}" height="${h}"/>`).join("")}</g>`],
     ["wellness", "Wellness tracker", "c", (o) => { let s = tx(44, 112, "This week I…", o, 34); "MTWTFSS".split("").forEach((d, i) => { const x = 110 + i * 64; s += `<text x="${x}" y="160" font-family="Manrope" font-weight="700" font-size="14" fill="${o.a}" text-anchor="middle">${d}</text>`; }); [["SLEEP (HRS)", 0], ["WATER", 1], ["MOVE", 2], ["MOOD", 3], ["SCREEN TIME", 4]].forEach(([t, r]) => { const y = 200 + r * 120; s += lb(44, y - 6, t, o, 11); "1234567".split("").forEach((_, i) => { const x = 110 + i * 64; s += r === 3 ? `<circle cx="${x}" cy="${y + 40}" r="22" fill="none" stroke="${o.a}" stroke-width="2"/><path d="M${x - 8} ${y + 46}q8 7 16 0" stroke="${o.a}" fill="none" stroke-width="2"/>` : `<rect x="${x - 22}" y="${y + 10}" width="44" height="70" rx="8" fill="none" stroke="${o.l2}"/>`; }); }); return s; }]
   ];
+  /* 1.25: every template has a group (for the chips in Page setup); the new shared library adds ~100 more in four looks */
+  const GRP = { lined: "basic", dotted: "basic", grid: "basic", blank: "basic", check: "lists", margin: "basic", iso: "graphs", hexg: "graphs", mind: "notes", cornell: "study", meeting: "work", dump: "notes", book: "study", lecture: "study", session: "work", story: "creative", pros: "notes", revise: "study", studytt: "study", daily: "daily", hourly: "daily", grat: "wellness", affirm: "wellness", quote: "creative", dream: "wellness", weekly: "weekly", month: "monthly", pixels: "wellness", smart: "goals", vision: "goals", bucket: "goals", project: "work", swot: "work", matrix: "work", contacts: "home", habitc: "wellness", medit: "wellness", fitness: "wellness", wheel: "wellness", jar: "wellness", bingo: "wellness", wellness: "wellness", budget: "money", travel: "travel", travelj: "travel", packing: "travel", recipe: "home", gifts: "home", garden: "home", party: "creative", music: "music" };
+  TPL.forEach((t) => (t[4] = GRP[t[0]] || "creative"));
+  (MP.TPL_NEW || []).forEach(([id, name, g, fn, ad]) => { TPL.push([id, name, "n", fn, g]); if (ad) ADAPT.add(id); });
+  const BUSY = new Set(["graph", "dots", "polka", "stripes", "gingham", "hearts", "stars", "leaves", "waves", "confetti", "starry", "bokeh"]); /* patterned paper that fights with a ruled layout */
+  let LK = "pastel", DT = null; /* look and date for the template being drawn */
+  const LOOKPAPER = { pastel: "#FFFFFF", minimal: "#FFFFFF", serif: "#FBF7EF", midnight: "#1F2536" };
+  const pgDate = (p) => (p && (p.td || p.date) ? new Date((p.td || p.date) + "T00:00:00") : new Date((p && p.c) || Date.now()));
   const TP = Object.fromEntries(TPL.map((t) => [t[0], t]));
-  MP.diaryFrames = (id) => { FR = []; try { (TP[id] || TP.lined)[3]({ a: "#000", d: false, l: "", l2: "", t: "" }); } catch (e) {} const r = FR; FR = null; return r; };
+  MP.diaryFrames = (id) => { if ((TP[id] || {})[2] === "n") return []; FR = []; try { (TP[id] || TP.lined)[3]({ a: "#000", d: false, l: "", l2: "", t: "" }); } catch (e) {} const r = FR; FR = null; return r; };
   const tplSVG = (id, col, acc, live) => { if (live) FR = []; try { return tplSVG0(id, col, acc); } finally { FR = null; } };
-  const tplTag = (id, col, acc, live, r) => { const hh = Math.round(W * r), ad = ADAPT.has(id); H = ad ? hh : 846; try { return `<svg class="dtpl" viewBox="0 0 ${W} ${H}" preserveAspectRatio="${ad ? "none" : "xMidYMin meet"}" aria-hidden="true">${tplSVG(id, col, acc, live)}</svg>`; } finally { H = 846; } };
+  const tplTag = (id, col, acc, live, r, lk, dt) => { const hh = Math.round(W * r), ad = ADAPT.has(id); H = ad ? hh : 846; LK = lk || "pastel"; DT = dt || null; try { return `<svg class="dtpl" viewBox="0 0 ${W} ${H}" preserveAspectRatio="${ad ? "none" : "xMidYMin meet"}" aria-hidden="true">${tplSVG(id, col, acc, live)}</svg>`; } finally { H = 846; LK = "pastel"; DT = null; } };
   MP.diaryTplTag = tplTag;
-  const tplSVG0 = (id, col, acc) => { const d = isDark(col), o = { a: acc, d, l: d ? "rgba(255,255,255,.2)" : "rgba(0,0,0,.13)", l2: d ? "rgba(255,255,255,.35)" : "rgba(0,0,0,.25)", t: d ? "rgba(255,255,255,.7)" : "rgba(0,0,0,.55)" }; return (TP[id] || TP.lined)[3](o); };
+  const tplSVG0 = (id, col, acc) => { const d = isDark(col), e = TP[id] || TP.lined; if (e[2] === "n") return MP.tplKit ? e[3](MP.tplKit(LK, { d, H, dt: DT || new Date() })) : ""; const o = { a: acc, d, l: d ? "rgba(255,255,255,.2)" : "rgba(0,0,0,.13)", l2: d ? "rgba(255,255,255,.35)" : "rgba(0,0,0,.25)", t: d ? "rgba(255,255,255,.7)" : "rgba(0,0,0,.55)" }; return (TP[id] || TP.lined)[3](o); };
 
   /* ---------- data ---------- */
   const DS = () => MP.S.diaries, PS = () => MP.S.dpages;
@@ -222,6 +230,7 @@
     const o = at == null ? (pg.length ? (pg[pg.length - 1][1].o || 0) + 1 : 1) : at;
     PS()[id] = { u: now(), c: now(), d: did, s: sid, o, tpl: look.tpl || "lined", col: look.col || t[2], tex: look.tex || t[3], date: withDate === true ? todayISO() : "", ds: d.ds || "chip", ask: withDate === "ask" ? 1 : 0, text: "" };
     if (look.sz && SIZES[look.sz]) PS()[id].sz = look.sz;
+    if (look.lk) PS()[id].lk = look.lk;
     MP.changed(); return id;
   }
   function newDiary(name, theme, size) {
@@ -229,6 +238,26 @@
     DS()[id] = { u: now(), c: now(), o: diaries().length + 1, name: name || "My diary", theme, secs: [{ id: sid, name: "Notes", col: t[4] }], ds: "chip", dateAsk: "ask", font: "Caveat", def: { tpl: "lined", col: t[2], tex: t[3] }, size: SIZES[size] ? size : "b5" };
     newPage(id, sid, DS()[id].def, null, true);
     ST = { did: id, sid, idx: 0 }; keep(); return id;
+  }
+
+  /* 1.25: a dated year planner — one section per month, pages already dated */
+  function newPlanner(name, theme, size, o) {
+    const id = uid(), sid = () => "s" + Math.random().toString(36).slice(2, 7), y = o.y, col = LOOKPAPER[o.lk] || "#FFFFFF", tex = "smooth";
+    const MC = ["#E8546B", "#F28C38", "#E0B400", "#5FA463", "#2FA39A", "#4FA3F7", "#5B6CE0", "#9B6BDF", "#D45BB0", "#C0703C", "#7A8B3A", "#3C6E9E"];
+    const MN = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const ss = [{ id: sid(), name: String(y), col: th(theme)[4] }, ...MN.map((m, i) => ({ id: sid(), name: m, col: MC[i] }))];
+    DS()[id] = { u: now(), c: now(), o: diaries().length + 1, name: name || `${y} Planner`, theme, secs: ss, ds: "chip", dateAsk: "never", font: "Caveat", def: { tpl: "daily-pl", col, tex, lk: o.lk }, size: SIZES[size] ? size : "b5", plan: y };
+    const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const pg = (s, tpl, td, ord) => { const p = newPage(id, s, { tpl, col, tex, lk: o.lk }, ord, false); PS()[p].td = td; };
+    ["year-cal", "year-over2", "goal4", "imp-dates", "birthdays"].forEach((tp, i) => pg(ss[0].id, tp, `${y}-01-01`, i + 1));
+    for (let m = 0; m < 12; m++) {
+      const s = ss[m + 1].id, n = new Date(y, m + 1, 0).getDate(); let ord = 1;
+      pg(s, "month-pl", ymd(new Date(y, m, 1)), ord++);
+      for (let dd = 1; dd <= n; dd++) { const d = new Date(y, m, dd); if (o.wk && d.getDay() === 1) pg(s, "week-pl", ymd(d), ord++); if (o.daily) pg(s, "daily-pl", ymd(d), ord++); }
+      if (o.rev) pg(s, "month-rev", ymd(new Date(y, m, 1)), ord++);
+    }
+    const t = new Date(), cm = t.getFullYear() === y ? t.getMonth() + 1 : 0;
+    ST = { did: id, sid: ss[cm].id, idx: 0 }; keep(); MP.changed(); return id;
   }
 
   /* ---------- views ---------- */
@@ -252,7 +281,7 @@
     <label class="tiny muted row" style="gap:6px">Size<input type="range" min="1" max="10" value="${pen.size}" data-size style="width:70px"></label>
     <button type="button" class="tool ${pen.eraser ? "on" : ""}" data-eraser aria-label="Eraser">${bl(MP.ic("eraser", 22), "Eraser")}</button>
     <button type="button" class="tool" data-dundo aria-label="Undo">${bl(MP.ic("undo", 22), "Undo")}</button><button type="button" class="tool" data-dredo aria-label="Redo">${bl(MP.ic("redo", 22), "Redo")}</button>`; };
-  const FONTS = [["Caveat", "Caveat · handwriting"], ["Kalam", "Kalam · handwriting, Hindi too"], ["Patrick Hand", "Patrick Hand · handwriting"], ["Dancing Script", "Dancing Script · flowing"], ["Fraunces", "Fraunces"], ["Cormorant Garamond", "Cormorant"], ["Playfair Display", "Playfair"], ["Libre Baskerville", "Baskerville"], ["Poppins", "Poppins"], ["Quicksand", "Quicksand"], ["Nunito Sans", "Nunito"], ["Inter", "Inter"]];
+  const FONTS = [["Caveat", "Caveat · handwriting"], ["Kalam", "Kalam · handwriting, Hindi too"], ["Patrick Hand", "Patrick Hand · handwriting"], ["Great Vibes", "Great Vibes · script titles"], ["Pacifico", "Pacifico · bold lettering"], ["Fredoka", "Fredoka · rounded"], ["Dancing Script", "Dancing Script · flowing"], ["Fraunces", "Fraunces"], ["Cormorant Garamond", "Cormorant"], ["Playfair Display", "Playfair"], ["Libre Baskerville", "Baskerville"], ["Poppins", "Poppins"], ["Quicksand", "Quicksand"], ["Nunito Sans", "Nunito"], ["Inter", "Inter"]];
   const fb = (c, t, l, s) => `<button type="button" class="tool" data-dfmt="${c}" title="${l}" aria-label="${l}">${bl(t, s || l)}</button>`;
   const textBar = (d) => `${fb("bold", "<b>B</b>", "Bold")}${fb("italic", "<i>I</i>", "Italic")}${fb("underline", "<u>U</u>", "Underline")}${fb("strikeThrough", "<s>S</s>", "Strikethrough", "Strike")}<span class="vsep"></span>
     <select class="f sm" data-dfont aria-label="Font">${FONTS.map(([f, n]) => `<option value="${f}" ${d.font === f ? "selected" : ""}>${n}</option>`).join("")}</select>
@@ -266,7 +295,7 @@
     const chip = p.date ? `<button class="ddate ds-${E(p.ds || "chip")}" data-ddate="${E(id)}" style="--acc:${t[4]};--on:${isDark(t[4]) ? "#fff" : "#1B1F4B"}" title="Tap to change or remove the date">${fmtD(p.date, p.ds)}</button>` : "";
     const ask = p.ask && !p.date ? `<div class="dask noprint"><span>Add today's date to this page?</span><button class="btn sm" data-dask="yes|${E(id)}">Add date</button><button class="btn ghost sm" data-dask="no|${E(id)}">No</button><button class="link tiny" data-dask="always|${E(id)}">Always</button><button class="link tiny" data-dask="never|${E(id)}">Never ask</button></div>` : "";
     return `<div class="dpg ${MP.dSel ? "selecting" : MP.inputMode === "type" ? "typing" : "inking"}" data-dpg="${E(id)}" style="aspect-ratio:1/${ratioOf(p, d).toFixed(4)};background:${bgOf(p.col, p.tex)};--ink:${ink};--acc:${t[4]}">
-      <div class="dbgim" data-dbgim="${E(id)}"></div>${tplTag(p.tpl, p.col, t[4], id !== "preview", ratioOf(p, d))}${chip}${ask}
+      <div class="dbgim" data-dbgim="${E(id)}"></div>${tplTag(p.tpl, p.col, t[4], id !== "preview", ratioOf(p, d), p.lk || (d.def && d.def.lk) || "pastel", pgDate(p))}${chip}${ask}
       <div class="dtxt" data-dtxt="${E(id)}" ${MP.inputMode === "type" ? 'contenteditable="true"' : ""} spellcheck="true" style="font-family:'${E(d.font || "Caveat")}',cursive" aria-label="Typed text on page ${n}">${p.text || ""}</div>
       <div class="dobjs" data-dobjs="${E(id)}"></div><canvas class="dink" data-dink="${E(id)}" aria-label="Handwriting on page ${n}"></canvas><span class="dnum">${n}</span></div>`;
   }
@@ -292,10 +321,17 @@
 
   /* ---------- dialogs ---------- */
   let nd = null; /* new-diary draft */
+  const ndKeep = () => { const g = (i) => document.getElementById(i); if (!nd) return; if (g("dsize")) nd.size = g("dsize").value; if (g("dpy")) nd.y = g("dpy").value; if (g("dplk")) nd.lk = g("dplk").value; if (g("dpwk")) nd.wk = g("dpwk").checked; if (g("dpday")) nd.daily = g("dpday").checked; if (g("dprev")) nd.rev = g("dprev").checked; };
   function newDiaryDlg() {
     if (!nd) nd = { name: "", theme: PLAN2DIARY[MP.S.profile.theme] || "botanical" };
     MP.modal(`<div class="between"><h2>New diary</h2><button class="tool" data-close aria-label="Close">✕</button></div>
       <label class="stack small">Name<input class="f" id="dname" maxlength="60" placeholder="e.g. M.Phil notes, Personal, Creative thoughts" value="${E(nd.name)}"></label>
+      <div class="seg mt" role="group" aria-label="Kind of diary"><button class="tool ${nd.kind !== "plan" ? "on" : ""}" data-dkind="blank">📓 Diary</button><button class="tool ${nd.kind === "plan" ? "on" : ""}" data-dkind="plan">📅 Dated year planner</button></div>
+      ${nd.kind === "plan" ? `<div class="card stack mt" style="gap:8px;padding:12px"><span class="small">A full year, ready to write in: a year calendar, goals and birthdays first, then one tab per month with a monthly planner page${nd.wk !== false ? ", a weekly page for every week" : ""}${nd.daily ? " and a page for every day" : ""}${nd.rev !== false ? " and a monthly review" : ""}. All pages already carry their dates.</span>
+        <div class="row wrap" style="gap:10px"><label class="row small">Year <select class="f sm" id="dpy">${[0, 1].map((i) => { const yy = new Date().getFullYear() + i; return `<option value="${yy}" ${+(nd.y || 0) === yy ? "selected" : ""}>${yy}</option>`; }).join("")}</select></label><label class="row small">Look <select class="f sm" id="dplk">${Object.entries(MP.TPL_LOOKS || {}).map(([k2, n]) => `<option value="${k2}" ${(nd.lk || "pastel") === k2 ? "selected" : ""}>${n}</option>`).join("")}</select></label></div>
+        <label class="row small"><input type="checkbox" id="dpwk" ${nd.wk !== false ? "checked" : ""}> A weekly planner page for every week</label>
+        <label class="row small"><input type="checkbox" id="dpday" ${nd.daily ? "checked" : ""}> A daily planner page for every day (365 pages)</label>
+        <label class="row small"><input type="checkbox" id="dprev" ${nd.rev !== false ? "checked" : ""}> A monthly review page at the end of each month</label></div>` : ""}
       <label class="stack small mt">Page size <select class="f" id="dsize">${sizeOpts(nd.size || "b5")}</select><span class="tiny muted">B5 is a comfortable notebook size. You can change it later, and give any single page its own size.</span></label>
       <div class="small mt">Theme <span class="tiny muted">· cover, paper and ink. Each page can still change its colour and texture.</span></div>
       <div class="dthemes">${Object.entries(TH).map(([k, t]) => `<button class="dth ${nd.theme === k ? "on" : ""}" data-dth="${k}" title="${E(t[0])}"><span class="dthc" style="background:${t[1]}"></span><span class="dthp" style="background:${bgOf(t[2], t[3])}"><i style="background:${t[4]}"></i></span><span class="tiny">${E(t[0])}</span></button>`).join("")}</div>
@@ -304,19 +340,28 @@
   const sizeOpts = (sel) => Object.entries(SIZES).map(([k, s]) => `<option value="${k}" ${sel === k ? "selected" : ""}>${E(s[0])}${k === "b5" ? " (recommended)" : ""}</option>`).join("");
   const sizeName = (k) => (SIZES[k] || SIZES.b5)[0].split(" · ")[0];
   let pk = null; /* add-page / page-settings draft */
+  function tilesHTML(d, t) {
+    const q = (pk.q || "").trim().toLowerCase(), col = pk.col; LK = pk.lk || "pastel"; DT = pk.edit ? pgDate(PS()[pk.edit]) : new Date();
+    const list = q ? TPL.filter((x) => x[1].toLowerCase().includes(q) || (x[4] || "").includes(q)) : TPL.filter((x) => x[4] === pk.grp);
+    try { return list.length ? list.map(([id, name, kind]) => `<button class="dtile ${pk.tpl === id ? "on" : ""}" data-pktpl="${id}" title="${E(name)}"><svg viewBox="0 0 ${W} ${H}" style="background:${col}">${tplSVG(id, col, t[4])}</svg><span>${E(name)}${kind === "n" ? "" : ""}</span></button>`).join("") : `<p class="small muted">No template matches “${E(pk.q)}”.</p>`; } finally { LK = "pastel"; DT = null; }
+  }
   const recent = () => { try { return JSON.parse(localStorage.getItem("mp-drecent") || "[]"); } catch (e) { return []; } };
   function pickerDlg() {
     const keepS = [document.querySelector("#modal .in"), document.querySelector("#modal .dpick")].map((x) => (x ? x.scrollTop : 0)), wasOpen = document.getElementById("modal").classList.contains("on") && !!document.querySelector("#modal .dpick");
-    pickerDlg0(); if (wasOpen) { const a = document.querySelector("#modal .in"), b = document.querySelector("#modal .dpick"); if (a) a.scrollTop = keepS[0]; if (b) b.scrollTop = keepS[1]; }
+    const chipX = (document.querySelector("#modal .dchips") || {}).scrollLeft || 0;
+    pickerDlg0(); { const cb = document.querySelector("#modal .dchips"), on = cb && cb.querySelector(".dchip.on"); if (cb) cb.scrollLeft = wasOpen ? chipX : on ? on.offsetLeft - cb.offsetLeft - 12 : 0; } if (wasOpen) { const a = document.querySelector("#modal .in"), b = document.querySelector("#modal .dpick"); if (a) a.scrollTop = keepS[0]; if (b) b.scrollTop = keepS[1]; }
   }
   function pickerDlg0() {
     const c = cur(); if (!c) return; const { d } = c, t = th(d.theme), edit = pk.edit, col = pk.col, rc = recent();
-    const tiles = TPL.filter((x) => x[2] === pk.cat).map(([id, name]) => `<button class="dtile ${pk.tpl === id ? "on" : ""}" data-pktpl="${id}" title="${E(name)}"><svg viewBox="0 0 ${W} ${H}" style="background:${col}">${tplSVG(id, col, t[4])}</svg><span>${E(name)}</span></button>`).join("");
-    const prev = pageHTML("preview", { sz: pk.sz, col, tex: pk.tex, tpl: pk.tpl, date: pk.date ? (edit ? (PS()[edit].date || todayISO()) : todayISO()) : "", ds: pk.ds || d.ds, text: "" }, d, "");
+    const tiles = tilesHTML(d, t);
+    const isN = (TP[pk.tpl] || [])[2] === "n";
+    const prev = pageHTML("preview", { sz: pk.sz, lk: pk.lk, col, tex: pk.tex, tpl: pk.tpl, date: pk.date ? (edit ? (PS()[edit].date || todayISO()) : todayISO()) : "", ds: pk.ds || d.ds, text: "" }, d, "");
     MP.modal(`<div class="between"><h2>${edit ? "This page" : "Add a page"}</h2><button class="tool" data-close aria-label="Close">✕</button></div>
       <div class="dpick"><div class="stack" style="gap:10px;min-width:0">
-        <div class="dpsec"><b>① Template</b> <span class="seg sm" style="margin-left:6px"><button class="tool ${pk.cat === "p" ? "on" : ""}" data-pkcat="p">Professional</button><button class="tool ${pk.cat === "c" ? "on" : ""}" data-pkcat="c">Creative</button></span></div>
+        <div class="dpsec"><b>① Template</b> <input class="f sm" type="search" data-pkq placeholder="Search ${TPL.length} templates" value="${E(pk.q || "")}" style="margin-left:6px;max-width:220px" aria-label="Search templates" data-novoice></div>
+        <div class="dchips" role="tablist">${(MP.TPL_GROUPS || []).filter(([g]) => g !== "all").map(([g, n]) => `<button class="dchip ${!pk.q && pk.grp === g ? "on" : ""}" data-pkgrp="${g}">${n} <span class="tiny">${TPL.filter((x) => x[4] === g).length}</span></button>`).join("")}</div>
         <div class="dtiles">${tiles}</div>
+        ${isN ? `<div class="dpsec"><b>Look</b> <span class="tiny muted">· the same layout in four styles</span></div><div class="row wrap" style="gap:6px">${Object.entries(MP.TPL_LOOKS).map(([k2, n]) => `<button class="dlook ${pk.lk === k2 ? "on" : ""}" data-pklk="${k2}" style="background:${LOOKPAPER[k2]}"><span class="dlk-${k2}">${k2 === "pastel" ? "Daily" : k2 === "serif" ? "Daily" : "DAILY"}</span><span class="tiny">${n}</span></button>`).join("")}</div>` : ""}
         <div class="dpsec"><b>② Page colour</b></div>
         ${Object.entries(COLGROUPS).map(([g, list]) => `<div class="dcolg"><span class="tiny muted">${g}</span><div class="row wrap" style="gap:6px">${list.map(([n, c2]) => `<button class="dsw ${col === c2 ? "on" : ""}" data-pkcol="${c2}" style="background:${c2}" title="${n}" aria-label="${n}"></button>`).join("")}</div></div>`).join("")}
         <div class="dcolg"><span class="tiny muted">Recent and any colour</span><div class="row wrap" style="gap:6px;align-items:center">${rc.filter((c2) => !COLS.some((x) => x[1] === c2)).map((c2) => `<button class="dsw ${col === c2 ? "on" : ""}" data-pkcol="${c2}" style="background:${c2}" title="Recent colour"></button>`).join("")}<label class="dsw any" title="Choose any colour">+<input type="color" data-pkany value="${col}" class="overlay-input" aria-label="Choose any colour"></label><button class="link tiny" data-pkcol="${t[2]}">Use the theme's colour</button></div></div>
@@ -335,8 +380,8 @@
   }
   const openPicker = (editId) => {
     const c = cur(); if (!c) return; const { d, pg } = c;
-    if (editId) { const p = PS()[editId]; pk = { edit: editId, sz: p.sz || "", tpl: p.tpl, col: p.col, tex: p.tex, date: !!p.date, ds: p.ds, cat: (TP[p.tpl] || TP.lined)[2] }; }
-    else { const last = pg.length ? pg[Math.min(ST.idx, pg.length - 1)][1] : d.def; pk = { sz: "", tpl: last.tpl || d.def.tpl, col: last.col || d.def.col, tex: last.tex || d.def.tex, date: d.dateAsk !== "never", cat: (TP[last.tpl || "lined"] || TP.lined)[2], def: false }; }
+    if (editId) { const p = PS()[editId]; pk = { edit: editId, sz: p.sz || "", lk: p.lk || (d.def && d.def.lk) || "pastel", tpl: p.tpl, col: p.col, tex: p.tex, date: !!p.date, ds: p.ds, grp: (TP[p.tpl] || TP.lined)[4] }; }
+    else { const last = pg.length ? pg[Math.min(ST.idx, pg.length - 1)][1] : d.def; pk = { sz: "", lk: last.lk || d.def.lk || "pastel", tpl: last.tpl || d.def.tpl, col: last.col || d.def.col, tex: last.tex || d.def.tex, date: d.dateAsk !== "never", grp: (TP[last.tpl || "lined"] || TP.lined)[4], def: false }; }
     pickerDlg();
   };
   function secDlg(sid) {
@@ -455,14 +500,15 @@
   const addSame = () => {
     const c = cur(); if (!c) return; const { d, pg } = c, src = pg.length ? pg[pg.length - 1][1] : d.def;
     const w = d.dateAsk === "always" ? true : d.dateAsk === "never" ? false : "ask";
-    newPage(ST.did, ST.sid, { tpl: src.tpl, col: src.col, tex: src.tex, sz: src.sz }, null, w); ST.idx = pagesOf(ST.did, ST.sid).length - 1; keep(); rerender();
+    newPage(ST.did, ST.sid, { tpl: src.tpl, col: src.col, tex: src.tex, sz: src.sz, lk: src.lk }, null, w); ST.idx = pagesOf(ST.did, ST.sid).length - 1; keep(); rerender();
   };
   document.addEventListener("click", (e) => {
     const b = e.target.closest("button,[data-dsecedit],.dchk,label.dsw"); if (!b) return; const a = b.dataset || {};
     if (b.classList.contains("dchk")) { const on = b.classList.toggle("on"); b.textContent = on ? "☑" : "☐"; const ed = b.closest("[data-dtxt]"); if (ed) saveText(ed); return; }
     if (a.dnew !== undefined) { nd = null; return newDiaryDlg(); }
-    if (a.dth) { nd.name = (document.getElementById("dname") || {}).value || nd.name; nd.theme = a.dth; nd.size = (document.getElementById("dsize") || {}).value || nd.size; return newDiaryDlg(); }
-    if (a.dcreate !== undefined) { const nm = ((document.getElementById("dname") || {}).value || "").trim(); newDiary(nm || "My diary", nd.theme, (document.getElementById("dsize") || {}).value || "b5"); nd = null; MP.closeModal(); return rerender(); }
+    if (a.dth) { nd.name = (document.getElementById("dname") || {}).value || nd.name; nd.theme = a.dth; ndKeep(); return newDiaryDlg(); }
+    if (a.dkind) { nd.name = (document.getElementById("dname") || {}).value || nd.name; ndKeep(); nd.kind = a.dkind; if (a.dkind === "plan" && !nd.name) nd.name = `${new Date().getFullYear() + (new Date().getMonth() >= 10 ? 1 : 0)} Planner`; if (!nd.y) nd.y = new Date().getFullYear() + (new Date().getMonth() >= 10 ? 1 : 0); return newDiaryDlg(); }
+    if (a.dcreate !== undefined) { const nm = ((document.getElementById("dname") || {}).value || "").trim(); ndKeep(); if (nd.kind === "plan") { MP.toast("Making your planner…"); newPlanner(nm, nd.theme, nd.size || "b5", { y: +nd.y || new Date().getFullYear(), lk: nd.lk || "pastel", wk: nd.wk !== false, daily: !!nd.daily, rev: nd.rev !== false }); } else newDiary(nm || "My diary", nd.theme, (document.getElementById("dsize") || {}).value || "b5"); nd = null; MP.closeModal(); return rerender(); }
     if (a.dopen) { const d = DS()[a.dopen]; ST = { did: a.dopen, sid: (d.last && d.last.sid) || (secs(d)[0] || {}).id, idx: (d.last && d.last.idx) || 0 }; keep(); return rerender(); }
     if (a.dshelf !== undefined) { const d = DS()[ST.did]; if (d) { d.last = { sid: ST.sid, idx: ST.idx }; } ST = {}; keep(); return rerender(); }
     if (a.dview) { const d = DS()[ST.did]; if (a.dview === "book" && !wide()) MP.toast("Book view needs a tablet or laptop screen"); d.view = a.dview; saveD(ST.did); return rerender(); }
@@ -517,8 +563,9 @@
     if (a.dundo !== undefined || a.dredo !== undefined) { const c = cur(); if (!c || !c.pg.length) return; const key = activeKey || "dp-" + c.pg[ST.idx][0]; if (a.dundo !== undefined) { const s = strokes(key).pop(); if (s) (redo[key] = redo[key] || []).push(s); } else { const s = (redo[key] || []).pop(); if (s) strokes(key).push(s); } touchInk(key); document.querySelectorAll("canvas.dink").forEach((cv) => cv._draw && cv._draw()); return; }
     if (b.closest(".dtools") && (a.pen || a.ink !== undefined || a.eraser !== undefined)) { setTimeout(() => { const bar = document.querySelector(".dtools"); if (bar) bar.querySelectorAll("[data-pen],[data-ink],[data-eraser]").forEach((x) => x.classList.toggle("on", x.dataset.pen ? x.dataset.pen === MP.pen.type && !MP.pen.eraser : x.dataset.ink ? x.dataset.ink === MP.pen.color && !MP.pen.eraser : MP.pen.eraser)); }, 0); return; }
     /* page picker */
-    if (a.pkcat) { pk.cat = a.pkcat; return pickerDlg(); }
-    if (a.pktpl) { pk.tpl = a.pktpl; return pickerDlg(); }
+    if (a.pkgrp) { pk.grp = a.pkgrp; pk.q = ""; return pickerDlg(); }
+    if (a.pklk) { const was = pk.lk; pk.lk = a.pklk; if (a.pklk === "midnight" || a.pklk === "serif" || (was !== a.pklk && (pk.col === LOOKPAPER[was] || isDark(pk.col)))) { pk.col = LOOKPAPER[a.pklk]; if (a.pklk === "midnight") pk.tex = "smooth"; } if (BUSY.has(pk.tex)) pk.tex = "smooth"; return pickerDlg(); }
+    if (a.pktpl) { pk.tpl = a.pktpl; if ((TP[a.pktpl] || [])[2] === "n" && BUSY.has(pk.tex)) pk.tex = "smooth"; return pickerDlg(); }
     if (a.pkcol) { pk.col = a.pkcol; return pickerDlg(); }
     if (a.pktex) { pk.tex = a.pktex; return pickerDlg(); }
     if (a.pkds) { pk.ds = a.pkds; return pickerDlg(); }
@@ -526,8 +573,8 @@
     if (a.pkok !== undefined) {
       const c = cur(); if (!c) return; const d = c.d;
       if (pk.col && !COLS.some((x) => x[1] === pk.col)) { const r = [pk.col, ...recent().filter((x) => x !== pk.col)].slice(0, 8); try { localStorage.setItem("mp-drecent", JSON.stringify(r)); } catch (er) {} }
-      if (pk.edit) { const p = PS()[pk.edit], dd = document.querySelector("[data-pkdd]"); if (p.tpl !== pk.tpl) { p.obj = (p.obj || []).filter((x) => x.k !== "frame"); p.fr = 0; } if (pk.sz) p.sz = pk.sz; else delete p.sz; Object.assign(p, { tpl: pk.tpl, col: pk.col, tex: pk.tex, ds: pk.ds || p.ds, date: pk.date ? (dd && dd.value) || p.date || todayISO() : "", ask: 0 }); saveP(pk.edit); }
-      else { const at = c.pg.length ? (c.pg[ST.idx][1].o || 0) + 0.5 : null; const id = newPage(ST.did, ST.sid, pk, at, !!pk.date); if (pk.ds) PS()[id].ds = pk.ds; if (pk.def) { d.def = { tpl: pk.tpl, col: pk.col, tex: pk.tex }; saveD(ST.did); } ST.idx = pagesOf(ST.did, ST.sid).findIndex((x) => x[0] === id); keep(); }
+      if (pk.edit) { const p = PS()[pk.edit], dd = document.querySelector("[data-pkdd]"); if (p.tpl !== pk.tpl) { p.obj = (p.obj || []).filter((x) => x.k !== "frame"); p.fr = 0; } if (pk.sz) p.sz = pk.sz; else delete p.sz; Object.assign(p, { lk: pk.lk, tpl: pk.tpl, col: pk.col, tex: pk.tex, ds: pk.ds || p.ds, date: pk.date ? (dd && dd.value) || p.date || todayISO() : "", ask: 0 }); saveP(pk.edit); }
+      else { const at = c.pg.length ? (c.pg[ST.idx][1].o || 0) + 0.5 : null; const id = newPage(ST.did, ST.sid, pk, at, !!pk.date); if (pk.ds) PS()[id].ds = pk.ds; if (pk.def) { d.def = { tpl: pk.tpl, col: pk.col, tex: pk.tex, lk: pk.lk }; saveD(ST.did); } ST.idx = pagesOf(ST.did, ST.sid).findIndex((x) => x[0] === id); keep(); }
       MP.closeModal(); return rerender();
     }
     if (a.pkdup !== undefined) { const p = PS()[pk.edit], id = newPage(ST.did, p.s, p, (p.o || 0) + 0.5, false); Object.assign(PS()[id], { text: p.text, date: p.date, ds: p.ds, obj: JSON.parse(JSON.stringify(p.obj || [])).map((x) => Object.assign(x, { id: "o" + Math.random().toString(36).slice(2, 9) })), fr: 1, bgim: p.bgim }); const ink = MP.S.ink["dp-" + pk.edit]; if (ink && ink.s.length) MP.S.ink["dp-" + id] = { u: now(), s: JSON.parse(JSON.stringify(ink.s)) }; ST.idx += 1; keep(); MP.changed(); MP.closeModal(); MP.toast("Page duplicated"); return rerender(); }
@@ -565,5 +612,10 @@
   MP.diaryCur = () => { const c = cur(); return c && c.pg.length ? c.pg[ST.idx][0] : null; };
   MP.diaryTheme = () => { const c = cur(); return c ? c.d.theme : null; };
   window.addEventListener("resize", () => { clearTimeout(window._mpDr); window._mpDr = setTimeout(() => document.querySelectorAll("canvas.dink").forEach((cv) => cv._size && cv._size()), 200); });
+  document.addEventListener("input", (e) => {
+    const q = e.target.closest && e.target.closest("[data-pkq]"); if (!q || !pk) return;
+    pk.q = q.value; const c = cur(); if (!c) return; const box = document.querySelector("#modal .dtiles"); if (box) box.innerHTML = tilesHTML(c.d, th(c.d.theme));
+    document.querySelectorAll("#modal [data-pkgrp]").forEach((x) => x.classList.toggle("on", !pk.q && x.dataset.pkgrp === pk.grp));
+  });
   MP.diaryThemes = TH; MP.diaryTemplates = TPL;
 })();

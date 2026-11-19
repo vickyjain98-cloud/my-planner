@@ -544,3 +544,40 @@ input[type=time]{cursor:pointer}
  .dprp img.dink{position:absolute;inset:0;width:100%;height:100%;z-index:4;pointer-events:none}
  .dprp .dnum{opacity:.35}
 }
+
+/* ---------- 1.25 template library: group chips, search, looks ---------- */
+.dchips{display:flex;gap:6px;overflow-x:auto;padding:2px 0 6px;scrollbar-width:thin}
+.dchip{flex:none;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:6px 12px;font:600 13px/1 Manrope,sans-serif;cursor:pointer;white-space:nowrap}
+.dchip .tiny{opacity:.55;margin-left:2px}
+.dchip.on{background:var(--acc);color:var(--onacc);border-color:var(--acc)}
+.dlook{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:104px;padding:10px 8px 8px;border:2px solid var(--line);border-radius:12px;cursor:pointer}
+.dlook.on{border-color:var(--acc);box-shadow:0 0 0 2px var(--acc) inset}
+.dlook .tiny{color:#555}.dlook[data-pklk=midnight] .tiny{color:#cdd5e4}
+.dlk-pastel{font:28px/1 'Great Vibes',cursive;color:#2A2A2E}
+.dlk-minimal{font:800 13px/1.6 Manrope,sans-serif;letter-spacing:3px;color:#2A2A2E;border-bottom:1.5px solid #2A2A2E}
+.dlk-serif{font:500 20px/1.2 Fraunces,serif;color:#2A2A2E}
+.dlk-midnight{font:700 13px/1.6 Manrope,sans-serif;letter-spacing:3px;color:#EEF1F8}
+#printarea.tplsheet{padding:0;display:block}
+#printarea.tplsheet .tplsvg{width:100%;height:100%;display:block}
+@media print{#printarea.tplsheet{width:190mm!important;height:268mm!important;min-height:0!important;margin:auto;-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+/* 1.25 page look for planner screens (headings and card labels only; colours come from the theme) */
+body[data-look=pastel] h1.title{font-family:"Great Vibes",cursive;font-weight:400;font-size:48px;line-height:1.15}
+body[data-look=pastel] .card>.lab:first-child,body[data-look=pastel] .card>.between:first-child>.lab{display:inline-block;align-self:flex-start;background:#F8D5D9;color:#5b4a4e;padding:3px 10px;border-radius:3px;letter-spacing:1.8px}
+body[data-look=pastel] section:nth-of-type(6n+2) .card>.lab:first-child,body[data-look=pastel] .card:nth-of-type(6n+2)>.lab:first-child{background:#D2ECE3;color:#3d5a50}
+body[data-look=pastel] .card:nth-of-type(6n+3)>.lab:first-child{background:#E2DBF3;color:#4d4766}
+body[data-look=pastel] .card:nth-of-type(6n+4)>.lab:first-child{background:#F6EDCB;color:#5c5530}
+body[data-look=pastel] .card:nth-of-type(6n+5)>.lab:first-child{background:#D3E7F7;color:#3a5266}
+body[data-look=minimal] h1.title{font-family:Manrope,sans-serif;font-weight:800;text-transform:uppercase;letter-spacing:5px;font-size:26px;padding-bottom:8px;border-bottom:2px solid currentColor;display:inline-block}
+body[data-look=minimal] .card>.lab:first-child{color:var(--ink);border-bottom:1.5px solid currentColor;padding-bottom:4px;align-self:stretch}
+body[data-look=serif] h1.title{font-family:Fraunces,serif;font-weight:500}
+body[data-look=serif] .card>.lab:first-child{display:inline-block;align-self:flex-start;background:#E9E1D3;color:#5a5245;padding:3px 10px;letter-spacing:1.6px}
+body[data-look=serif] .card:nth-of-type(3n+2)>.lab:first-child{background:#D9E3D3;color:#47533f}
+body[data-look=serif] .card:nth-of-type(3n+3)>.lab:first-child{background:#EFD9D6;color:#5e4542}
+.mxgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:700px){.mxgrid{grid-template-columns:1fr}}
+.mxq{border-top:4px solid var(--line)}.mxq.pri-urg{border-top-color:#D9534F}.mxq.pri-med{border-top-color:#E2C26B}.mxq.pri-high{border-top-color:#E39A5B}.mxq.pri-low{border-top-color:#8DB596}
+.mxrow{display:flex;gap:8px;align-items:center;padding:4px 0;border-bottom:1px solid var(--line)}.mxrow .ttext{flex:1;text-align:left}
+.olgrid{display:flex;flex-direction:column}.olrow{display:flex;gap:10px;align-items:baseline;padding:3px 6px;border-bottom:1px solid var(--line);min-height:24px}.olrow.alt{background:var(--soft)}.olrow .b{width:20px;text-align:right}
+.wsgrid{display:grid;grid-template-columns:28px repeat(8,1fr) 54px;gap:2px;font-size:11px;align-items:center}.wsgrid i{height:12px;border-radius:2px;background:var(--soft)}.wsgrid i.on{background:var(--acc)}
+.dob.sticker svg.stk{filter:drop-shadow(0 1px 1.2px rgba(0,0,0,.22))}
+.dstk.wide{grid-template-columns:repeat(auto-fill,minmax(110px,1fr))}.dstk.wide .dstkb{aspect-ratio:2/1}

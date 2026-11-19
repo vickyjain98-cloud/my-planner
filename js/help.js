@@ -303,6 +303,7 @@ window.MP_HELP = [
 "A task not done on its day moves to the top as Overdue, marked Overdue 1 day, 2 days and so on. Move all to today or tomorrow in one tap.",
 "A task past its Due date gets a red Past deadline mark.",
 "Today shows your whole list. Tasks you finish today stay there, struck through, until midnight.",
+"Matrix (top right) shows the same tasks as an Eisenhower matrix: Urgent + important (do it now), Important (plan for later), Urgent (assign someone), Neither (ignore or drop). Tick a task there to finish it; tap it to change it. List switches back.",
 "Completed tasks, at the bottom of To-Do, lists every finished task with the date it was created and completed. Tasks finished before 18 Nov 2026 show \u201cbefore 18 Nov 2026\u201d."
 ]
 ]
@@ -352,6 +353,12 @@ window.MP_HELP = [
 "+ Add page… opens the same four choices for a new page. Tick Make this the default to use it for every new page in that diary.",
 "⚙ Page setup (top right, next to Page and Book) has four parts: ① Template (30 professional and 30 creative), ② Page colour (44 colours in Soft, Bright, Earthy and Dark, recent colours, or any colour with +), ③ Texture (27, shown on your page colour) and ④ Date style. It also duplicates the page, moves it to another section, or deletes it.",
 "Dates: a new page offers to add today's date. Tap the date on a page to change it, pick a style (chip, handwritten, numbers, week strip) or remove it. ⋯ Diary sets Ask / Always / Never for new pages.",
+"Templates (1.25): ⚙ Page setup now has more than 160 templates in groups: Basics, Notes, Study, Academic, Daily, Weekly, Monthly, Yearly, Goals, Wellness, Health, Money, Home, Travel, Work, Lists, Graphs, Music and Creative. Tap a group, or type in Search (e.g. cornell, exam, habit, budget).",
+"Looks: the new templates come in four looks: Pastel script, Minimal caps, Serif on cream and Midnight. Pick one under Look. Serif and Midnight also set a matching paper colour (you can still change it). Tick “Make this the default” to use it for new pages.",
+"Dated templates (Monthly planner, Week overview, Weekly planner, Year calendar, Mood tracker…) fill in the real dates from the page's date, or from the day you added the page.",
+"Dated year planner: + New diary → 📅 Dated year planner. Pick the year and look; you get a year section (calendar, 5-year vision, important dates, birthdays) and one tab per month with a monthly planner, a weekly page for each week, an optional page for every day and a monthly review.",
+"Stickers: ✥ Insert → Sticker has packs: Flowers, Plants, Cute, Study, Food, Occasion, Nature, Words and Decor. Decor has washi tape, sticky notes, clouds, speech bubbles, banners and labels that stretch to any shape; put a text box on top to write on them.",
+"Headings: text boxes and typing now also offer Great Vibes (script titles), Pacifico (bold lettering) and Fredoka (rounded).",
 "Page size: each diary has a paper size — B5 by default (176 × 250 mm, a comfortable notebook). Choose it when you create the diary or change it in ⋯ Diary settings (A5, A4, US Letter, A5 or A4 landscape, Square, Tall). One page can have its own size in ⚙ Page setup → ⑤ Page size; ‘Same as diary’ puts it back. If you make a page shorter, writing near the bottom may be cut off — change it back and it returns.",
 "Print or save as PDF: ⚙ Page setup → 🖨 Print (this page), or ⋯ Diary settings → 🖨 Print / Save as PDF. Choose this page, a range of pages, this section or the whole diary; tick Plain white paper to leave out the page colour and texture; untick the date if you don't want it. In the print window pick Save as PDF, margins None, scale 100%. Each page prints at its own size; Chrome and Edge do this best, some phone browsers print on A4 or Letter instead. Logins never print, and the diary only prints when the journal lock is open.",
 "Delete a diary: tap 🗑 on its cover on the bookshelf (or Delete in ⋯ Diary settings). It goes to Recently deleted at the bottom of the bookshelf for 30 days, where Restore brings it back with every page, and Delete forever removes it straight away.",
@@ -480,7 +487,8 @@ window.MP_HELP = [
 "Pick a mood word and its strength (1–5) for morning and evening.",
 "Optionally note what affected your mood.",
 "Tap the water drops, energy and hours slept.",
-"Watch the mood-vs-sleep chart and your Year in Pixels."
+"Watch the mood-vs-sleep chart and your Year in Pixels.",
+"Open Water and sleep to see this month day by day."
 ]
 ],
 [
@@ -536,6 +544,21 @@ window.MP_HELP = [
 "Hourly time-block sheet",
 "Journal spread"
 ]
+],
+[
+"p",
+"Planner sheets (new in 1.25) use the diary's template designs and write your own data in for you. Pick a Look (Pastel script, Minimal caps, Serif on cream, Midnight) next to the layout."
+],
+[
+"list",
+[
+"Daily planner and Daily planner · basic: today's top to-dos, the rest of today's to-dos, and your timetable and events by the hour.",
+"Weekly planner, Week overview, Week on one page: each day's events and to-dos, your week goals and undated tasks.",
+"Monthly planner: every event and to-do written on its day.",
+"Eisenhower matrix: your open to-dos sorted into the four boxes.",
+"Habit tracker, Water tracker, Sleep tracker, Mood tracker: this month, filled from what you logged (Mood only when the journal lock is open).",
+"Monthly review and Year calendar: ready to write on."
+]
 ]
 ]
 },
@@ -572,6 +595,7 @@ window.MP_HELP = [
 "list",
 [
 "Theme: Sage Botanical, Lavender Dream, Beige Minimal, Blush Floral, Midnight Moon, Ocean Calm.",
+"Page look: Classic, Pastel script, Minimal caps or Serif changes the screen headings and card labels to match the diary templates. Your colours stay.",
 "Profile name, study blocks, study music playlist and Calendar alert time.",
 "Family progress summary (opt-in) and Connections (Buddy OS).",
 "Your data: backup, restore, export CSV, delete all data. Version history."
@@ -698,6 +722,10 @@ window.MP_HELP = [
 "After Shut down: ticked items are done; moved ones appear tomorrow (or in Later); dropped ones are deleted. Your line and mood are saved privately, the 9:30 pm reminder stops for that day, and the button changes to Shut down again in case you want to add more. Nothing is locked: you can still add or tick things that night. Tomorrow's Plan my day picks up whatever is still open, and your line shows in the Weekly review.",
 "Weekly review (in the menu, and on Today at the weekend): habits by day, time per activity and meetings, to-dos done and overdue, mood trend, top wins and journal highlights; then set 3 goals for next week."
 ]
+],
+[
+"p",
+"Monthly review: open Weekly review → Monthly review. It shows the month's habits, tasks done, activity time, moods, sleep and water, then asks: How was my month? Lessons learned, accomplishments, grateful for, what went well, what to improve, and goals for next month. Answers are saved for that month; ‹ and › move between months."
 ],
 [
 "tip",

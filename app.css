@@ -474,3 +474,21 @@ input[type=time]{cursor:pointer}
 .crbox{position:absolute;outline:2px solid #fff;box-shadow:0 0 0 9999px rgba(0,0,0,.55);cursor:move;touch-action:none}
 .crh{position:absolute;width:20px;height:20px;background:#fff;border-radius:50%;margin:-10px 0 0 -10px}.crh.nw{left:0;top:0}.crh.ne{left:100%;top:0}.crh.sw{left:0;top:100%}.crh.se{left:100%;top:100%}
 .crwrap{overflow:hidden}
+/* 1.21 diagrams */
+.dob.diag svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.dob.diag .dn{position:absolute;display:flex;align-items:center;justify-content:center;text-align:center;font-family:Manrope,sans-serif;font-weight:700;line-height:1.15;overflow:hidden;padding:0 .4cqw}
+.dob.diag .dnt{outline:none;max-width:100%;word-wrap:break-word}.dob.diag .dnt[contenteditable]{background:rgba(255,255,255,.85);color:#222;border-radius:4px;padding:0 4px;cursor:text;user-select:text;-webkit-user-select:text}
+.dob.diag.thumb{position:absolute;left:0;top:0;width:100%;height:100%;transform:none}
+.ddgg{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px;margin:6px 0 4px}
+.ddgb{border:1px solid var(--line);background:var(--surf);border-radius:10px;padding:8px;cursor:pointer;color:var(--ink);display:flex;flex-direction:column;gap:6px;align-items:stretch}.ddgb:hover{background:var(--soft)}
+.ddgt{display:flex;align-items:center;justify-content:center;height:70px}.ddgt>div{flex:none}
+.dbgim{position:absolute;inset:0;z-index:0}.dbgim .obg{position:absolute;inset:0}
+.dtpl{z-index:1}.dtxt{z-index:2}.dobjs{z-index:3}.dink{z-index:4}.ddate{z-index:5}.dask{z-index:6}
+/* 1.21 logins page */
+.vwarn{background:#FFF4D6;color:#5A3A00;border:1px solid #F2C94C;border-radius:12px;padding:10px 14px;font-size:13px;line-height:1.5;margin-bottom:14px}
+[data-theme=midnight] .vwarn{background:#3a3010;color:#FFE9A8;border-color:#7a6420}
+.vlist{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+.vrow{padding:12px 14px}.vhead{display:flex;gap:10px;align-items:center;margin-bottom:8px}
+.vico{width:36px;height:36px;border-radius:10px;background:var(--soft);color:var(--acc);display:flex;align-items:center;justify-content:center;font-weight:800;flex:none}
+.vfield{display:flex;align-items:center;gap:8px;border-top:1px dashed var(--line);padding:6px 0}.vfield>.tiny{width:70px;flex:none}.vval{flex:1;min-width:0;overflow-wrap:anywhere;font-size:14px}.vval.mono{font-family:ui-monospace,Menlo,monospace}
+.vcard{display:flex;gap:12px;align-items:center;text-align:left;cursor:pointer;border:1px solid var(--line);max-width:360px;width:100%;color:var(--ink)}

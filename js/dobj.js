@@ -77,10 +77,33 @@
     let url = c.toDataURL(mime, 0.82); if (png && url.length > 1.4e6) url = c.toDataURL("image/jpeg", 0.85);
     return { url, mime: url.slice(5, url.indexOf(";")), ar: h / w };
   }
-  async function storeImg(file, lib) {
-    const r = await shrink(file), id = "i" + new Date().toISOString().slice(0, 7) + Math.random().toString(36).slice(2, 8);
+  async function storeData(r, name, lib) {
+    const id = "i" + new Date().toISOString().slice(0, 7) + Math.random().toString(36).slice(2, 8);
     IMG[id] = r.url; await MP.idbSet("dimg:" + id, r.url);
-    IMS()[id] = { u: now(), t: r.mime, ar: r.ar, lib: lib ? 1 : 0, n: String(file.name || "picture").slice(0, 60) }; MP.changed(); pump(); return { id, ar: r.ar };
+    IMS()[id] = { u: now(), t: r.mime, ar: r.ar, lib: lib ? 1 : 0, n: String(name || "picture").slice(0, 60) }; MP.changed(); return { id, ar: r.ar };
+  }
+  async function storeImg(file, lib) { const r = await shrink(file), o = await storeData(r, file.name, lib); pump(); return o; }
+
+  /* ---------- PDFs: each page becomes a diary page you can write on (pdf.js from Mozilla, kept inside the app) ---------- */
+  async function addPdf() {
+    const f = await pickFile("application/pdf,.pdf"); if (!f) return;
+    if (!/pdf$/i.test(f.type || "") && !/\.pdf$/i.test(f.name || "")) return MP.toast("Choose a PDF file");
+    if (f.size > 20e6) return MP.toast("That PDF is over 20 MB. Split it or choose a smaller one.");
+    if (!MP.diaryCur || !MP.diaryCur()) return MP.toast("Open a diary first");
+    let lib; try { lib = await import("../vendor/pdfjs/pdf.min.js"); lib.GlobalWorkerOptions.workerSrc = "vendor/pdfjs/pdf.worker.min.js"; } catch (e) { return MP.toast("The PDF reader couldn't load. Check your internet connection once, then try again."); }
+    let doc; try { doc = await lib.getDocument({ data: new Uint8Array(await f.arrayBuffer()), isEvalSupported: false, disableFontFace: false }).promise; } catch (e) { return MP.toast(/password/i.test(String(e && e.name)) ? "This PDF is password-protected. Open it elsewhere and save a copy without the password." : "This PDF couldn't be opened."); }
+    const total = doc.numPages, n = Math.min(total, 50);
+    if (total > 50) MP.toast(`This PDF has ${total} pages; adding the first 50.`);
+    const pages = [];
+    for (let i = 1; i <= n; i++) {
+      MP.toast(`Adding PDF page ${i} of ${n}…`);
+      const pg = await doc.getPage(i), vp0 = pg.getViewport({ scale: 1 }), sc = Math.min(2.5, 1240 / vp0.width), vp = pg.getViewport({ scale: sc });
+      const c = document.createElement("canvas"); c.width = Math.round(vp.width); c.height = Math.round(vp.height); const cx = c.getContext("2d"); cx.fillStyle = "#fff"; cx.fillRect(0, 0, c.width, c.height);
+      await pg.render({ canvasContext: cx, viewport: vp }).promise;
+      const r = await storeData({ url: c.toDataURL("image/jpeg", 0.82), mime: "image/jpeg", ar: c.height / c.width }, `${f.name} p${i}`, false);
+      pages.push({ bgim: r.id, bgfit: "contain", pdf: String(f.name || "PDF").slice(0, 60) + " · page " + i });
+    }
+    MP.diaryAddPages(pages); MP.dSel = false; MP.inputMode = "pen"; MP.render(); MP.toast(`Added ${n} page${n === 1 ? "" : "s"}. Write on them with the pen.`); pump();
   }
   let pumping = false;
   async function pump() {
@@ -119,22 +142,76 @@
     if (o.k === "frame") return `<div class="dob frame" data-ob="${o.id}" style="${box(o)}"><span>📷 Add photo</span></div>`;
     if (o.k === "sticker") return `<div class="dob sticker" data-ob="${o.id}" style="${box(o)}">${o.im ? `<img data-im="${E(o.im)}" alt="" draggable="false" style="width:100%;height:100%;object-fit:contain">` : stickerSVG(o.s)}</div>`;
     if (o.k === "text") return `<div class="dob textb" data-ob="${o.id}" style="${box(o)};background:${o.bg || "transparent"};${o.bc ? `border:2px solid ${o.bc};` : ""}"><div class="otx" style="font-family:'${E(o.font || "Caveat")}',cursive;font-size:${(o.sz || 4.4)}cqw;color:${o.tc || "var(--ink)"}">${o.html || ""}</div></div>`;
+    if (o.k === "diagram") return diagHTML(o);
     if (o.k === "shape") { const s = SH[o.sh] || SH.rect, sw = (o.sw ?? 3) / 6; return `<div class="dob shape" data-ob="${o.id}" style="${box(o)}"><svg viewBox="0 0 100 100" preserveAspectRatio="none"><path d="${s.d}" fill="${o.f || "none"}" stroke="${o.sc || "#333"}" stroke-width="${o.sw ?? 3}" vector-effect="non-scaling-stroke" fill-rule="evenodd"/>${s.x ? `<path d="${s.x}" fill="none" stroke="${o.sc || "#333"}" stroke-width="${o.sw ?? 3}" vector-effect="non-scaling-stroke"/>` : ""}</svg><div class="otx" style="color:${o.tc || "#222"};font-family:'${E(o.font || "Manrope")}',sans-serif">${o.html || ""}</div></div>`; }
     return "";
   }
   const linesSVG = (objs, sel) => `<svg class="dlines" viewBox="0 0 100 ${RATIO * 100}" preserveAspectRatio="none"><defs><marker id="dah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="context-stroke"/></marker></defs>${objs.filter((o) => o.k === "line").map((o) => { const d = linePath(o, objs), sw = (o.sw ?? 3) / 6; return `<path d="${d}" fill="none" stroke="${o.sc || "#333"}" stroke-width="${sw}" ${o.a1 ? 'marker-start="url(#dah)"' : ""} ${o.a2 ? 'marker-end="url(#dah)"' : ""} stroke-linejoin="round" stroke-linecap="round"/><path d="${d}" class="lhit" data-ob="${o.id}" fill="none" stroke="transparent" stroke-width="${Math.max(3, sw * 3)}"/>`; }).join("")}</svg>`;
   function selHTML(o, objs) {
     if (o.k === "line") { const a = anchor(objs, o.p1), b = anchor(objs, o.p2); return `<div class="dhd end" data-h="p1" style="left:${a.x * 100}cqw;top:${a.y * 100}cqw"></div><div class="dhd end" data-h="p2" style="left:${b.x * 100}cqw;top:${b.y * 100}cqw"></div>`; }
-    return `<div class="dselb" style="${box(o)};z-index:999">${["nw", "ne", "se", "sw"].map((h) => `<div class="dhd c ${h}" data-h="${h}"></div>`).join("")}${o.k === "shape" || o.k === "text" || o.k === "frame" ? ["n", "e", "s", "w"].map((h) => `<div class="dhd m ${h}" data-h="${h}"></div>`).join("") : ""}<div class="dhd rot" data-h="rot" title="Drag to rotate">⟳</div></div>`;
+    return `<div class="dselb" style="${box(o)};z-index:999">${["nw", "ne", "se", "sw"].map((h) => `<div class="dhd c ${h}" data-h="${h}"></div>`).join("")}${o.k === "shape" || o.k === "text" || o.k === "frame" || o.k === "diagram" ? ["n", "e", "s", "w"].map((h) => `<div class="dhd m ${h}" data-h="${h}"></div>`).join("") : ""}<div class="dhd rot" data-h="rot" title="Drag to rotate">⟳</div></div>`;
   }
   let SEL = null; /* {pid, id} */
   const objsOf = (pid) => { const p = PS()[pid]; if (!p) return []; if (!Array.isArray(p.obj)) p.obj = []; return p.obj; };
   function renderLayer(pid) {
     const L = document.querySelector(`[data-dobjs="${CSS.escape(pid)}"]`); if (!L) return; const p = PS()[pid], objs = objsOf(pid);
     const s = SEL && SEL.pid === pid ? objs.find((o) => o.id === SEL.id) : null;
-    L.innerHTML = (p.bgim ? `<div class="obg" data-bgim="${E(p.bgim)}" style="opacity:${p.bgo ?? 1}"></div>` : "") + objs.filter((o) => o.k !== "line").sort((a, b) => (a.z || 0) - (b.z || 0)).map(objHTML).join("") + linesSVG(objs) + (s ? selHTML(s, objs) : "");
-    fillImgs(L); const bg = L.querySelector(".obg"); if (bg) fillBg(bg, p.bgim);
+    const BG = document.querySelector(`[data-dbgim="${CSS.escape(pid)}"]`); if (BG) { BG.innerHTML = p.bgim ? `<div class="obg" style="opacity:${p.bgo ?? 1};${p.bgfit === "contain" ? "background-size:contain;background-color:#fff" : ""}"></div>` : ""; const bg = BG.firstChild; if (bg) fillBg(bg, p.bgim); }
+    L.innerHTML = objs.filter((o) => o.k !== "line").sort((a, b) => (a.z || 0) - (b.z || 0)).map(objHTML).join("") + linesSVG(objs) + (s ? selHTML(s, objs) : "");
+    fillImgs(L);
   }
+
+
+  /* ---------- ready-made diagrams (like Word's SmartArt): tap a box to pick it, double-tap to type, + to add ---------- */
+  const PAL = [["#5B8DEF", "#EAF1FF", "#1F3B73"], ["#2F9E6E", "#E6F6EE", "#14513A"], ["#E8574F", "#FDECEA", "#6B2416"], ["#9B7BE0", "#F1ECFC", "#3A2A6B"], ["#E0A100", "#FFF6DA", "#5A3A00"], ["#2B2622", "#F2EFE8", "#2B2622"]];
+  const DG = {
+    flow: ["Flowchart", () => [["Start"], ["Step 1"], ["Ready?", "", 1], ["Step 2"], ["End"]], [0.42, 0.9]],
+    process: ["Process flow", () => [["Plan"], ["Do"], ["Check"], ["Act"]], [0.84, 0.16]],
+    mind: ["Mind map", () => [["Main idea"], ["Idea 1", 0], ["Idea 2", 0], ["Idea 3", 0], ["Idea 4", 0]], [0.84, 0.6]],
+    cycle: ["Cycle", () => [["Step 1"], ["Step 2"], ["Step 3"], ["Step 4"]], [0.62, 0.62]],
+    tree: ["Hierarchy", () => [["Top"], ["Team A", 0], ["Team B", 0], ["Team C", 0], ["A1", 1], ["A2", 1]], [0.84, 0.5]],
+    time: ["Timeline", () => [["Jan"], ["Mar"], ["Jun"], ["Sep"], ["Dec"]], [0.84, 0.26]],
+    venn: ["Venn", () => [["A"], ["B"], ["Both"]], [0.7, 0.44]],
+    pyr: ["Pyramid", () => [["Top"], ["Middle"], ["Base"]], [0.6, 0.5]]
+  };
+  MP.diaryDiagrams = DG;
+  const newDiagram = (dt) => { const ids = []; const n = DG[dt][1]().map((r, i) => { const id = "n" + Math.random().toString(36).slice(2, 7); ids.push(id); return { id, t: r[0], p: r[1] != null && r[1] !== "" ? null : null, pi: r[1], d: r[2] ? 1 : 0 }; }); n.forEach((x) => { x.p = typeof x.pi === "number" ? ids[x.pi] : null; delete x.pi; }); return n; };
+  /* layouts return boxes {id,x,y,w,h,shape} and lines in a 100×100 box */
+  const kids = (n, id) => n.filter((x) => x.p === id);
+  function layout(o) {
+    const n = o.n || [], B = [], L = [], A = o.w / o.h; /* A: box width/height, to keep circles round */
+    if (o.dt === "flow") { const k = n.length, gap = 100 / k; n.forEach((x, i) => { const h = gap * 0.62, w = x.d ? 46 : 70; B.push({ id: x.id, x: 50 - w / 2, y: i * gap + (gap - h) / 2, w, h, s: x.d ? "dia" : i === 0 || i === k - 1 ? "pill" : "rect" }); if (i) L.push([50, i * gap - (gap - h) / 2 + 0.5, 50, i * gap + (gap - h) / 2 - 0.5, 1]); }); }
+    if (o.dt === "process") { const k = n.length, w = 100 / k; n.forEach((x, i) => B.push({ id: x.id, x: i * w, y: 8, w: w + 2, h: 84, s: i === 0 ? "home" : "chev" })); }
+    if (o.dt === "cycle") { const k = n.length, R = 36, bw = Math.min(34, 90 / Math.max(3, k) * 1.4), bh = bw * A * 0.5; n.forEach((x, i) => { const a = -Math.PI / 2 + (i * 2 * Math.PI) / k; B.push({ id: x.id, x: 50 + R * Math.cos(a) - bw / 2, y: 50 + R * Math.sin(a) * 1 - bh / 2, w: bw, h: bh, s: "pill" }); const a1 = a + 0.42, a2 = a + (2 * Math.PI) / k - 0.42; L.push([50 + R * Math.cos(a1), 50 + R * Math.sin(a1), 50 + R * Math.cos(a2), 50 + R * Math.sin(a2), 1, "arc", R]); }); }
+    if (o.dt === "mind") { const root = n.find((x) => !x.p) || n[0], ch = kids(n, root.id), rw = 26, rh = 22; B.push({ id: root.id, x: 50 - rw / 2, y: 50 - rh / 2, w: rw, h: rh, s: "oval", main: 1 });
+      ch.forEach((c, i) => { const a = -Math.PI / 2 + (i * 2 * Math.PI) / Math.max(1, ch.length), cx = 50 + 31 * Math.cos(a), cy = 50 + 34 * Math.sin(a), bw = 20, bh = 13; B.push({ id: c.id, x: cx - bw / 2, y: cy - bh / 2, w: bw, h: bh, s: "pill" }); L.push([50, 50, cx, cy, 0]);
+        kids(n, c.id).forEach((g, j, arr) => { const b = a + (j - (arr.length - 1) / 2) * 0.42, gx = 50 + 46 * Math.cos(b), gy = 50 + 45 * Math.sin(b), gw = 15, gh = 9; B.push({ id: g.id, x: gx - gw / 2, y: gy - gh / 2, w: gw, h: gh, s: "line" }); L.push([cx, cy, gx, gy, 0]); }); }); }
+    if (o.dt === "tree") { const root = n.find((x) => !x.p) || n[0], lv = []; const leaves = (id) => { const k = kids(n, id); return k.length ? k.reduce((s, c) => s + leaves(c.id), 0) : 1; }; const total = leaves(root.id), depth = (id, d = 0) => Math.max(d, ...kids(n, id).map((c) => depth(c.id, d + 1))); const D = depth(root.id) + 1, rowH = 100 / D;
+      const place = (id, d, x0) => { const span = leaves(id) / total * 100, cx = x0 + span / 2, bw = Math.min(26, 100 / total * 0.86 * Math.max(1, leaves(id) > 1 ? 1.4 : 1)), bh = rowH * 0.55; B.push({ id, x: cx - bw / 2, y: d * rowH + (rowH - bh) / 2, w: bw, h: bh, s: "rect", main: d === 0 }); let x = x0; kids(n, id).forEach((c) => { const cs = leaves(c.id) / total * 100, ccx = x + cs / 2, y1 = d * rowH + (rowH + bh) / 2, y2 = (d + 1) * rowH + (rowH - bh) / 2, ym = (y1 + y2) / 2; L.push([cx, y1, cx, ym, 0], [cx, ym, ccx, ym, 0], [ccx, ym, ccx, y2, 0]); place(c.id, d + 1, x); x += cs; }); };
+      place(root.id, 0, 0); }
+    if (o.dt === "time") { const k = n.length; L.push([2, 50, 98, 50, 1]); n.forEach((x, i) => { const cx = 8 + (i * 84) / Math.max(1, k - 1), up = i % 2 === 0; B.push({ id: x.id, x: cx - 9, y: up ? 6 : 60, w: 18, h: 34, s: "rect" }); B.push({ dot: 1, x: cx - 2, y: 50 - 2 * A / 1, w: 4, h: 4 * A, s: "oval" }); L.push([cx, up ? 40 : 60, cx, 50, 0]); }); }
+    if (o.dt === "venn") { const k = Math.min(3, Math.max(2, n.length - 1)), r = 30 / Math.max(1, A) * 1.0; const cs = k === 2 ? [[34, 50], [66, 50]] : [[38, 38], [62, 38], [50, 62]]; n.slice(0, k).forEach((x, i) => { const [cx, cy] = cs[i], rw = k === 2 ? Math.min(30, 46 / A) : Math.min(24, 34 / A), rh = rw * A; B.push({ id: x.id, x: cx - rw, y: cy - rh, w: rw * 2, h: rh * 2, s: "circ", lab: k === 2 ? [i ? 78 : 22, 50] : null }); }); const c = n[k]; if (c) B.push({ id: c.id, x: 40, y: (k === 2 ? 50 : 46) - 6, w: 20, h: 12, s: "none" }); }
+    if (o.dt === "pyr") { const k = n.length; n.forEach((x, i) => { const y0 = (i * 100) / k, y1 = ((i + 1) * 100) / k; B.push({ id: x.id, x: 0, y: y0, w: 100, h: y1 - y0, s: "slice", a: [50 - (y0 / 100) * 50, 50 + (y0 / 100) * 50, 50 + (y1 / 100) * 50, 50 - (y1 / 100) * 50] }); }); }
+    return { B, L };
+  }
+  function diagHTML(o) {
+    const { B, L } = layout(o), pal = PAL[o.pal || 0], dsn = DSN && DSN.oid === o.id ? DSN.nid : null, n = o.n || [], fz = Math.max(1.6, Math.min(4.2, o.w * 100 * 0.045));
+    const shp = (b, i) => { const sel = b.id === dsn ? ` stroke="#3C7BD9" stroke-width="3"` : ` stroke="${pal[0]}" stroke-width="1.6"`, fill = b.main ? pal[0] : pal[1], ve = ' vector-effect="non-scaling-stroke"';
+      if (b.s === "rect") return `<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" rx="1.5" fill="${fill}"${sel}${ve}/>`;
+      if (b.s === "pill") return `<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" rx="${Math.min(b.w, b.h) / 2}" ry="${b.h / 2}" fill="${fill}"${sel}${ve}/>`;
+      if (b.s === "dia") return `<path d="M${b.x + b.w / 2} ${b.y}L${b.x + b.w} ${b.y + b.h / 2}L${b.x + b.w / 2} ${b.y + b.h}L${b.x} ${b.y + b.h / 2}Z" fill="${pal[1]}"${sel}${ve}/>`;
+      if (b.s === "oval") return `<ellipse cx="${b.x + b.w / 2}" cy="${b.y + b.h / 2}" rx="${b.w / 2}" ry="${b.h / 2}" fill="${b.dot ? pal[0] : fill}"${b.dot ? "" : sel}${ve}/>`;
+      if (b.s === "circ") return `<ellipse cx="${b.x + b.w / 2}" cy="${b.y + b.h / 2}" rx="${b.w / 2}" ry="${b.h / 2}" fill="${PAL[(+(o.pal || 0) + i) % PAL.length][0]}" fill-opacity=".35"${sel}${ve}/>`;
+      if (b.s === "chev" || b.s === "home") { const t = Math.min(b.w * 0.28, 8), p = b.s === "home" ? `M${b.x} ${b.y}` : `M${b.x} ${b.y}L${b.x + t} ${b.y + b.h / 2}`; return `<path d="${b.s === "home" ? `M${b.x} ${b.y}H${b.x + b.w - t}L${b.x + b.w} ${b.y + b.h / 2}L${b.x + b.w - t} ${b.y + b.h}H${b.x}Z` : `M${b.x} ${b.y}H${b.x + b.w - t}L${b.x + b.w} ${b.y + b.h / 2}L${b.x + b.w - t} ${b.y + b.h}H${b.x}L${b.x + t} ${b.y + b.h / 2}Z`}" fill="${PAL[(+(o.pal || 0) + i) % PAL.length][0]}"${sel}${ve}/>`; }
+      if (b.s === "slice") { const [a, c, d, e] = b.a; return `<path d="M${a} ${b.y}H${c}L${d} ${b.y + b.h}H${e}Z" fill="${PAL[(+(o.pal || 0) + i) % PAL.length][0]}" stroke="#fff" stroke-width="2"${ve}/>`; }
+      if (b.s === "line") return `<line x1="${b.x}" y1="${b.y + b.h}" x2="${b.x + b.w}" y2="${b.y + b.h}" stroke="${b.id === dsn ? "#3C7BD9" : pal[0]}" stroke-width="2"${ve}/>`;
+      return ""; };
+    const lines = L.map(([x1, y1, x2, y2, ar, kind, R]) => kind === "arc" ? `<path d="M${x1} ${y1}A${R} ${R} 0 0 1 ${x2} ${y2}" fill="none" stroke="${pal[0]}" stroke-width="2" vector-effect="non-scaling-stroke" marker-end="url(#dgah)"/>` : `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${pal[0]}" stroke-width="2" vector-effect="non-scaling-stroke" ${ar ? 'marker-end="url(#dgah)"' : ""}/>`).join("");
+    const light = (b) => b.main || b.s === "chev" || b.s === "home" || b.s === "slice";
+    const txt = B.filter((b) => b.id).map((b) => { const x = n.find((y) => y.id === b.id); if (!x) return ""; const lb = b.lab, bx = lb ? { x: lb[0] - 14, y: lb[1] - 8, w: 28, h: 16 } : b.s === "line" ? { x: b.x, y: b.y - 2, w: b.w, h: b.h } : b.s === "dia" ? { x: b.x + b.w * 0.18, y: b.y + b.h * 0.2, w: b.w * 0.64, h: b.h * 0.6 } : b.s === "chev" ? { x: b.x + 6, y: b.y, w: b.w - 10, h: b.h } : b; return `<div class="dn" data-dn="${E(x.id)}" style="left:${bx.x}%;top:${bx.y}%;width:${bx.w}%;height:${bx.h}%;color:${light(b) ? "#fff" : pal[2]};font-size:${fz * (b.main ? 1.15 : b.s === "line" ? 0.85 : 1)}cqw"><div class="dnt">${E(x.t)}</div></div>`; }).join("");
+    return `<div class="dob diag" data-ob="${o.id}" style="${box(o)}"><svg viewBox="0 0 100 100" preserveAspectRatio="none"><defs><marker id="dgah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="${pal[0]}"/></marker></defs>${lines}${B.map(shp).join("")}</svg>${txt}</div>`;
+  }
+  let DSN = null; /* the box picked inside a diagram: {oid, nid} */
 
   /* ---------- moving, resizing, rotating ---------- */
   const hist = {};
@@ -153,6 +230,7 @@
     const o = objs.find((x) => x.id === hit.dataset.ob); if (!o) return;
     if (o.k === "text" && hit.querySelector(".otx[contenteditable]") && e.target.closest(".otx")) return; /* editing text: let the cursor work */
     const was = SEL && SEL.id === o.id; SEL = { pid, id: o.id }; snap(pid);
+    const dn = e.target.closest("[data-dn]"); if (o.k === "diagram") { const nid = dn ? dn.dataset.dn : null; if (!DSN || DSN.oid !== o.id || DSN.nid !== nid) { DSN = { oid: o.id, nid }; drag = { pid, o, mode: "move", p0, o0: JSON.parse(JSON.stringify(o)), pg, moved: false, was: true }; e.preventDefault(); L.setPointerCapture(e.pointerId); renderLayer(pid); tools(); return; } }
     drag = { pid, o, mode: "move", p0, o0: JSON.parse(JSON.stringify(o)), pg, moved: false, was }; e.preventDefault(); L.setPointerCapture(e.pointerId);
     if (!was) { renderLayer(pid); tools(); }
   });
@@ -187,8 +265,14 @@
   document.addEventListener("dblclick", (e) => {
     const hit = e.target.closest && e.target.closest(".selecting .dobjs [data-ob]"); if (!hit) return; const pid = hit.closest("[data-dobjs]").dataset.dobjs, o = objsOf(pid).find((x) => x.id === hit.dataset.ob); if (!o) return;
     if (o.k === "text" || o.k === "shape") editText(pid, o, hit);
+    if (o.k === "diagram") { const dn = e.target.closest("[data-dn]"); if (dn) editNode(pid, o, dn); }
     if (o.k === "photo") cropDlg(pid, o.id);
   });
+  function editNode(pid, o, el) {
+    const t = el.querySelector(".dnt"), x = (o.n || []).find((y) => y.id === el.dataset.dn); if (!t || !x) return; t.setAttribute("contenteditable", "true"); t.focus(); const s = window.getSelection(); s.selectAllChildren(t);
+    t.addEventListener("keydown", (ev) => { if (ev.key === "Enter") { ev.preventDefault(); t.blur(); } });
+    t.addEventListener("blur", () => { x.t = (t.textContent || "").trim().slice(0, 120) || "…"; save(pid); renderLayer(pid); }, { once: true });
+  }
   function editText(pid, o, el) {
     const t = el.querySelector(".otx"); t.setAttribute("contenteditable", "true"); t.focus(); const s = window.getSelection(); s.selectAllChildren(t); s.collapseToEnd();
     t.addEventListener("blur", () => { o.html = MP.diaryClean(t.innerHTML); t.removeAttribute("contenteditable"); save(pid); }, { once: true });
@@ -217,13 +301,14 @@
   const colIn = (a, v, l, sw) => `<label class="tool" title="${l}" style="position:relative">${sw}<input type="color" data-ob-${a} value="${v && v.startsWith("#") ? v : "#333333"}" class="overlay-input" aria-label="${l}"></label>`;
   function toolsHTML() {
     const o = selObj();
-    let h = `<span class="dins">${cbtn("photo", "🖼", "Photo from gallery")}${cbtn("camera", "📷", "Take a photo")}${cbtn("stk", "★", "Stickers")}${cbtn("shp", "◇", "Shapes, lines and arrows")}${cbtn("txt", "T", "Text box")}${cbtn("imp", "⇪", "Import a picture or design")}${cbtn("web", "🔎", "Find designs online")}${cbtn("undo", MP.ic("undo", 18), "Undo")}</span>`;
+    let h = `<span class="dins">${cbtn("photo", "🖼", "Photo from gallery")}${cbtn("camera", "📷", "Take a photo")}${cbtn("stk", "★", "Stickers")}${cbtn("shp", "◇", "Shapes, lines and arrows")}${cbtn("txt", "T", "Text box")}${cbtn("imp", "⇪", "Import a picture or design")}${cbtn("web", "🔎", "Find designs online")}${cbtn("pdf", "📄", "Add a PDF as pages to write on")}${cbtn("undo", MP.ic("undo", 18), "Undo")}</span>`;
     if (!o) return h + `<span class="tiny muted" style="margin-left:6px">Tap an item to move, resize or rotate it</span>`;
     h += `<span class="vsep"></span>`;
     if (o.k === "photo") h += cbtn("crop", "✂ Crop", "Crop") + cbtn("replace", "Replace", "Replace photo") + cbtn("polar", o.pf ? "▢ Border on" : "▢ Border", "White photo border");
     if (o.k === "frame") h += cbtn("fill", "📷 Add photo", "Put a photo in this frame");
     if (o.k === "shape") h += colIn("fill", o.f, "Fill colour", `<span class="cdot" style="background:${o.f || "transparent"}"></span>`) + cbtn("nofill", "∅", "No fill") + colIn("stroke", o.sc, "Outline colour", `<span class="cdot ring" style="border-color:${o.sc || "#333"}"></span>`) + `<select class="f sm" data-ob-sw aria-label="Outline width">${[0, 1, 2, 3, 5, 8].map((n) => `<option value="${n}" ${(o.sw ?? 3) == n ? "selected" : ""}>${n ? n + " pt" : "No outline"}</option>`).join("")}</select>` + colIn("tc", o.tc, "Text colour", "A") + cbtn("edit", "✎ Text", "Type in the shape");
     if (o.k === "text") h += `<select class="f sm" data-ob-font aria-label="Font">${["Caveat", "Kalam", "Patrick Hand", "Dancing Script", "Fraunces", "Playfair Display", "Poppins", "Inter"].map((f) => `<option ${o.font === f ? "selected" : ""}>${f}</option>`).join("")}</select>` + cbtn("smaller", "A−", "Smaller") + cbtn("bigger", "A+", "Bigger") + colIn("tc", o.tc, "Text colour", "A") + colIn("bg", o.bg, "Box colour", `<span class="cdot" style="background:${o.bg || "transparent"}"></span>`) + cbtn("nobg", "∅", "No box colour") + cbtn("border", "▭", "Border on/off") + cbtn("edit", "✎ Edit", "Edit text");
+    if (o.k === "diagram") { const tr = o.dt === "mind" || o.dt === "tree"; h += cbtn("dadd", tr ? "+ Branch" : "+ Add", tr ? "Add a branch under the picked box" : "Add a box after the picked one") + (tr ? cbtn("dsib", "+ Same level", "Add a box next to the picked one") : "") + cbtn("drm", "− Remove", "Remove the picked box") + (o.dt === "flow" ? cbtn("ddec", "◇ Decision", "Make the picked box a decision") : "") + cbtn("dedit", "✎ Text", "Type in the picked box") + cbtn("dpal", "🎨 Colours", "Change colours") + `<span class="tiny muted">${DSN && DSN.oid === o.id && DSN.nid ? "Box picked" : "Tap a box to pick it"}</span>`; }
     if (o.k === "line") h += colIn("stroke", o.sc, "Line colour", `<span class="cdot ring" style="border-color:${o.sc || "#333"}"></span>`) + `<select class="f sm" data-ob-sw aria-label="Line width">${[1, 2, 3, 5, 8].map((n) => `<option value="${n}" ${(o.sw ?? 3) == n ? "selected" : ""}>${n} pt</option>`).join("")}</select>` + `<select class="f sm" data-ob-lt aria-label="Line type">${[["s", "Straight"], ["e", "Elbow"], ["c", "Curved"]].map(([k, n]) => `<option value="${k}" ${o.t === k ? "selected" : ""}>${n}</option>`).join("")}</select>` + cbtn("a1", "◀", "Arrow at start", o.a1 ? 'style="background:var(--soft)"' : "") + cbtn("a2", "▶", "Arrow at end", o.a2 ? 'style="background:var(--soft)"' : "");
     if (o.k !== "line") h += `<span class="tiny muted">${Math.round(o.r || 0)}°</span>` + cbtn("rot0", "0°", "Straighten");
     return h + cbtn("fwd", "⬆", "Bring forward") + cbtn("back", "⬇", "Send backward") + cbtn("dup", "⧉", "Duplicate") + cbtn("del", "🗑", "Delete");
@@ -244,6 +329,7 @@
       case "txt": { const o2 = add(Object.assign({ k: "text", html: "", font: "Caveat", sz: 4.4 }, centred(0.5, 0.11))); if (o2) setTimeout(() => { const el = document.querySelector(`[data-ob="${o2.id}"]`); if (el) editText(SEL.pid, o2, el); }, 50); return; }
       case "imp": return importDlg();
       case "web": return webDlg();
+      case "pdf": return addPdf();
       case "undo": { const p2 = target(), h = hist[p2]; if (!h || !h.length) return MP.toast("Nothing to undo"); const s = JSON.parse(h.pop()); PS()[p2].obj = s.obj; PS()[p2].bgim = s.bgim; SEL = null; save(p2); renderLayer(p2); return tools(); }
     }
     if (!o) return;
@@ -260,6 +346,18 @@
       case "smaller": o.sz = Math.max(2, (o.sz || 4.4) - 0.6); return done();
       case "bigger": o.sz = Math.min(14, (o.sz || 4.4) + 0.6); return done();
       case "edit": { hist[pid].pop(); const el = document.querySelector(`[data-ob="${o.id}"]`); if (el) editText(pid, o, el); return; }
+      case "dadd": case "dsib": {
+        const n = o.n, cur2 = DSN && DSN.oid === o.id && n.find((x) => x.id === DSN.nid), id = "n" + Math.random().toString(36).slice(2, 7), tr = o.dt === "mind" || o.dt === "tree";
+        if (o.dt === "venn" && n.length >= 4) { hist[pid].pop(); return MP.toast("A Venn diagram has up to three circles"); }
+        if (tr) { const root = n.find((x) => !x.p); const par = act === "dsib" ? (cur2 && cur2.p) || root.id : cur2 ? cur2.id : root.id; n.push({ id, t: "New", p: par }); }
+        else if (o.dt === "venn") n.splice(n.length - 1, 0, { id, t: "C", p: null });
+        else { const at = cur2 ? n.indexOf(cur2) + 1 : n.length - (o.dt === "flow" ? 1 : 0); n.splice(at, 0, { id, t: o.dt === "time" ? "Date" : "Step", p: null }); if (o.dt === "flow" || o.dt === "pyr") o.h = Math.min(RATIO - o.y - 0.02, o.h + (o.dt === "flow" ? 0.1 : 0.06)); }
+        DSN = { oid: o.id, nid: id }; done(); setTimeout(() => { const el = document.querySelector(`[data-ob="${o.id}"] [data-dn="${id}"]`); if (el) editNode(pid, o, el); }, 30); return;
+      }
+      case "drm": { const n = o.n, cur2 = DSN && DSN.oid === o.id && n.find((x) => x.id === DSN.nid); if (!cur2) { hist[pid].pop(); return MP.toast("Tap a box first"); } if (!cur2.p && (o.dt === "mind" || o.dt === "tree")) { hist[pid].pop(); return MP.toast("The main box stays. Delete the whole diagram with 🗑"); } if (n.length <= 2) { hist[pid].pop(); return MP.toast("A diagram needs at least two boxes"); } const gone = new Set([cur2.id]); let grew = true; while (grew) { grew = false; n.forEach((x) => { if (x.p && gone.has(x.p) && !gone.has(x.id)) { gone.add(x.id); grew = true; } }); } o.n = n.filter((x) => !gone.has(x.id)); DSN = null; return done(); }
+      case "ddec": { const cur2 = DSN && DSN.oid === o.id && o.n.find((x) => x.id === DSN.nid); if (!cur2) { hist[pid].pop(); return MP.toast("Tap a box first"); } cur2.d = cur2.d ? 0 : 1; return done(); }
+      case "dedit": { hist[pid].pop(); const el = DSN && document.querySelector(`[data-ob="${o.id}"] [data-dn="${DSN.nid}"]`); if (!el) return MP.toast("Tap a box first"); return editNode(pid, o, el); }
+      case "dpal": o.pal = ((o.pal || 0) + 1) % PAL.length; return done();
       case "a1": o.a1 = o.a1 ? 0 : 1; return done();
       case "a2": o.a2 = o.a2 ? 0 : 1; return done();
       case "rot0": o.r = 0; return done();
@@ -284,6 +382,7 @@
   document.addEventListener("keydown", (e) => { if (!SEL || !document.querySelector(".selecting") || /INPUT|TEXTAREA|SELECT/.test(e.target.tagName) || e.target.isContentEditable) return; if (e.key === "Delete" || e.key === "Backspace") { e.preventDefault(); const b = document.querySelector("[data-ob-del]"); if (b) b.click(); } });
 
   /* ---------- dialogs ---------- */
+  const dgThumb = (k) => { const [w, h] = DG[k][2]; return `<div style="position:relative;container-type:inline-size;height:66px;max-width:100%;aspect-ratio:${w}/${h}">${diagHTML({ id: "t", dt: k, n: newDiagram(k), pal: 0, x: 0, y: 0, w: 1, h: h / w, r: 0, z: 0 }).replace('class="dob diag"', 'class="dob diag thumb"')}</div>`; };
   function stickerDlg() {
     const mine = Object.entries(IMS()).filter(([, m]) => m.lib && !m.del);
     MP.modal(`<div class="between"><h2>Stickers</h2><button class="tool" data-close aria-label="Close">✕</button></div>
@@ -295,8 +394,8 @@
   function shapeDlg() {
     MP.modal(`<div class="between"><h2>Shapes</h2><button class="tool" data-close aria-label="Close">✕</button></div>
       <svg width="0" height="0" style="position:absolute"><defs><marker id="dah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="4" markerHeight="4" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="currentColor"/></marker></defs></svg>
-      <div class="dshp">${Object.entries(SHAPES).map(([cat, l]) => `<div class="small mt"><b>${cat}</b></div><div class="dshpg">${l.map((s) => `<button class="dshpb" data-shp="${s[0]}" title="${E(s[1])}" aria-label="${E(s[1])}">${shapeThumb(s[0])}</button>`).join("")}</div>`).join("")}</div>
-      <p class="tiny muted mt">Double-tap a shape to type in it. Drag a line's end onto a shape and it stays attached when you move the shape. Ready-made diagrams (flowchart, mind map and more) come in the next update.</p>`);
+      <div class="dshp"><div class="small"><b>Diagrams</b> <span class="tiny muted">· tap a box to pick it, double-tap to type, + to add</span></div><div class="ddgg">${Object.entries(DG).map(([k, d]) => `<button class="ddgb" data-dgm="${k}" title="${E(d[0])}"><span class="ddgt">${dgThumb(k)}</span><span class="tiny">${E(d[0])}</span></button>`).join("")}</div>${Object.entries(SHAPES).map(([cat, l]) => `<div class="small mt"><b>${cat}</b></div><div class="dshpg">${l.map((s) => `<button class="dshpb" data-shp="${s[0]}" title="${E(s[1])}" aria-label="${E(s[1])}">${shapeThumb(s[0])}</button>`).join("")}</div>`).join("")}</div>
+      <p class="tiny muted mt">Double-tap a shape to type in it. Drag a line's end onto a shape and it stays attached when you move the shape.</p>`);
   }
   const TQ = { cognac: "vintage leather", kraft: "kraft paper", rose: "pink floral", botanical: "green botanical leaves", midnight: "night sky stars", ocean: "ocean watercolor", sunset: "sunset orange pink", lavender: "lavender purple", mango: "yellow summer", atlas: "vintage map", sakura: "cherry blossom", ivory: "minimal white", peacock: "peacock teal gold", marigold: "marigold diwali", monsoon: "rain blue", galaxy: "galaxy nebula", tropical: "tropical palm", coffee: "coffee brown cozy", luxe: "black and gold", rainbow: "pastel rainbow" };
   function webDlg() {
@@ -325,6 +424,7 @@
   }
   document.addEventListener("click", async (e) => {
     const b = e.target.closest && e.target.closest("button"); if (!b) return; const d = b.dataset;
+    if (d.dgm) { MP.closeModal(); const [w, h] = DG[d.dgm][2]; add(Object.assign({ k: "diagram", dt: d.dgm, n: newDiagram(d.dgm), pal: 0 }, centred(w, h))); return; }
     if (d.stk) { MP.closeModal(); add(Object.assign({ k: "sticker", s: d.stk }, centred(0.16, /^tape/.test(d.stk) ? 0.06 : 0.16))); return; }
     if (d.stkim) { MP.closeModal(); const ar = (IMS()[d.stkim] || {}).ar || 1; add(Object.assign({ k: "sticker", im: d.stkim }, centred(0.2, 0.2 * ar))); return; }
     if (d.shp) { MP.closeModal(); const L2 = LINEK[d.shp]; if (L2) { add({ k: "line", t: L2[0], a1: L2[1], a2: L2[2], p1: { x: 0.3, y: RATIO / 2 }, p2: { x: 0.7, y: RATIO / 2 - (L2[0] === "s" ? 0 : 0.12) }, sc: "#333333", sw: 3, x: 0, y: 0, w: 0, h: 0 }); return; } const sq = /oval|circle|^s\d|boom|sun|smiley|donut|nosym|pie|chord|fconn|fsum|for|fseq|heart|moon|plus|oct|hex|pent|hept|dec|dodec|cube|bolt|tear|aquad|acirc/.test(d.shp); add(Object.assign({ k: "shape", sh: d.shp, f: "#FFFFFF", sc: "#333333", sw: 3, html: "" }, centred(sq ? 0.26 : 0.34, sq ? 0.26 : 0.2))); return; }

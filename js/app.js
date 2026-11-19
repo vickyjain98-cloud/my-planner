@@ -879,6 +879,7 @@
   const jKey = (k, tpl, i) => (tpl === "free" ? "journal-" + k : `jr-${k}-${tpl}-${i}`);
   const hasEntry = (key) => { const t = MP.S.typed[key], n = MP.S.ink[key]; return (t && t.l && t.l.some(Boolean)) || (n && n.s && n.s.length); };
   V.diary = () => (MP.diaryView ? MP.diaryView() : "");
+  V.vault = () => (MP.vaultView ? MP.vaultView() : "");
   V.journal = () => {
     const k = view.jd || iso(today()), d = parseISO(k), tplId = view.jt || P().journalTpl || "grat", tpl = JT.find((x) => x[0] === tplId) || JT[1], n = Math.floor(d.getTime() / 864e5);
     const fields = tpl[3].map((f, i) => {
@@ -1216,7 +1217,7 @@
   const bioOK = () => !!(window.PublicKeyCredential && navigator.credentials);
   function lockHTML() {
     return `${head("Private", "Locked", "")}<section class="card stack" style="max-width:420px;margin:0 auto;align-items:center;text-align:center">${ic("lock", 28)}
-      <p class="small">Journal, Mood, 3-6-9 and History are locked.</p>
+      <p class="small">Journal, Diary, Mood, 3-6-9 and History are locked.</p>
       ${bioId() && bioOK() ? `<button class="btn" data-unbio>Unlock with fingerprint or face</button>` : ""}
       <div class="row" style="justify-content:center"><input class="f" type="password" inputmode="numeric" maxlength="6" id="pinin" placeholder="PIN" style="width:130px;text-align:center;letter-spacing:.3em" aria-label="PIN"><button class="btn ${bioId() ? "ghost" : ""}" data-unpin>Unlock</button></div>
       <button class="link tiny" data-pinforgot>Forgot your PIN?</button></section>`;
@@ -1268,7 +1269,7 @@
     route = r; try { history.replaceState(null, "", "#" + r); } catch (e) {}
     MP.render(); window.scrollTo(0, 0);
   }
-  MP.go = go;
+  MP.go = go; MP.route = () => route;
 
   /* ---------- saving & syncing ---------- */
   let saveT = null, syncT = null, syncing = false, again = false;
@@ -1894,7 +1895,7 @@
   document.addEventListener("pointercancel", () => { if (drag) { drag.el.remove(); drag = null; MP.render(); } });
 
   /* ---------- start-up ---------- */
-  MP.VERSION = "1.20";
+  MP.VERSION = "1.21";
   if (MP.sound) MP.sound.onchange = () => { miniPlayer(); if (route === "study") MP.render(); };
   /* Public, read-only helpers for future modules and connectors. */
   MP.api = { today, iso, dayPct, studyHours, streak, tasks, feed: () => MP.buildFeed(MP.S), version: MP.VERSION, schemaVersion: MP.SCHEMA_VERSION };

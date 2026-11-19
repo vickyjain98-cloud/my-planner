@@ -368,7 +368,9 @@ window.MP_HELP = [
 "Shapes: change the fill, outline colour and width; double-tap to type inside. Lines and arrows: drag an end onto the edge of a shape and it stays attached when you move the shape; choose straight, elbow or curved, and arrowheads at either end.",
 "Text boxes: double-tap to edit; change the font, size, colour, box colour and border.",
 "⬆ ⬇ bring an item forward or back, ⧉ duplicates, 🗑 deletes, and ↶ undoes. You can still write over photos with the pen.",
-"Import: a picture can become a photo, a sticker, or the page background. Everything you import is kept in My imports to reuse on any page."
+"Import: a picture can become a photo, a sticker, or the page background. Everything you import is kept in My imports to reuse on any page.",
+"Diagrams: ◇ opens Diagrams at the top: flowchart, process flow, mind map, cycle, hierarchy, timeline, Venn and pyramid. Tap a box to pick it and double-tap to type in it. + Add puts a new step after the picked box (+ Branch and + Same level for mind maps and hierarchies), − Remove deletes it, ◇ Decision turns a flowchart step into a decision, and 🎨 Colours changes the colour set. The whole diagram moves, resizes and rotates like any other item.",
+"PDFs: in ✥ mode tap 📄 and choose a PDF (up to 20 MB; the first 50 pages). Each page is added after the current one as a diary page you can write on with the pen, type over, or add stickers and shapes to."
 ]
 ],
 [
@@ -377,6 +379,7 @@ window.MP_HELP = [
 ],
 [
 "p",
+"Logins: the 🔐 Logins card on the Diary shelf keeps simple reminders of app and website logins (name, website, username, password, notes). It has its own PIN, hides passwords until you tap 👁, copies with ⧉, and locks after 2 minutes. It is NOT strongly encrypted, so don't keep bank, UPI, card or email passwords there. Forgot the PIN? Sign in with Google again to set a new one; your logins stay. The journal lock has the same Forgot your PIN? option.",
 "Once you have used the S Pen, fingers turn pages and the palm is ignored, so you can rest your hand while writing. Diaries are covered by the journal lock, are never sent to Buddy, and are not included in search or printing. Pages sync through your Google Drive (diary.json and the ink files)."
 ]
 ]

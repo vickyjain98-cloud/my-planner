@@ -179,6 +179,7 @@
     return `<div class="between wrap mb"><div><p class="eyebrow">Your notebooks</p><h1 class="title">Diary</h1></div><button class="btn" data-dnew>+ New diary</button></div>
       ${list.length ? `<div class="dshelf">${list.map(([id, d]) => coverHTML(Object.assign({ _id: id }, d), allPages(id).length)).join("")}</div>`
         : `<section class="card stack center" style="padding:36px"><div class="big">Start your first diary</div><p class="small muted">One for study, one for personal notes, one for creative ideas — name each one and choose its theme. Write with the S Pen, type, or speak.</p><button class="btn" data-dnew>+ New diary</button></section>`}
+      <button class="card vcard mt" data-go="vault"><span style="font-size:26px">🔐</span><span><b>Logins</b><br><span class="tiny muted">Website and app logins as reminders · its own PIN</span></span></button>
       <p class="tiny muted mt">Diaries are private like your Journal: covered by the journal lock, never shared with Buddy, and not included in search or printing.</p>`;
   }
   const penBar = () => { const pen = MP.pen; return `${MP.PENS.map((p) => `<button type="button" class="tool ${pen.type === p[0] && !pen.eraser ? "on" : ""}" data-pen="${p[0]}" title="${p[1]}" aria-label="${p[1]}">${MP.penSvg(p[0])}</button>`).join("")}<span class="vsep"></span>
@@ -201,7 +202,7 @@
     const chip = p.date ? `<button class="ddate ds-${E(p.ds || "chip")}" data-ddate="${E(id)}" style="--acc:${t[4]};--on:${isDark(t[4]) ? "#fff" : "#1B1F4B"}" title="Tap to change or remove the date">${fmtD(p.date, p.ds)}</button>` : "";
     const ask = p.ask && !p.date ? `<div class="dask noprint"><span>Add today's date to this page?</span><button class="btn sm" data-dask="yes|${E(id)}">Add date</button><button class="btn ghost sm" data-dask="no|${E(id)}">No</button><button class="link tiny" data-dask="always|${E(id)}">Always</button><button class="link tiny" data-dask="never|${E(id)}">Never ask</button></div>` : "";
     return `<div class="dpg ${MP.dSel ? "selecting" : MP.inputMode === "type" ? "typing" : "inking"}" data-dpg="${E(id)}" style="background:${bgOf(p.col, p.tex)};--ink:${ink};--acc:${t[4]}">
-      <svg class="dtpl" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">${tplSVG(p.tpl, p.col, t[4], id !== "preview")}</svg>${chip}${ask}
+      <div class="dbgim" data-dbgim="${E(id)}"></div><svg class="dtpl" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">${tplSVG(p.tpl, p.col, t[4], id !== "preview")}</svg>${chip}${ask}
       <div class="dtxt" data-dtxt="${E(id)}" ${MP.inputMode === "type" ? 'contenteditable="true"' : ""} spellcheck="true" style="font-family:'${E(d.font || "Caveat")}',cursive" aria-label="Typed text on page ${n}">${p.text || ""}</div>
       <div class="dobjs" data-dobjs="${E(id)}"></div><canvas class="dink" data-dink="${E(id)}" aria-label="Handwriting on page ${n}"></canvas><span class="dnum">${n}</span></div>`;
   }
@@ -416,6 +417,8 @@
   document.addEventListener("keydown", (e) => { if (!document.querySelector(".dstage") || document.getElementById("modal").classList.contains("on")) return; const t = e.target; if (t.isContentEditable || /INPUT|TEXTAREA|SELECT/.test(t.tagName)) return; if (e.key === "ArrowRight" || e.key === "ArrowLeft") { const btn = document.querySelector(`.dstage [data-dnav="${e.key === "ArrowRight" ? 1 : -1}"]`); if (btn && !btn.disabled) btn.click(); } });
 
   MP.diaryAfter = () => { document.querySelectorAll("canvas.dink").forEach(setupInk); if (MP.dobjAfter) MP.dobjAfter(); };
+  /* used by PDF import: add pages after the current one, then show the first */
+  MP.diaryAddPages = (list) => { const c = cur(); if (!c) return []; const base = c.pg.length ? (c.pg[ST.idx][1].o || 0) : 0, nx = c.pg[ST.idx + 1], step = nx ? ((nx[1].o || base + 1) - base) / (list.length + 1) : 1; const ids = list.map((x, i) => { const id = newPage(ST.did, ST.sid, { tpl: "blank", col: "#FFFFFF", tex: "smooth" }, base + step * (i + 1), false); Object.assign(PS()[id], x, { fr: 1 }); return id; }); MP.changed(); ST.idx = pagesOf(ST.did, ST.sid).findIndex((x) => x[0] === ids[0]); keep(); return ids; };
   MP.diaryCur = () => { const c = cur(); return c && c.pg.length ? c.pg[ST.idx][0] : null; };
   MP.diaryTheme = () => { const c = cur(); return c ? c.d.theme : null; };
   window.addEventListener("resize", () => { clearTimeout(window._mpDr); window._mpDr = setTimeout(() => document.querySelectorAll("canvas.dink").forEach((cv) => cv._size && cv._size()), 200); });

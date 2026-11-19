@@ -528,3 +528,19 @@ input[type=time]{cursor:pointer}
 .dcdel{position:absolute;top:8px;right:8px;width:36px;height:36px;border-radius:50%;border:0;background:rgba(255,255,255,.9);box-shadow:0 2px 6px rgba(0,0,0,.25);cursor:pointer;font-size:16px;z-index:2}
 .dcdel:hover{background:#fff;transform:scale(1.08)}
 .dbin summary{cursor:pointer;color:var(--muted)}
+
+/* ---------- Diary 1.24: page sizes + printing ---------- */
+.dszb{display:inline-flex;align-items:center;gap:6px}
+.dszb i{display:inline-block;height:18px;border:1.5px solid currentColor;border-radius:2px;opacity:.7}
+#dprint{display:none}
+@media print{
+ body.dprinting > :not(#dprint){display:none!important}
+ body.dprinting #dprint{display:block;position:static}
+ body.dprinting #dprint,body.dprinting #dprint *{visibility:visible}
+ body.dprinting{margin:0;padding:0;background:#fff}
+ .dprp{break-after:page;page-break-after:always;overflow:hidden;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+ .dprp:last-of-type{break-after:auto;page-break-after:auto}
+ .dprp .dpg{width:100%!important;max-width:none;height:100%;aspect-ratio:auto!important;border-radius:0;box-shadow:none;margin:0}
+ .dprp img.dink{position:absolute;inset:0;width:100%;height:100%;z-index:4;pointer-events:none}
+ .dprp .dnum{opacity:.35}
+}

@@ -5,7 +5,8 @@
 (function () {
   const MP = window.MP;
   const E = (s) => MP.esc(s), now = () => Date.now();
-  const PW = 600, PH = 846, RATIO = PH / PW;
+  const PW = 600, PH = 846; let RATIO = PH / PW; /* 1.24: set per page from its paper size */
+  const ratioFor = (pid) => (MP.diaryRatio ? MP.diaryRatio(pid) : PH / PW);
   const oid = () => "o" + Math.random().toString(36).slice(2, 9);
   const PS = () => MP.S.dpages;
 
@@ -158,7 +159,7 @@
   let SEL = null; /* {pid, id} */
   const objsOf = (pid) => { const p = PS()[pid]; if (!p) return []; if (!Array.isArray(p.obj)) p.obj = []; return p.obj; };
   function renderLayer(pid) {
-    const L = document.querySelector(`[data-dobjs="${CSS.escape(pid)}"]`); if (!L) return; const p = PS()[pid], objs = objsOf(pid);
+    const L = document.querySelector(`[data-dobjs="${CSS.escape(pid)}"]`); if (!L) return; RATIO = ratioFor(pid); const p = PS()[pid], objs = objsOf(pid);
     const s = SEL && SEL.pid === pid ? objs.find((o) => o.id === SEL.id) : null;
     const BG = document.querySelector(`[data-dbgim="${CSS.escape(pid)}"]`); if (BG) { BG.innerHTML = p.bgim ? `<div class="obg" style="opacity:${p.bgo ?? 1};${p.bgfit === "contain" ? "background-size:contain;background-color:#fff" : ""}"></div>` : ""; const bg = BG.firstChild; if (bg) fillBg(bg, p.bgim); }
     L.innerHTML = objs.filter((o) => o.k !== "line").sort((a, b) => (a.z || 0) - (b.z || 0)).map(objHTML).join("") + linesSVG(objs) + (s ? selHTML(s, objs) : "");
@@ -293,7 +294,7 @@
   const target = () => { const id = MP._dActive && document.querySelector(`[data-dobjs="${CSS.escape(MP._dActive)}"]`) ? MP._dActive : MP.diaryCur && MP.diaryCur(); return id; };
   const topZ = (pid) => Math.max(0, ...objsOf(pid).map((o) => o.z || 0)) + 1;
   function add(o) { const pid = target(); if (!pid) { MP.toast("Add a page first"); return null; } snap(pid); o.id = oid(); o.z = topZ(pid); o.r = o.r || 0; objsOf(pid).push(o); save(pid); SEL = { pid, id: o.id }; if (!MP.dSel) { MP.dSel = true; MP.render(); } else { renderLayer(pid); tools(); } return o; }
-  const centred = (w, h) => ({ x: 0.5 - w / 2, y: Math.min(RATIO - h - 0.04, Math.max(0.12, RATIO / 2 - h / 2)), w, h });
+  const centred = (w, h) => (RATIO = ratioFor(target()), { x: 0.5 - w / 2, y: Math.min(RATIO - h - 0.04, Math.max(0.12, RATIO / 2 - h / 2)), w, h });
   const pickFile = (accept, capture) => new Promise((ok) => { const i = document.createElement("input"); i.type = "file"; i.accept = accept; if (capture) i.setAttribute("capture", "environment"); i.onchange = () => ok(i.files && i.files[0]); i.click(); });
   async function addPhoto(capture, into) {
     const f = await pickFile("image/*", capture); if (!f) return;
@@ -535,5 +536,12 @@
     tools(); pump();
   };
   MP.dobjClear = () => { SEL = null; };
+  /* 1.24 printing: the page's items as plain HTML (no handles), plus a background holder */
+  MP.dobjStatic = (pid) => { RATIO = ratioFor(pid); const p = PS()[pid], objs = objsOf(pid); return { bg: p && p.bgim ? `<div class="obg" data-bgsrc="${E(p.bgim)}" style="opacity:${p.bgo ?? 1};${p.bgfit === "contain" ? "background-size:contain;background-color:#fff" : ""}"></div>` : "", objs: objs.filter((o) => o.k !== "line").sort((a, b) => (a.z || 0) - (b.z || 0)).map(objHTML).join("") + linesSVG(objs) }; };
+  MP.dobjFillAll = async (root) => {
+    const jobs = [...root.querySelectorAll("img[data-im]")].map(async (el) => { const u = await getImg(el.dataset.im); if (u) { el.src = u; if (!el.complete) await new Promise((ok) => { el.onload = el.onerror = ok; setTimeout(ok, 8000); }); } });
+    root.querySelectorAll("[data-bgsrc]").forEach((el) => jobs.push(getImg(el.dataset.bgsrc).then((u) => new Promise((ok) => { if (!u) return ok(); el.style.backgroundImage = `url("${u}")`; const im = new Image(); im.onload = im.onerror = ok; im.src = u; setTimeout(ok, 8000); }))));
+    await Promise.all(jobs);
+  };
   MP.dobjPump = pump;
 })();
